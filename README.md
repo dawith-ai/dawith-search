@@ -35,6 +35,14 @@ npm start
 
 `npm start`는 개발 모드 데스크톱 앱을 실행합니다. GitHub 저장소 자체는 웹 앱 주소가 아니라 소스 코드 주소입니다. 설치 파일은 [앱 다운로드(Releases)](https://github.com/dawith-ai/dawith-search/releases)에서 받습니다.
 
+### 현재 공개 앱 주소
+
+- [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest)
+- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest)
+
+릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서는 Everything이 설치되어 있으면 `es.exe` 네이티브 검색을 사용하고, 없으면 Dawith Search 로컬 색인으로 동작합니다.
+
 ## 공식 참고 주소
 
 - [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
@@ -52,7 +60,8 @@ npm audit --audit-level=high
 
 ```bash
 npm run build:win   # Windows portable EXE
-npm run build:mac   # macOS DMG + ZIP
+npm run build:win:arm64 # Windows ARM64 portable EXE
+npm run build:mac   # macOS universal DMG + ZIP (Apple Silicon + Intel)
 ```
 
 ## CLI

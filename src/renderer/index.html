@@ -121,6 +121,26 @@
     </footer>
   </div>
 
+  <!-- Command Palette Modal (Ctrl+K) -->
+  <div class="modal-overlay" id="cmdPaletteModal" style="display: none;">
+    <div class="cmd-palette-dialog">
+      <div class="cmd-input-wrapper">
+        <span class="cmd-icon">⌨️</span>
+        <input type="text" id="cmdPaletteInput" placeholder="명령어를 검색하세요 (예: 재색인, 모바일, 용량, 내보내기, AI)..." />
+      </div>
+      <div class="cmd-list" id="cmdPaletteList">
+        <div class="cmd-item" data-action="toggle-ai">✨ AI 자연어 검색 모드 토글</div>
+        <div class="cmd-item" data-action="open-remote">📱 모바일 원격 공유 (QR 코드)</div>
+        <div class="cmd-item" data-action="open-storage">📊 스토리지 용량 & 중복 파일 분석</div>
+        <div class="cmd-item" data-action="reindex">⚡ 전체 디스크 다시 색인 (Reindex)</div>
+        <div class="cmd-item" data-action="export-csv">💾 검색 결과 CSV로 내보내기</div>
+        <div class="cmd-item" data-action="export-efu">💾 검색 결과 Everything EFU로 내보내기</div>
+        <div class="cmd-item" data-action="open-settings">⚙️ 설정 열기</div>
+        <div class="cmd-item" data-action="open-syntax">❓ Everything 검색 문법 가이드</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Spacebar Quick Look Modal -->
   <div class="modal-overlay" id="quickLookModal" style="display: none;">
     <div class="quick-look-dialog">

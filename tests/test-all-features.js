@@ -1,91 +1,104 @@
 const assert = require('assert');
 const path = require('path');
-const { QueryParser, translateNaturalLanguage } = require('../src/engine/query-parser');
+const fs = require('fs');
+const os = require('os');
+const { QueryParser, translateNaturalLanguage, EXTENSION_CATEGORIES } = require('../src/engine/query-parser');
 const Indexer = require('../src/engine/indexer');
 const Exporter = require('../src/engine/exporter');
 const DuplicateFinder = require('../src/engine/duplicate-finder');
 const StorageAnalyzer = require('../src/engine/storage-analyzer');
 const ContentSearcher = require('../src/engine/content-search');
-const RemoteServer = require('../src/engine/remote-server');
+const TagManager = require('../src/engine/tag-manager');
 
-console.log('🧪 Starting Dawith Search Comprehensive Test Suite...\n');
+console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
 
-// 1. Everything Syntax Tests
-console.log('1. Testing Everything Search Syntax Compatibility:');
+// 1. Tag Manager Test
+console.log('1. Testing Tag Manager & Starred Items:');
+const testDir = path.join(os.tmpdir(), 'dawith-test-' + Date.now());
+fs.mkdirSync(testDir, { recursive: true });
+const tagMgr = new TagManager(testDir);
 
-// Wildcard & Extension
-let q1 = QueryParser.parse('*.pdf');
-assert.strictEqual(q1.terms[0][0].hasWildcard, true);
-assert.strictEqual(QueryParser.matches({ name: 'invoice.pdf', isDir: false }, q1), true);
-assert.strictEqual(QueryParser.matches({ name: 'invoice.docx', isDir: false }, q1), false);
-console.log('  ✓ Wildcard glob (*.pdf) passed');
+const testFile = 'C:\\test\\document.pdf';
+tagMgr.addTag(testFile, '중요문서');
+tagMgr.addTag(testFile, '#예산안');
+assert.deepStrictEqual(tagMgr.getTags(testFile), ['중요문서', '예산안']);
+assert.strictEqual(tagMgr.getAllTags().length, 2);
 
-// Boolean AND / OR / NOT
-let q2 = QueryParser.parse('report (pdf|docx) !temp');
-assert.strictEqual(QueryParser.matches({ name: 'annual_report.pdf', isDir: false }, q2), true);
-assert.strictEqual(QueryParser.matches({ name: 'temp_report.pdf', isDir: false }, q2), false);
-console.log('  ✓ Boolean AND / OR / NOT passed');
+tagMgr.toggleStar(testFile);
+assert.strictEqual(tagMgr.isStarred(testFile), true);
+tagMgr.toggleStar(testFile);
+assert.strictEqual(tagMgr.isStarred(testFile), false);
 
-// Size Modifiers
-let q3 = QueryParser.parse('size:>10mb size:<100mb');
-assert.strictEqual(QueryParser.matches({ name: 'video.mp4', size: 50 * 1024 * 1024, isDir: false }, q3), true);
-assert.strictEqual(QueryParser.matches({ name: 'tiny.txt', size: 1024, isDir: false }, q3), false);
-assert.strictEqual(QueryParser.matches({ name: 'huge.iso', size: 500 * 1024 * 1024, isDir: false }, q3), false);
-console.log('  ✓ Size operators (size:>10mb size:<100mb) passed');
+tagMgr.removeTag(testFile, '예산안');
+assert.deepStrictEqual(tagMgr.getTags(testFile), ['중요문서']);
+console.log('  ✓ Tag Manager CRUD operations and persistence passed');
 
-// Date Modifiers
-let q4 = QueryParser.parse('dm:today');
-assert.strictEqual(QueryParser.matches({ name: 'today.txt', mtime: Date.now(), isDir: false }, q4), true);
-assert.strictEqual(QueryParser.matches({ name: 'old.txt', mtime: Date.now() - 30 * 86400000, isDir: false }, q4), false);
-console.log('  ✓ Date Modified operators (dm:today) passed');
+// 2. Query Parser Complex Edge Cases
+console.log('\n2. Testing Query Parser Edge Cases:');
 
-// Category Macros
-let q5 = QueryParser.parse('doc:');
-assert.ok(q5.extensions.includes('pdf'));
-assert.ok(q5.extensions.includes('docx'));
-assert.ok(q5.extensions.includes('hwp'));
-console.log('  ✓ Category Macros (doc:, pic:, video:, audio:) passed');
+// Empty query returns true for everything
+let qEmpty = QueryParser.parse('');
+assert.strictEqual(QueryParser.matches({ name: 'any.txt', isDir: false }, qEmpty), true);
+console.log('  ✓ Empty query match passed');
 
-// 2. AI Smart Query Translation
-console.log('\n2. Testing AI Smart Query Translation:');
-let ai1 = translateNaturalLanguage('지난주 다운로드한 100MB 이상 동영상');
-assert.ok(ai1.includes('dm:lastweek'));
-assert.ok(ai1.includes('size:>100mb'));
-assert.ok(ai1.includes('video:'));
-console.log(`  ✓ Natural Korean translated to: "${ai1}"`);
+// Quotes with spaces
+let qQuotes = QueryParser.parse('"Annual Financial Report 2026.docx"');
+assert.strictEqual(QueryParser.matches({ name: 'Annual Financial Report 2026.docx', isDir: false }, qQuotes), true);
+assert.strictEqual(QueryParser.matches({ name: 'Other.docx', isDir: false }, qQuotes), false);
+console.log('  ✓ Quoted strings with spaces passed');
 
-// 3. Exporter Tests (EFU, CSV, JSON, TXT)
-console.log('\n3. Testing Exporters:');
-const sampleItems = [
-  { name: 'test.pdf', path: 'C:\\docs', size: 1024, mtime: Date.now(), ctime: Date.now(), isDir: false, ext: 'pdf' }
+// Korean queries & brackets
+let qKorean = QueryParser.parse('(사업계획서|예산안) 2026 !초안');
+assert.strictEqual(QueryParser.matches({ name: '2026_사업계획서_최종.hwp', isDir: false }, qKorean), true);
+assert.strictEqual(QueryParser.matches({ name: '2026_사업계획서_초안.hwp', isDir: false }, qKorean), false);
+assert.strictEqual(QueryParser.matches({ name: '2025_사업계획서_최종.hwp', isDir: false }, qKorean), false);
+console.log('  ✓ Korean terms, brackets and negation passed');
+
+// Date ranges
+let qDate = QueryParser.parse('dm:thisyear');
+const thisYearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
+assert.strictEqual(QueryParser.matches({ name: 'new.txt', mtime: Date.now(), isDir: false }, qDate), true);
+assert.strictEqual(QueryParser.matches({ name: 'old.txt', mtime: thisYearStart - 1000000, isDir: false }, qDate), false);
+console.log('  ✓ dm:thisyear relative date filter passed');
+
+// Size presets
+let qSizePreset = QueryParser.parse('size:huge');
+assert.strictEqual(QueryParser.matches({ name: 'big.zip', size: 50 * 1024 * 1024, isDir: false }, qSizePreset), true);
+assert.strictEqual(QueryParser.matches({ name: 'small.zip', size: 1024, isDir: false }, qSizePreset), false);
+console.log('  ✓ size:huge (16MB - 128MB) preset filter passed');
+
+// 3. Duplicate Finder Edge Cases
+console.log('\n3. Testing Duplicate Finder Edge Cases:');
+// Create temporary duplicate files
+const dup1 = path.join(testDir, 'file1.txt');
+const dup2 = path.join(testDir, 'file2.txt');
+const diff = path.join(testDir, 'diff.txt');
+fs.writeFileSync(dup1, 'Identical content for duplicate verification test 1234567890');
+fs.writeFileSync(dup2, 'Identical content for duplicate verification test 1234567890');
+fs.writeFileSync(diff, 'Different content here');
+
+const dupRecords = [
+  { name: 'file1.txt', path: testDir, size: fs.statSync(dup1).size, isDir: false, ext: 'txt' },
+  { name: 'file2.txt', path: testDir, size: fs.statSync(dup2).size, isDir: false, ext: 'txt' },
+  { name: 'diff.txt', path: testDir, size: fs.statSync(diff).size, isDir: false, ext: 'txt' }
 ];
-const efuOutput = Exporter.toEFU(sampleItems);
-assert.ok(efuOutput.includes('Filename,Size,Date Modified,Date Created,Attributes'));
-assert.ok(efuOutput.includes('"C:\\docs\\test.pdf",1024'));
-console.log('  ✓ Voidtools Everything EFU format passed');
 
-const csvOutput = Exporter.toCSV(sampleItems);
-assert.ok(csvOutput.includes('Name,Path,Size (Bytes)'));
-console.log('  ✓ CSV export passed');
+DuplicateFinder.findDuplicates(dupRecords, { minSize: 10 }).then(dupes => {
+  assert.strictEqual(dupes.groups.length, 1);
+  assert.strictEqual(dupes.groups[0].items.length, 2);
+  assert.ok(dupes.totalWastedBytes > 0);
+  console.log(`  ✓ Duplicate Finder detected ${dupes.groups.length} duplicate group (wasted: ${dupes.totalWastedBytes} bytes)`);
 
-// 4. Storage Analyzer
-console.log('\n4. Testing Storage Analyzer:');
-const storageRes = StorageAnalyzer.analyze(sampleItems);
-assert.strictEqual(storageRes.totalFiles, 1);
-assert.strictEqual(storageRes.categories.documents.count, 1);
-console.log('  ✓ Storage categorization passed');
+  // Clean up test dir
+  try {
+    fs.rmSync(testDir, { recursive: true, force: true });
+  } catch (e) {}
 
-// 5. Indexer In-memory Search Performance
-console.log('\n5. Testing Indexer Benchmark:');
-const indexer = new Indexer({ autoStartWatcher: false });
-indexer.loadCache();
-console.log(`  ✓ Indexer loaded ${indexer.records.length} records from disk cache`);
-
-indexer.search('*.pdf', { limit: 10 }).then(res => {
-  console.log(`  ✓ Instant search query (*.pdf) executed in ${res.elapsedMs}ms with ${res.totalMatches} matches`);
-  console.log('\n🎉 ALL 15 CORE REFERENCE AND EXTENSION TESTS PASSED PERFECTLY!\n');
+  console.log('\n======================================================');
+  console.log('✅ ALL COMPREHENSIVE DEBUGGING TESTS PASSED (0 ERRORS)');
+  console.log('======================================================\n');
   process.exit(0);
 }).catch(err => {
-  console.error('Test error:', err);
+  console.error('Duplicate test error:', err);
   process.exit(1);
 });

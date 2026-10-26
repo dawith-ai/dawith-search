@@ -242,18 +242,20 @@ async function showQuickLook(item) {
   const ext = (item.ext || '').toLowerCase();
 
   // Handle Images
+  const fileUrl = 'file:///' + encodeURI(full.replace(/\\/g, '/')).replace(/#/g, '%23');
+
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
-    bodyEl.innerHTML = `<img src="file://${full.replace(/\\/g, '/')}" alt="Preview" />`;
+    bodyEl.innerHTML = `<img src="${fileUrl}" alt="Preview" />`;
     return;
   }
 
   // Handle Audio / Video
   if (['mp4', 'webm', 'ogg'].includes(ext)) {
-    bodyEl.innerHTML = `<video controls autoplay style="max-width:100%; max-height:100%;"><source src="file://${full.replace(/\\/g, '/')}" type="video/${ext}"></video>`;
+    bodyEl.innerHTML = `<video controls autoplay style="max-width:100%; max-height:100%;"><source src="${fileUrl}" type="video/${ext}"></video>`;
     return;
   }
   if (['mp3', 'wav'].includes(ext)) {
-    bodyEl.innerHTML = `<audio controls autoplay><source src="file://${full.replace(/\\/g, '/')}" type="audio/${ext}"></audio>`;
+    bodyEl.innerHTML = `<audio controls autoplay><source src="${fileUrl}" type="audio/${ext}"></audio>`;
     return;
   }
 
@@ -263,6 +265,63 @@ async function showQuickLook(item) {
     bodyEl.innerHTML = `<pre>${escapeHtml(res.content)}</pre>`;
   } else {
     bodyEl.innerHTML = `<div style="text-align:center; color:#94a3b8;">미리보기를 지원하지 않는 바이너리 파일입니다.<br><button class="btn btn-primary mt-2" onclick="openItem(searchResults[selectedIndex])">기본 프로그램으로 열기</button></div>`;
+  }
+}
+
+// Command Palette Implementation (Ctrl+K)
+const cmdPaletteModal = document.getElementById('cmdPaletteModal');
+const cmdPaletteInput = document.getElementById('cmdPaletteInput');
+const cmdPaletteList = document.getElementById('cmdPaletteList');
+
+function openCommandPalette() {
+  cmdPaletteModal.style.display = 'flex';
+  cmdPaletteInput.value = '';
+  filterCmdItems('');
+  cmdPaletteInput.focus();
+}
+
+function closeCommandPalette() {
+  cmdPaletteModal.style.display = 'none';
+}
+
+function filterCmdItems(query) {
+  const items = cmdPaletteList.querySelectorAll('.cmd-item');
+  const q = query.toLowerCase().trim();
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(q) ? 'flex' : 'none';
+  });
+}
+
+cmdPaletteInput.addEventListener('input', (e) => {
+  filterCmdItems(e.target.value);
+});
+
+cmdPaletteList.addEventListener('click', (e) => {
+  const item = e.target.closest('.cmd-item');
+  if (!item) return;
+  const action = item.dataset.action;
+  closeCommandPalette();
+  handleCmdAction(action);
+});
+
+function handleCmdAction(action) {
+  if (action === 'toggle-ai') {
+    aiToggleBtn.click();
+  } else if (action === 'open-remote') {
+    document.getElementById('btnRemoteServer').click();
+  } else if (action === 'open-storage') {
+    document.getElementById('btnStorageAnalyzer').click();
+  } else if (action === 'reindex') {
+    window.dawithAPI.reindex();
+  } else if (action === 'export-csv') {
+    if (searchResults.length > 0) window.dawithAPI.exportResults('csv', searchResults);
+  } else if (action === 'export-efu') {
+    if (searchResults.length > 0) window.dawithAPI.exportResults('efu', searchResults);
+  } else if (action === 'open-settings') {
+    document.getElementById('btnSettings').click();
+  } else if (action === 'open-syntax') {
+    document.getElementById('syntaxHintBtn').click();
   }
 }
 
@@ -279,6 +338,7 @@ document.addEventListener('keydown', (e) => {
 
   // Close modals on Escape
   if (e.key === 'Escape') {
+    cmdPaletteModal.style.display = 'none';
     remoteModal.style.display = 'none';
     storageModal.style.display = 'none';
     settingsModal.style.display = 'none';

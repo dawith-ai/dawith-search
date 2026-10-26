@@ -33,6 +33,14 @@ npm ci
 npm start
 ```
 
+`npm start`는 개발 모드 데스크톱 앱을 실행합니다. GitHub 저장소 자체는 웹 앱 주소가 아니라 소스 코드 주소입니다. 설치 파일은 [앱 다운로드(Releases)](https://github.com/dawith-ai/dawith-search/releases)에서 받습니다.
+
+## 공식 참고 주소
+
+- [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
+- [Everything 다운로드](https://www.voidtools.com/ko-kr/downloads/)
+- [Everything 공식 도움말](https://www.voidtools.com/support/everything/)
+
 검증 명령:
 
 ```bash

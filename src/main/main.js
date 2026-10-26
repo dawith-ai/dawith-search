@@ -37,6 +37,21 @@ let remoteServer = null;
 let bookmarkManager = null;
 let historyManager = null;
 
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      createWindow();
+      return;
+    }
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1150,
@@ -51,10 +66,25 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true
     },
-    show: true
+    show: false
   });
 
-  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+  });
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    if (errorCode === -3) return;
+    const message = `MAIN_WINDOW_LOAD_FAILED ${errorCode}: ${errorDescription} (${validatedURL})`;
+    writeCrashLog(message);
+    dialog.showErrorBox('Dawith Search를 열 수 없습니다', `${errorDescription}\n\n${validatedURL}`);
+  });
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    writeCrashLog(`RENDERER_GONE: ${details.reason || 'unknown'} ${details.exitCode || ''}`);
+  });
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html')).catch(error => {
+    writeCrashLog('MAIN_WINDOW_LOAD_EXCEPTION: ' + error.stack);
+    dialog.showErrorBox('Dawith Search를 열 수 없습니다', error.message);
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -79,6 +109,12 @@ function openGuideWindow() {
       nodeIntegration: false,
       contextIsolation: true
     }
+  });
+  guideWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) {
+      shell.openExternal(url).catch(error => writeCrashLog('EXTERNAL_OPEN_FAILED: ' + error.stack));
+    }
+    return { action: 'deny' };
   });
   guideWindow.loadFile(path.join(__dirname, '../renderer/guide.html'));
   guideWindow.on('closed', () => {
@@ -195,6 +231,14 @@ app.on('window-all-closed', () => {
   writeCrashLog('EVENT: window-all-closed');
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  else if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
   }
 });
 

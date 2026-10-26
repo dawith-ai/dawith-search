@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawith Search</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="dark-theme">
+  <!-- Custom Titlebar -->
+  <div class="titlebar">
+    <div class="titlebar-drag">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">Dawith Search</span>
+        <span class="version-tag">Everything Clone Pro</span>
+      </div>
+      <div class="titlebar-status" id="titlebarStatus">
+        <span class="status-dot"></span>
+        <span id="titlebarStatusText">준비 완료</span>
+      </div>
+    </div>
+    <div class="titlebar-controls">
+      <button class="win-btn" id="btnMinimize" title="최소화">&#x2014;</button>
+      <button class="win-btn" id="btnMaximize" title="최대화">&#x25A2;</button>
+      <button class="win-btn win-close" id="btnClose" title="닫기">&#x2715;</button>
+    </div>
+  </div>
+
+  <div class="app-container">
+    <!-- Top Control Bar -->
+    <header class="search-header">
+      <div class="search-input-container">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="searchInput" 
+          placeholder="파일 또는 폴더 검색 (Everything 문법 완벽 지원: ext: doc: size:>100mb dm:today)..." 
+          autocomplete="off" 
+          spellcheck="false"
+          autofocus
+        />
+        <button class="clear-btn" id="btnClear" title="검색어 지우기">✕</button>
+      </div>
+
+      <div class="header-actions">
+        <button class="btn btn-toggle" id="btnAiToggle" title="자연어 문장을 Everything 검색 문법으로 자동 변환">
+          <span class="icon">✨</span> AI 자연어 검색
+        </button>
+        <button class="btn btn-ghost" id="btnRemoteServer" title="스마트폰에서 내 PC 파일 검색 & 다운로드 (QR 코드)">
+          <span class="icon">📱</span> 모바일 공유
+        </button>
+        <button class="btn btn-ghost" id="btnStorageAnalyzer" title="디스크 용량 분석 및 중복 파일 찾기">
+          <span class="icon">📊</span> 용량/중복 분석
+        </button>
+        <button class="btn btn-ghost" id="btnExport" title="검색 결과 내보내기 (CSV, TXT, JSON, EFU)">
+          <span class="icon">💾</span> 내보내기
+        </button>
+        <button class="btn btn-icon" id="btnSettings" title="색인 설정">
+          ⚙️
+        </button>
+      </div>
+    </header>
+
+    <!-- Category Filter Tabs -->
+    <nav class="filter-bar">
+      <div class="filter-tabs" id="filterTabs">
+        <button class="tab-btn active" data-filter="">모두 (All)</button>
+        <button class="tab-btn" data-filter="doc:">📄 문서</button>
+        <button class="tab-btn" data-filter="pic:">🖼️ 사진</button>
+        <button class="tab-btn" data-filter="video:">🎬 동영상</button>
+        <button class="tab-btn" data-filter="audio:">🎵 음악</button>
+        <button class="tab-btn" data-filter="zip:">📦 압축</button>
+        <button class="tab-btn" data-filter="exe:">⚙️ 실행</button>
+        <button class="tab-btn" data-filter="folder:">📁 폴더</button>
+        <button class="tab-btn" data-filter="starred:">⭐ 즐겨찾기</button>
+        <button class="tab-btn" data-filter="dupe:">🔄 중복 파일</button>
+      </div>
+      <div class="syntax-hint-badge" id="syntaxHintBtn" title="Everything 검색 문법 가이드">
+        ❓ 문법 도움말
+      </div>
+    </nav>
+
+    <!-- Main Results Area -->
+    <main class="results-container">
+      <div class="table-header">
+        <div class="th col-name" data-col="name">이름 <span class="sort-indicator">▲</span></div>
+        <div class="th col-path" data-col="path">경로</div>
+        <div class="th col-size" data-col="size">크기</div>
+        <div class="th col-mtime" data-col="mtime">수정 날짜</div>
+        <div class="th col-ext" data-col="ext">확장자</div>
+        <div class="th col-actions">동작</div>
+      </div>
+      
+      <div class="table-body" id="tableBody">
+        <!-- Rows rendered dynamically -->
+      </div>
+      
+      <div class="empty-state" id="emptyState" style="display: none;">
+        <div class="empty-icon">📂</div>
+        <div class="empty-text">검색 결과가 없습니다.</div>
+        <div class="empty-sub">다른 키워드나 필터 조건을 사용해 보세요.</div>
+      </div>
+    </main>
+
+    <!-- Status Bar -->
+    <footer class="status-bar">
+      <div class="status-left">
+        <span id="statMatches">0개 항목</span>
+        <span class="status-sep">|</span>
+        <span id="statElapsed">0 ms</span>
+        <span class="status-sep">|</span>
+        <span id="statTotalIndexed">색인된 항목: 0개</span>
+      </div>
+      <div class="status-right">
+        <span class="key-hint"><kbd>Space</kbd> 빠른 미리보기</span>
+        <span class="key-hint"><kbd>Enter</kbd> 열기</span>
+        <span class="key-hint"><kbd>Ctrl+Enter</kbd> 폴더 열기</span>
+        <span class="key-hint"><kbd>Ctrl+K</kbd> 명령 팔레트</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Spacebar Quick Look Modal -->
+  <div class="modal-overlay" id="quickLookModal" style="display: none;">
+    <div class="quick-look-dialog">
+      <div class="quick-look-header">
+        <div class="quick-look-title">
+          <span id="qlIcon">📄</span>
+          <span id="qlName">파일명</span>
+          <span class="ql-badge" id="qlSize">0 KB</span>
+        </div>
+        <div class="quick-look-actions">
+          <button class="btn btn-sm btn-primary" id="qlBtnOpen">열기</button>
+          <button class="btn btn-sm btn-ghost" id="qlBtnOpenFolder">폴더 열기</button>
+          <button class="btn btn-sm btn-close" id="qlBtnClose">✕</button>
+        </div>
+      </div>
+      <div class="quick-look-body" id="qlBody">
+        <!-- Rendered preview content -->
+      </div>
+      <div class="quick-look-footer" id="qlFooter">
+        <span id="qlPath">C:\...</span>
+        <span id="qlDate">수정일: ...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Remote QR Modal -->
+  <div class="modal-overlay" id="remoteModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>📱 스마트폰 원격 검색 (Everything HTTP Server Pro)</h3>
+        <button class="btn-close" id="btnCloseRemote">✕</button>
+      </div>
+      <div class="modal-body text-center">
+        <p class="modal-desc">같은 Wi-Fi 공유기에 연결된 스마트폰으로 아래 QR 코드를 스캔하세요.<br>스마트폰 브라우저에서 내 PC 파일을 실시간으로 검색하고 바로 다운로드할 수 있습니다.</p>
+        <div class="qr-container">
+          <img id="qrImage" alt="QR Code" />
+        </div>
+        <div class="url-box">
+          <input type="text" id="remoteUrlInput" readonly />
+          <button class="btn btn-primary" id="btnCopyRemoteUrl">URL 복사</button>
+        </div>
+        <div class="server-status-info" id="remoteStatusText">서버 실행 중 (포트 8888)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage & Duplicates Analyzer Modal -->
+  <div class="modal-overlay" id="storageModal" style="display: none;">
+    <div class="modal-dialog modal-large">
+      <div class="modal-header">
+        <h3>📊 스토리지 용량 & 중복 파일 분석기</h3>
+        <button class="btn-close" id="btnCloseStorage">✕</button>
+      </div>
+      <div class="storage-tabs">
+        <button class="storage-tab-btn active" id="tabStorageOverview">용량 현황</button>
+        <button class="storage-tab-btn" id="tabDuplicates">중복 파일 정리</button>
+        <button class="storage-tab-btn" id="tabLargestFiles">대용량 파일 TOP 50</button>
+      </div>
+      <div class="modal-body" id="storageBody">
+        <!-- Dynamic storage tabs content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settingsModal" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>⚙️ Dawith Search 설정</h3>
+        <button class="btn-close" id="btnCloseSettings">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <label>색인할 드라이브 및 폴더 (Roots):</label>
+          <div class="roots-list" id="rootsList"></div>
+          <button class="btn btn-sm btn-ghost mt-2" id="btnReindexNow">⚡ 지금 전체 다시 색인 (Reindex)</button>
+        </div>
+        <div class="setting-group mt-4">
+          <label>단축키 안내:</label>
+          <ul class="shortcuts-list">
+            <li><kbd>Alt + Space</kbd> : 어디서든 Dawith Search 즉시 호출/숨기기</li>
+            <li><kbd>Space</kbd> : 선택한 파일 즉시 Quick Look 미리보기</li>
+            <li><kbd>Enter</kbd> : 파일 기본 프로그램으로 실행</li>
+            <li><kbd>Ctrl + Enter</kbd> : 파일이 있는 폴더 열기 (Explorer)</li>
+            <li><kbd>F2</kbd> : 이름 변경</li>
+            <li><kbd>Delete</kbd> : 휴지통으로 파일 삭제</li>
+            <li><kbd>Ctrl + C</kbd> : 파일 전체 경로 복사</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Syntax Guide Modal -->
+  <div class="modal-overlay" id="syntaxModal" style="display: none;">
+    <div class="modal-dialog modal-large">
+      <div class="modal-header">
+        <h3>⚡ Everything 검색 문법 완벽 지원 가이드</h3>
+        <button class="btn-close" id="btnCloseSyntax">✕</button>
+      </div>
+      <div class="modal-body">
+        <table class="syntax-table">
+          <thead>
+            <tr><th>연산자/필터</th><th>예시</th><th>설명</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>공백 (AND)</code></td><td><code>보고서 2026</code></td><td>보고서와 2026이 모두 포함된 항목</td></tr>
+            <tr><td><code>| (OR)</code></td><td><code>jpg|png|gif</code></td><td>jpg 또는 png 또는 gif 항목</td></tr>
+            <tr><td><code>! 또는 - (NOT)</code></td><td><code>doc !temp</code></td><td>doc을 포함하되 temp는 제외</td></tr>
+            <tr><td><code>* 및 ? (와일드카드)</code></td><td><code>*.xlsx</code>, <code>test?.txt</code></td><td>모든 문자(*) 또는 한 문자(?) 일치</td></tr>
+            <tr><td><code>ext:</code></td><td><code>ext:pdf;docx</code></td><td>지정된 확장자만 검색</td></tr>
+            <tr><td><code>size:</code></td><td><code>size:>100mb</code>, <code>size:empty</code></td><td>파일 크기 조건 (&gt;, &lt;, &gt;=, &lt;=)</td></tr>
+            <tr><td><code>dm: (수정일)</code></td><td><code>dm:today</code>, <code>dm:lastweek</code></td><td>오늘/어제/지난주/올해 수정한 파일</td></tr>
+            <tr><td><code>content:</code></td><td><code>content:비밀번호</code></td><td>텍스트/코드/문서 파일 본문 내용 검색</td></tr>
+            <tr><td><code>dupe:</code></td><td><code>dupe:name</code>, <code>dupe:size</code></td><td>중복된 파일 검색</td></tr>
+            <tr><td><code>tag:</code></td><td><code>tag:중요</code></td><td>Dawith Search에서 부여한 태그로 검색</td></tr>
+            <tr><td><code>카테고리 매크로</code></td><td><code>doc:</code>, <code>pic:</code>, <code>video:</code>, <code>audio:</code>, <code>zip:</code>, <code>exe:</code></td><td>카테고리별 즉시 필터링</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu -->
+  <div class="context-menu" id="contextMenu" style="display: none;">
+    <div class="ctx-item" id="ctxOpen">📂 열기 (Enter)</div>
+    <div class="ctx-item" id="ctxOpenFolder">📁 상위 폴더 열기 (Ctrl+Enter)</div>
+    <div class="ctx-item" id="ctxQuickLook">👁️ 빠른 미리보기 (Space)</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctxCopyPath">📋 경로 복사 (Ctrl+C)</div>
+    <div class="ctx-item" id="ctxTag">🏷️ 태그 추가/관리</div>
+    <div class="ctx-item" id="ctxStar">⭐ 즐겨찾기 토글</div>
+    <div class="ctx-separator"></div>
+    <div class="ctx-item" id="ctxRename">✏️ 이름 바꾸기 (F2)</div>
+    <div class="ctx-item text-danger" id="ctxDelete">🗑️ 삭제 (Del)</div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

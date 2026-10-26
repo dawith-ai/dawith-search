@@ -1,0 +1,51 @@
+{
+  "name": "dawith-search",
+  "version": "1.0.0",
+  "description": "Dawith Search - Voidtools Everything Clone with AI Smart Query, Spacebar Quick Look & Mobile Remote Access",
+  "main": "src/main/main.js",
+  "bin": {
+    "dawith-search": "bin/dawith-cli.js",
+    "dawith-cli": "bin/dawith-cli.js"
+  },
+  "scripts": {
+    "start": "electron .",
+    "cli": "node bin/dawith-cli.js",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win"
+  },
+  "keywords": [
+    "everything",
+    "file-search",
+    "desktop-search",
+    "dawith",
+    "instant-search"
+  ],
+  "author": "Dawith",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "express": "^4.21.2",
+    "lucide-react": "^1.16.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dawith.search",
+    "productName": "Dawith Search",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "DawithSearch-${version}-portable.exe"
+    }
+  }
+}

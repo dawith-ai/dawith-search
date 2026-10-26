@@ -27,7 +27,7 @@ function createWindow() {
     minWidth: 850,
     minHeight: 550,
     frame: false, // Modern custom borderless titlebar
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,

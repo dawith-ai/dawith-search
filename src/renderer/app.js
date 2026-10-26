@@ -12,10 +12,11 @@ let currentSortOrder = 'asc';
 let searchDebounceTimer = null;
 let currentContextItem = null;
 
-// DOM Elements
+// UI Elements
 const searchInput = document.getElementById('searchInput');
 const clearBtn = document.getElementById('btnClear');
 const aiToggleBtn = document.getElementById('btnAiToggle');
+const btnThemeToggle = document.getElementById('btnThemeToggle');
 const tableBody = document.getElementById('tableBody');
 const emptyState = document.getElementById('emptyState');
 const statMatches = document.getElementById('statMatches');
@@ -477,6 +478,27 @@ clearBtn.addEventListener('click', () => {
   searchInput.focus();
   executeSearch();
 });
+
+// Theme Toggle Logic
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme') || 'light-theme';
+  document.body.className = savedTheme;
+  if (btnThemeToggle) {
+    btnThemeToggle.textContent = savedTheme === 'light-theme' ? '🌙' : '☀️';
+  }
+}
+
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener('click', () => {
+    const isLight = document.body.classList.contains('light-theme');
+    const newTheme = isLight ? 'dark-theme' : 'light-theme';
+    document.body.className = newTheme;
+    btnThemeToggle.textContent = newTheme === 'light-theme' ? '🌙' : '☀️';
+    localStorage.setItem('theme', newTheme);
+  });
+}
+
+initTheme();
 
 // AI Mode Toggle
 aiToggleBtn.addEventListener('click', () => {

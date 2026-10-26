@@ -423,7 +423,10 @@ class Indexer extends EventEmitter {
 
     // Check if query is duplicate check
     if (parsed.dupe) {
-      matched = this.findDuplicatesQuick(parsed.dupe);
+      const scopedRecords = scopeRoot
+        ? this.records.filter(item => this.isWithinScope(getFullPath(item), scopeRoot))
+        : this.records;
+      matched = this.findDuplicatesQuick(parsed.dupe, scopedRecords);
     } else {
       for (let i = 0; i < this.records.length; i++) {
         const item = this.records[i];
@@ -493,11 +496,11 @@ class Indexer extends EventEmitter {
     this.saveTimer = setTimeout(() => this.saveCache(), 250);
   }
 
-  findDuplicatesQuick(by = 'name') {
+  findDuplicatesQuick(by = 'name', records = this.records) {
     const map = new Map();
     const dupes = [];
 
-    for (const item of this.records) {
+    for (const item of records) {
       if (item.isDir) continue;
       const key = by === 'size' ? item.size : item.name.toLowerCase();
       if (key === 0 && by === 'size') continue; // ignore empty files

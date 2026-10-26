@@ -481,7 +481,8 @@ async function showQuickLook(item) {
   if (res.success) {
     bodyEl.innerHTML = `<pre>${escapeHtml(res.content)}</pre>`;
   } else {
-    bodyEl.innerHTML = `<div style="text-align:center; color:#94a3b8;">미리보기를 지원하지 않는 바이너리 파일입니다.<br><button class="btn btn-primary mt-2" onclick="openItem(searchResults[selectedIndex])">기본 프로그램으로 열기</button></div>`;
+    bodyEl.innerHTML = '<div style="text-align:center; color:#94a3b8;">미리보기를 지원하지 않는 바이너리 파일입니다.<br><button class="btn btn-primary mt-2 ql-open-default" type="button">기본 프로그램으로 열기</button></div>';
+    bodyEl.querySelector('.ql-open-default').addEventListener('click', () => openItem(item));
   }
 }
 
@@ -872,6 +873,7 @@ document.getElementById('btnCopySelectedPaths').addEventListener('click', copySe
 document.getElementById('btnBatchRename').addEventListener('click', batchRenameSelected);
 document.getElementById('btnDeleteSelected').addEventListener('click', deleteSelectedItems);
 document.getElementById('btnClearSelection').addEventListener('click', () => {
+  selectedIndex = -1;
   selectedIndexes = new Set();
   updateSelectionUI();
   renderResults(searchResults, searchInput.value.trim());
@@ -1007,14 +1009,17 @@ document.getElementById('tabDuplicates').addEventListener('click', async (e) => 
           </div>
           ${grp.items.map(it => `
             <div class="duplicate-path-row">
-              <span class="duplicate-path" title="${getFullPath(it)}">${getFullPath(it)}</span>
-              <button class="btn btn-sm btn-ghost" onclick="window.dawithAPI.openFolder('${getFullPath(it).replace(/\\/g, '\\\\')}')">위치</button>
+              <span class="duplicate-path" title="${escapeHtml(getFullPath(it))}">${escapeHtml(getFullPath(it))}</span>
+              <button class="btn btn-sm btn-ghost" type="button" data-open-duplicate-folder="${escapeHtml(getFullPath(it))}">위치</button>
             </div>
           `).join('')}
         </div>
       `).join('')}
     </div>
   `;
+  storageBody.querySelectorAll('[data-open-duplicate-folder]').forEach(button => {
+    button.addEventListener('click', () => window.dawithAPI.openFolder(button.dataset.openDuplicateFolder));
+  });
 });
 
 document.getElementById('tabLargestFiles').addEventListener('click', async (e) => {

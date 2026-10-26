@@ -86,6 +86,20 @@ const scopeIndexer = new Indexer({
 });
 assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'scope', 'report.pdf'), path.join(testDir, 'scope')), true);
 assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'other', 'report.pdf'), path.join(testDir, 'scope')), false);
+const scopeRoot = path.join(testDir, 'scope');
+scopeIndexer.records = [
+  { name: 'report.pdf', path: scopeRoot, fullPath: path.join(scopeRoot, 'report.pdf'), isDir: false, size: 10 },
+  { name: 'report.pdf', path: scopeRoot, fullPath: path.join(scopeRoot, 'nested', 'report.pdf'), isDir: false, size: 20 },
+  { name: 'report.pdf', path: path.join(testDir, 'other'), fullPath: path.join(testDir, 'other', 'report.pdf'), isDir: false, size: 30 }
+];
+scopeIndexer.search('dupe:name', { scopeRoot }).then(result => {
+  assert.strictEqual(result.results.length, 2);
+  assert.ok(result.results.every(item => scopeIndexer.isWithinScope(item.fullPath, scopeRoot)));
+  console.log('  ✓ Scoped duplicate search stays within the selected folder passed');
+}).catch(error => {
+  console.error('Scoped search test error:', error);
+  process.exit(1);
+});
 scopeIndexer.fileWatcher.close();
 console.log('  ✓ Folder scope boundary checks passed');
 

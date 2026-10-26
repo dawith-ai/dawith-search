@@ -11,7 +11,7 @@
     "start": "electron .",
     "cli": "node bin/dawith-cli.js",
     "test": "node tests/test-all-features.js",
-    "lint": "node scripts/check-syntax.js",
+    "lint": "node scripts/check-syntax.js && node scripts/check-renderer-contract.js",
     "check": "npm run lint && npm test",
     "build": "electron-builder",
     "build:win": "electron-builder --win --publish never",

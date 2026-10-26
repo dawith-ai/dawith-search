@@ -14,8 +14,8 @@
     "lint": "node scripts/check-syntax.js",
     "check": "npm run lint && npm test",
     "build": "electron-builder",
-    "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:win": "electron-builder --win --publish never",
+    "build:mac": "electron-builder --mac --publish never"
   },
   "keywords": [
     "everything",

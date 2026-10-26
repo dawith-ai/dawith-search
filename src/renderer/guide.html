@@ -11,6 +11,7 @@
     <a class="brand" href="#top"><span class="brand-mark">✦</span> Dawith Search</a>
     <nav aria-label="안내 메뉴">
       <a href="#start">시작하기</a>
+      <a href="#workflow">기관 업무</a>
       <a href="#syntax">검색 문법</a>
       <a href="#platforms">플랫폼</a>
       <a href="#shortcuts">단축키</a>
@@ -43,7 +44,7 @@
         <article class="step-card featured">
           <span class="step-number">02</span>
           <h3>아는 만큼만 입력하세요</h3>
-          <p><code>report</code>처럼 이름 일부만 입력해도 됩니다. 자연어 모드를 켜면 “지난주 큰 영상”도 검색식으로 바뀝니다.</p>
+          <p><code>report</code>처럼 이름 일부만 입력해도 됩니다. 자연어 모드는 인터넷이나 외부 AI 없이 규칙으로 검색식을 바꿉니다.</p>
           <code>⌘/Ctrl + F → 검색창</code>
         </article>
         <article class="step-card">
@@ -52,6 +53,19 @@
           <p>Enter로 열고, Ctrl/⌘ + Enter로 위치를 열고, Space로 미리 봅니다. 우클릭에는 태그와 안전한 삭제가 있습니다.</p>
           <code>Space → Quick Look</code>
         </article>
+      </div>
+    </section>
+
+    <section class="section workflow-section" id="workflow">
+      <div class="section-heading split-heading">
+        <div><span class="section-kicker">OFFICE WORKFLOW</span><h2>기관 업무에 자주 쓰는<br>검색을 미리 모았습니다.</h2></div>
+        <p>왼쪽 업무 바로가기에서 문서·통계·최근 수정 파일을 바로 열고, 자주 쓰는 검색은 “현재 검색 저장”으로 팀의 업무 흐름에 맞게 이름을 붙여 보관하세요.</p>
+      </div>
+      <div class="workflow-grid">
+        <article><span class="workflow-icon">▤</span><h3>문서 모아보기</h3><code>doc:</code><p>한글·워드·PDF·텍스트 문서를 한 번에 찾습니다.</p></article>
+        <article><span class="workflow-icon">▦</span><h3>통계·스프레드시트</h3><code>ext:xls,xlsx,csv</code><p>보고서와 실적 자료를 빠르게 모읍니다.</p></article>
+        <article><span class="workflow-icon">◷</span><h3>최근 수정 파일</h3><code>dm:today</code><p>오늘 또는 최근 7일 동안 작업한 자료를 확인합니다.</p></article>
+        <article><span class="workflow-icon">⌂</span><h3>폴더 범위 검색</h3><code>검색 폴더 선택</code><p>기관별 공유 폴더를 범위로 지정해 섞이지 않게 찾습니다.</p></article>
       </div>
     </section>
 
@@ -70,7 +84,7 @@
         <div class="syntax-row"><code>regex:^2026_</code><span>정규식으로 이름 매칭</span></div>
         <div class="syntax-row"><code>content:계약서</code><span>지원하는 텍스트 파일의 본문 검색</span></div>
       </div>
-      <div class="example-callout"><span class="callout-icon">✦</span><div><strong>말하듯 검색해도 됩니다.</strong><p>자연어 모드: “지난주 100GB 이상 동영상” → <code>dm:lastweek size:&gt;100gb video:</code></p></div></div>
+      <div class="example-callout"><span class="callout-icon">✦</span><div><strong>규칙 기반 자연어 검색도 선택할 수 있습니다.</strong><p>“지난주 100GB 이상 동영상” → <code>dm:lastweek size:&gt;100gb video:</code> · 외부 AI나 서버를 사용하지 않습니다.</p></div></div>
     </section>
 
     <section class="section" id="platforms">

@@ -5,12 +5,15 @@
 // State
 let searchResults = [];
 let selectedIndex = -1;
+let selectedIndexes = new Set();
 let currentFilter = '';
 let isAiMode = false;
 let currentSortBy = 'name';
 let currentSortOrder = 'asc';
 let searchDebounceTimer = null;
+let historyDebounceTimer = null;
 let currentContextItem = null;
+let scopeRoot = '';
 
 // UI Elements
 const searchInput = document.getElementById('searchInput');
@@ -27,6 +30,15 @@ const statTotalIndexed = document.getElementById('statTotalIndexed');
 const titlebarStatus = document.getElementById('titlebarStatusText');
 const backendStatus = document.getElementById('backendStatusText');
 const statusDot = document.querySelector('.status-dot');
+const workspaceSidebar = document.getElementById('workspaceSidebar');
+const activeScope = document.getElementById('activeScope');
+const activeScopeLabel = document.getElementById('activeScopeLabel');
+const bookmarkList = document.getElementById('bookmarkList');
+const bookmarkCount = document.getElementById('bookmarkCount');
+const historyList = document.getElementById('historyList');
+const sidebarRoots = document.getElementById('sidebarRoots');
+const selectionBar = document.getElementById('selectionBar');
+const selectionSummary = document.getElementById('selectionSummary');
 
 // Modals
 const quickLookModal = document.getElementById('quickLookModal');
@@ -89,7 +101,138 @@ function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function getPathLabel(filePath) {
+  const value = String(filePath || '');
+  return value.replace(/[\\/]$/, '').split(/[\\/]/).pop() || value;
+}
+
+function updateScopeUI() {
+  if (!activeScope || !activeScopeLabel) return;
+  activeScope.hidden = !scopeRoot;
+  activeScopeLabel.textContent = scopeRoot ? getPathLabel(scopeRoot) : '';
+  activeScopeLabel.title = scopeRoot || '';
+}
+
+function setActivePreset(query) {
+  document.querySelectorAll('#workPresets .sidebar-nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.query === query && !scopeRoot);
+  });
+}
+
+function applyWorkspaceQuery(query, options = {}) {
+  currentFilter = '';
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.filter === ''));
+  scopeRoot = options.scopeRoot || '';
+  searchInput.value = query || '';
+  setActivePreset(query || '');
+  updateScopeUI();
+  if (options.bookmarkId) window.dawithAPI.touchBookmark(options.bookmarkId);
+  searchInput.focus();
+  executeSearch();
+}
+
+function renderSidebarRoots(roots = []) {
+  if (!sidebarRoots) return;
+  sidebarRoots.innerHTML = '';
+  if (!roots.length) {
+    sidebarRoots.innerHTML = '<div class="sidebar-empty">설정에서 검색 폴더를 추가하세요.</div>';
+    return;
+  }
+  roots.forEach(root => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sidebar-list-item';
+    button.dataset.root = root;
+    button.title = root;
+    button.innerHTML = `<span class="nav-mark">⌂</span><span class="sidebar-item-label">${escapeHtml(getPathLabel(root))}<small>${escapeHtml(root)}</small></span>`;
+    sidebarRoots.appendChild(button);
+  });
+}
+
+async function refreshBookmarks() {
+  if (!bookmarkList || !window.dawithAPI.listBookmarks) return;
+  const bookmarks = await window.dawithAPI.listBookmarks();
+  bookmarkCount.textContent = String(bookmarks.length);
+  bookmarkList.innerHTML = '';
+  if (!bookmarks.length) {
+    bookmarkList.innerHTML = '<div class="sidebar-empty">자주 쓰는 검색을 저장하세요.</div>';
+    return;
+  }
+  bookmarks.forEach(bookmark => {
+    const entry = document.createElement('div');
+    entry.className = 'sidebar-entry';
+    entry.innerHTML = `
+      <button class="sidebar-list-item" data-bookmark-id="${escapeHtml(bookmark.id)}" title="${escapeHtml(bookmark.query)}">
+        <span class="nav-mark">☆</span><span class="sidebar-item-label">${escapeHtml(bookmark.name)}<small>${escapeHtml(bookmark.query)}</small></span>
+      </button>
+      <button class="sidebar-item-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" title="저장된 검색 삭제">×</button>
+    `;
+    bookmarkList.appendChild(entry);
+  });
+}
+
+async function refreshHistory() {
+  if (!historyList || !window.dawithAPI.listSearchHistory) return;
+  const history = await window.dawithAPI.listSearchHistory();
+  historyList.innerHTML = '';
+  if (!history.length) {
+    historyList.innerHTML = '<div class="sidebar-empty">검색하면 최근 기록이 여기에 남습니다.</div>';
+    return;
+  }
+  history.slice(0, 8).forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sidebar-list-item';
+    button.dataset.historyQuery = item.query;
+    button.title = item.query;
+    button.innerHTML = `<span class="nav-mark">↗</span><span class="sidebar-item-label">${escapeHtml(item.query)}</span>`;
+    historyList.appendChild(button);
+  });
+}
+
+async function saveCurrentBookmark() {
+  const query = getActiveQuery();
+  if (!query && !scopeRoot) {
+    alert('먼저 저장할 검색어나 폴더 범위를 선택하세요.');
+    searchInput.focus();
+    return;
+  }
+  const defaultName = query || getPathLabel(scopeRoot);
+  const name = prompt('저장된 검색 이름을 입력하세요:', defaultName);
+  if (!name) return;
+  const result = await window.dawithAPI.addBookmark({
+    name,
+    query,
+    scopeRoot,
+    sortBy: currentSortBy,
+    sortOrder: currentSortOrder
+  });
+  if (!result.success) alert(`저장 실패: ${result.error}`);
+  await refreshBookmarks();
+}
+
+async function addSearchRoot() {
+  const result = await window.dawithAPI.chooseRoot();
+  if (!result || result.canceled || !result.path) return;
+  const config = await window.dawithAPI.getConfig();
+  const roots = Array.from(new Set([...(config.roots || []), result.path]));
+  await window.dawithAPI.saveConfig({ roots });
+  renderSidebarRoots(roots);
+  await window.dawithAPI.reindex();
+}
+
+async function initWorkspace() {
+  const config = await window.dawithAPI.getConfig();
+  renderSidebarRoots(config.roots || []);
+  await Promise.all([refreshBookmarks(), refreshHistory()]);
+  updateScopeUI();
+}
+
 // Perform Search
+function getActiveQuery() {
+  return `${currentFilter ? `${currentFilter} ` : ''}${searchInput.value.trim()}`.trim();
+}
+
 async function executeSearch() {
   const rawInput = searchInput.value.trim();
   const query = (currentFilter ? currentFilter + ' ' : '') + rawInput;
@@ -101,11 +244,14 @@ async function executeSearch() {
       useAI: isAiMode,
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
-      limit: 1000
+      limit: 1000,
+      scopeRoot: scopeRoot || undefined
     });
 
     searchResults = res.results || [];
     selectedIndex = searchResults.length > 0 ? 0 : -1;
+    selectedIndexes = searchResults.length > 0 ? new Set([0]) : new Set();
+    updateSelectionUI();
     renderResults(searchResults, rawInput);
 
     if (backendStatus) {
@@ -117,6 +263,14 @@ async function executeSearch() {
     statMatches.textContent = `${res.totalMatches.toLocaleString()}개 항목 발견`;
     statElapsed.textContent = `${res.elapsedMs} ms`;
     statTotalIndexed.textContent = `색인 항목: ${res.totalIndexed.toLocaleString()}개`;
+
+    if (query.trim()) {
+      clearTimeout(historyDebounceTimer);
+      historyDebounceTimer = setTimeout(async () => {
+        await window.dawithAPI.addSearchHistory(query);
+        refreshHistory();
+      }, 700);
+    }
   } catch (err) {
     console.error('Search error:', err);
   }
@@ -149,7 +303,7 @@ function renderResults(items, currentQuery) {
 
   items.forEach((item, idx) => {
     const row = document.createElement('div');
-    row.className = `table-row ${idx === selectedIndex ? 'selected' : ''}`;
+    row.className = `table-row ${selectedIndexes.has(idx) ? 'selected' : ''}`;
     row.dataset.index = idx;
 
     const icon = getFileIcon(item.ext, item.isDir);
@@ -180,7 +334,13 @@ function renderResults(items, currentQuery) {
         openItem(item);
         return;
       }
-      selectRow(idx);
+      if (e.metaKey || e.ctrlKey) {
+        toggleRowSelection(idx);
+      } else if (e.shiftKey && selectedIndex >= 0) {
+        selectRange(selectedIndex, idx);
+      } else {
+        selectRow(idx);
+      }
     });
 
     row.addEventListener('dblclick', () => {
@@ -203,11 +363,44 @@ function renderResults(items, currentQuery) {
 function selectRow(index) {
   if (index < 0 || index >= searchResults.length) return;
   selectedIndex = index;
+  selectedIndexes = new Set([index]);
+  updateSelectionUI();
   const rows = tableBody.children;
   for (let i = 0; i < rows.length; i++) {
     rows[i].classList.toggle('selected', i === selectedIndex);
   }
   scrollToSelected();
+}
+
+function toggleRowSelection(index) {
+  selectedIndex = index;
+  if (selectedIndexes.has(index) && selectedIndexes.size > 1) selectedIndexes.delete(index);
+  else selectedIndexes.add(index);
+  updateSelectionUI();
+  const rows = tableBody.children;
+  for (let i = 0; i < rows.length; i++) rows[i].classList.toggle('selected', selectedIndexes.has(i));
+}
+
+function selectRange(from, to) {
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+  selectedIndexes = new Set();
+  for (let index = start; index <= end; index++) selectedIndexes.add(index);
+  selectedIndex = to;
+  updateSelectionUI();
+  const rows = tableBody.children;
+  for (let i = 0; i < rows.length; i++) rows[i].classList.toggle('selected', selectedIndexes.has(i));
+}
+
+function updateSelectionUI() {
+  if (!selectionBar || !selectionSummary) return;
+  const count = selectedIndexes.size;
+  selectionBar.hidden = count < 2;
+  selectionSummary.textContent = `${count.toLocaleString()}개 선택`;
+}
+
+function getSelectedItems() {
+  return [...selectedIndexes].sort((a, b) => a - b).map(index => searchResults[index]).filter(Boolean);
 }
 
 function scrollToSelected() {
@@ -333,6 +526,8 @@ cmdPaletteList.addEventListener('click', (e) => {
 function handleCmdAction(action) {
   if (action === 'toggle-ai') {
     aiToggleBtn.click();
+  } else if (action === 'save-bookmark') {
+    saveCurrentBookmark();
   } else if (action === 'open-remote') {
     document.getElementById('btnRemoteServer').click();
   } else if (action === 'open-storage') {
@@ -392,16 +587,18 @@ document.addEventListener('keydown', (e) => {
     return;
   }
 
-  // Focus search input on Ctrl+F
-  if (e.ctrlKey && e.key === 'f') {
+  const primaryModifier = e.metaKey || e.ctrlKey;
+
+  // Focus search input on Cmd/Ctrl+F
+  if (primaryModifier && e.key === 'f') {
     searchInput.focus();
     searchInput.select();
     e.preventDefault();
     return;
   }
 
-  // Command Palette on Ctrl+K
-  if (e.ctrlKey && e.key === 'k') {
+  // Command Palette on Cmd/Ctrl+K
+  if (primaryModifier && e.key === 'k') {
     openCommandPalette();
     e.preventDefault();
     return;
@@ -416,7 +613,7 @@ document.addEventListener('keydown', (e) => {
     selectRow(Math.max(selectedIndex - 1, 0));
   } else if (e.key === 'Enter') {
     if (selectedIndex >= 0 && searchResults[selectedIndex]) {
-      if (e.ctrlKey) {
+      if (primaryModifier) {
         openItemFolder(searchResults[selectedIndex]);
       } else {
         openItem(searchResults[selectedIndex]);
@@ -431,9 +628,8 @@ document.addEventListener('keydown', (e) => {
     renameItemPrompt(searchResults[selectedIndex]);
   } else if (e.key === 'Delete' && selectedIndex >= 0) {
     deleteItemPrompt(searchResults[selectedIndex]);
-  } else if (e.ctrlKey && e.key === 'c' && document.activeElement !== searchInput && selectedIndex >= 0) {
-    const full = getFullPath(searchResults[selectedIndex]);
-    window.dawithAPI.copyPath(full);
+  } else if (primaryModifier && e.key === 'c' && document.activeElement !== searchInput && selectedIndex >= 0) {
+    copySelectedPaths();
   }
 });
 
@@ -468,6 +664,56 @@ async function deleteItemPrompt(item) {
       alert('삭제 실패: ' + res.error);
     }
   }
+}
+
+async function copySelectedPaths() {
+  const items = getSelectedItems();
+  if (!items.length) return;
+  await window.dawithAPI.copyPath(items.map(getFullPath).join('\n'));
+}
+
+async function batchRenameSelected() {
+  const items = getSelectedItems().filter(item => item && !item.isDir);
+  if (!items.length) {
+    alert('파일을 두 개 이상 선택하세요. 폴더는 일괄 이름 변경에서 제외됩니다.');
+    return;
+  }
+  const template = prompt('이름 형식을 입력하세요. {name}=기존 이름, {n}=순번, {ext}=확장자', '{name}_{n}.{ext}');
+  if (!template) return;
+  if (!confirm(`${items.length}개 파일의 이름을 변경하시겠습니까?`)) return;
+
+  let success = 0;
+  for (const [index, item] of items.entries()) {
+    const extension = item.ext || '';
+    const stem = extension ? item.name.slice(0, -(extension.length + 1)) : item.name;
+    const newName = template
+      .replace(/\{name\}/gi, stem)
+      .replace(/\{n\}/gi, String(index + 1).padStart(2, '0'))
+      .replace(/\{ext\}/gi, extension);
+    if (!newName || newName === item.name || /[\\/:*?"<>|]/.test(newName)) continue;
+    const separator = item.path.endsWith('\\') || item.path.endsWith('/') ? '' : (item.path.includes('\\') ? '\\' : '/');
+    const result = await window.dawithAPI.renameFile(getFullPath(item), item.path + separator + newName);
+    if (result.success) success++;
+  }
+  selectedIndexes = new Set();
+  updateSelectionUI();
+  await executeSearch();
+  alert(`${success}개 파일의 이름을 변경했습니다. 충돌하거나 건너뛴 파일: ${items.length - success}개`);
+}
+
+async function deleteSelectedItems() {
+  const items = getSelectedItems();
+  if (!items.length) return;
+  if (!confirm(`${items.length}개 항목을 휴지통으로 이동하시겠습니까?`)) return;
+  let success = 0;
+  for (const item of items) {
+    const result = await window.dawithAPI.deleteFile(getFullPath(item));
+    if (result.success) success++;
+  }
+  selectedIndexes = new Set();
+  updateSelectionUI();
+  await executeSearch();
+  alert(`${success}개 항목을 휴지통으로 이동했습니다.`);
 }
 
 // Context Menu Setup
@@ -568,8 +814,67 @@ document.getElementById('filterTabs').addEventListener('click', (e) => {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     e.target.classList.add('active');
     currentFilter = e.target.dataset.filter || '';
+    scopeRoot = '';
+    updateScopeUI();
+    setActivePreset('');
     executeSearch();
   }
+});
+
+document.getElementById('workPresets').addEventListener('click', (e) => {
+  const button = e.target.closest('.sidebar-nav-item');
+  if (!button) return;
+  applyWorkspaceQuery(button.dataset.query || '');
+});
+
+sidebarRoots.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-root]');
+  if (!button) return;
+  applyWorkspaceQuery('', { scopeRoot: button.dataset.root });
+});
+
+bookmarkList.addEventListener('click', async (e) => {
+  const removeButton = e.target.closest('[data-remove-bookmark]');
+  if (removeButton) {
+    await window.dawithAPI.removeBookmark(removeButton.dataset.removeBookmark);
+    await refreshBookmarks();
+    return;
+  }
+  const button = e.target.closest('[data-bookmark-id]');
+  if (!button) return;
+  const bookmarks = await window.dawithAPI.listBookmarks();
+  const bookmark = bookmarks.find(item => item.id === button.dataset.bookmarkId);
+  if (bookmark) applyWorkspaceQuery(bookmark.query, { scopeRoot: bookmark.scopeRoot, bookmarkId: bookmark.id });
+});
+
+historyList.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-history-query]');
+  if (button) applyWorkspaceQuery(button.dataset.historyQuery);
+});
+
+document.getElementById('btnSaveBookmark').addEventListener('click', saveCurrentBookmark);
+document.getElementById('btnClearHistory').addEventListener('click', async () => {
+  await window.dawithAPI.clearSearchHistory();
+  await refreshHistory();
+});
+document.getElementById('btnSidebarAddRoot').addEventListener('click', addSearchRoot);
+document.getElementById('btnAddRoot').addEventListener('click', addSearchRoot);
+document.getElementById('btnClearScope').addEventListener('click', () => {
+  scopeRoot = '';
+  updateScopeUI();
+  setActivePreset(searchInput.value.trim());
+  executeSearch();
+});
+document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
+  workspaceSidebar.classList.toggle('is-collapsed');
+});
+document.getElementById('btnCopySelectedPaths').addEventListener('click', copySelectedPaths);
+document.getElementById('btnBatchRename').addEventListener('click', batchRenameSelected);
+document.getElementById('btnDeleteSelected').addEventListener('click', deleteSelectedItems);
+document.getElementById('btnClearSelection').addEventListener('click', () => {
+  selectedIndexes = new Set();
+  updateSelectionUI();
+  renderResults(searchResults, searchInput.value.trim());
 });
 
 document.getElementById('emptyExamples').addEventListener('click', (e) => {
@@ -808,4 +1113,5 @@ async function initBackendStatus() {
 
 // Initial Search on App Launch
 initBackendStatus();
+initWorkspace();
 executeSearch();

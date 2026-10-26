@@ -26,12 +26,16 @@ const StorageAnalyzer = require('../engine/storage-analyzer');
 const DuplicateFinder = require('../engine/duplicate-finder');
 const Exporter = require('../engine/exporter');
 const RemoteServer = require('../engine/remote-server');
+const BookmarkManager = require('../engine/bookmark-manager');
+const HistoryManager = require('../engine/history-manager');
 
 let mainWindow = null;
 let guideWindow = null;
 let tray = null;
 let indexer = null;
 let remoteServer = null;
+let bookmarkManager = null;
+let historyManager = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -117,6 +121,8 @@ function setupTray() {
 app.whenReady().then(() => {
   indexer = new Indexer();
   remoteServer = new RemoteServer(indexer);
+  bookmarkManager = new BookmarkManager(indexer.storageDir);
+  historyManager = new HistoryManager(indexer.storageDir);
 
   // Fast load cached index first
   const loaded = indexer.loadCache();
@@ -196,6 +202,35 @@ app.on('window-all-closed', () => {
 ipcMain.handle('search', async (event, query, options) => {
   if (!indexer) return { results: [], totalMatches: 0, totalIndexed: 0, elapsedMs: 0 };
   return await indexer.search(query, options);
+});
+
+ipcMain.handle('list-bookmarks', () => bookmarkManager ? bookmarkManager.list() : []);
+
+ipcMain.handle('add-bookmark', (event, bookmark) => {
+  try {
+    return { success: true, bookmark: bookmarkManager.add(bookmark) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('touch-bookmark', (event, id) => ({
+  success: Boolean(bookmarkManager && bookmarkManager.touch(id))
+}));
+
+ipcMain.handle('remove-bookmark', (event, id) => ({
+  success: Boolean(bookmarkManager && bookmarkManager.remove(id))
+}));
+
+ipcMain.handle('list-search-history', () => historyManager ? historyManager.list() : []);
+
+ipcMain.handle('add-search-history', (event, query) => ({
+  success: Boolean(historyManager && historyManager.add(query))
+}));
+
+ipcMain.handle('clear-search-history', () => {
+  if (historyManager) historyManager.clear();
+  return { success: true };
 });
 
 ipcMain.handle('open-file', async (event, filePath) => {
@@ -363,6 +398,16 @@ ipcMain.handle('get-all-tags', () => {
 
 ipcMain.handle('get-config', () => {
   return indexer.config;
+});
+
+ipcMain.handle('choose-root', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '검색할 폴더 선택',
+    properties: ['openDirectory', 'createDirectory']
+  });
+  return result.canceled || result.filePaths.length === 0
+    ? { canceled: true, path: null }
+    : { canceled: false, path: result.filePaths[0] };
 });
 
 ipcMain.handle('get-backend-status', () => {

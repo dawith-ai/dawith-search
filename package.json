@@ -1,7 +1,7 @@
 {
   "name": "dawith-search",
   "version": "1.0.0",
-  "description": "Dawith Search - Voidtools Everything Clone with AI Smart Query, Spacebar Quick Look & Mobile Remote Access",
+  "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {
     "dawith-search": "bin/dawith-cli.js",

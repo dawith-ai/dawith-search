@@ -64,6 +64,13 @@ h1 em { color: var(--amber); font-style: normal; }
 .callout-icon { color: var(--amber); font-size: 20px; }
 .example-callout p { margin-top: 4px; color: var(--muted); font-size: 12px; }
 
+.workflow-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.workflow-grid article { min-height: 190px; padding: 20px; border: 1px solid var(--line); background: rgba(17,29,46,.72); }
+.workflow-icon { display: block; margin-bottom: 32px; color: var(--mint); font-size: 23px; }
+.workflow-grid h3 { font-size: 15px; letter-spacing: -.03em; }
+.workflow-grid code { display: block; margin-top: 9px; }
+.workflow-grid p { margin-top: 8px; color: var(--muted); font-size: 12px; }
+
 .platform-grid { grid-template-columns: 1fr 1fr; }
 .platform-card { display: flex; gap: 18px; min-height: 190px; }
 .platform-icon { display: grid; place-items: center; flex: 0 0 42px; height: 42px; border: 1px solid var(--line); border-radius: 12px; color: var(--blue); font-size: 24px; }
@@ -84,7 +91,7 @@ kbd { min-width: 30px; padding: 3px 8px; border: 1px solid #3b526e; border-botto
   .hero-query { margin-top: 30px; }
   .query-hint { display: none; }
   .hero-meta, .guide-footer { flex-direction: column; gap: 5px; }
-  .split-heading, .steps, .platform-grid, .shortcut-grid, .syntax-grid { grid-template-columns: 1fr; }
+  .split-heading, .steps, .platform-grid, .shortcut-grid, .syntax-grid, .workflow-grid { grid-template-columns: 1fr; }
   .syntax-row:nth-child(odd) { border-right: 0; }
   .step-card { min-height: auto; }
 }

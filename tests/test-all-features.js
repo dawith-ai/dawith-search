@@ -9,6 +9,8 @@ const DuplicateFinder = require('../src/engine/duplicate-finder');
 const StorageAnalyzer = require('../src/engine/storage-analyzer');
 const ContentSearcher = require('../src/engine/content-search');
 const TagManager = require('../src/engine/tag-manager');
+const BookmarkManager = require('../src/engine/bookmark-manager');
+const HistoryManager = require('../src/engine/history-manager');
 const { NativeSearchAdapter, normalizeEverythingRecord } = require('../src/engine/native-search');
 
 console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
@@ -33,6 +35,21 @@ assert.strictEqual(tagMgr.isStarred(testFile), false);
 tagMgr.removeTag(testFile, '예산안');
 assert.deepStrictEqual(tagMgr.getTags(testFile), ['중요문서']);
 console.log('  ✓ Tag Manager CRUD operations and persistence passed');
+
+console.log('\n1a. Testing saved searches and local search history:');
+const bookmarkMgr = new BookmarkManager(path.join(testDir, 'bookmarks'));
+const savedBookmark = bookmarkMgr.add({ name: '오늘 문서', query: 'doc: dm:today', sortBy: 'mtime', sortOrder: 'desc' });
+assert.strictEqual(bookmarkMgr.list()[0].name, '오늘 문서');
+assert.strictEqual(bookmarkMgr.touch(savedBookmark.id).id, savedBookmark.id);
+assert.strictEqual(bookmarkMgr.remove(savedBookmark.id), true);
+
+const historyMgr = new HistoryManager(path.join(testDir, 'history'));
+historyMgr.add('doc: 계약서');
+historyMgr.add('doc: 계약서');
+assert.strictEqual(historyMgr.list()[0].count, 2);
+historyMgr.clear();
+assert.strictEqual(historyMgr.list().length, 0);
+console.log('  ✓ Saved search persistence, recency, and history deduplication passed');
 
 // 1b. Cross-platform native adapter contracts
 console.log('\n1b. Testing native backend adapters:');
@@ -62,6 +79,15 @@ assert.strictEqual(normalizedRecord.ext, 'md');
 const normalizedWindowsPath = normalizeEverythingRecord({ path: 'C:\\Users\\Dawith\\Documents\\Report.md', size: 10 });
 assert.strictEqual(normalizedWindowsPath.name, 'Report.md');
 assert.strictEqual(normalizedWindowsPath.fullPath, 'C:\\Users\\Dawith\\Documents\\Report.md');
+
+const scopeIndexer = new Indexer({
+  storageDir: path.join(testDir, 'scope-index'),
+  nativeSearch: { search: async () => ({ supported: false }) }
+});
+assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'scope', 'report.pdf'), path.join(testDir, 'scope')), true);
+assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'other', 'report.pdf'), path.join(testDir, 'scope')), false);
+scopeIndexer.fileWatcher.close();
+console.log('  ✓ Folder scope boundary checks passed');
 
 // 2. Query Parser Complex Edge Cases
 console.log('\n2. Testing Query Parser Edge Cases:');

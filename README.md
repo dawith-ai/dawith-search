@@ -2,6 +2,8 @@
 
 macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하는 Electron 데스크톱 앱입니다. 검색 문법, 실시간 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
 
+사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
+
 ## 검색 백엔드
 
 - Windows: `es.exe`를 찾으면 실행 중인 Voidtools Everything의 네이티브 인덱스를 사용합니다. `DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다. Everything과 `es.exe`는 앱에 포함하지 않습니다.
@@ -17,6 +19,8 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 - 이미지·텍스트·오디오·비디오 Quick Look
 - CSV, TXT, JSON, EFU 내보내기
 - 별표·가상 태그, 안전한 휴지통 삭제, 이름 변경
+- 저장된 검색(Bookmarks), 최근 검색 기록, 기관 업무용 빠른 검색, 폴더 범위 검색
+- 기관별 검색 폴더 추가, 로컬 개인정보 보호 안내, 키보드 중심 작업 흐름
 - 스토리지 분류, 대용량 파일, SHA-256 기반 중복 분석
 - CLI와 QR 기반 모바일 원격 검색
 
@@ -56,6 +60,18 @@ dawith-cli "*.png|*.jpg" -s size -r
 - [fdir](https://github.com/thecodrr/fdir) — MIT, 초기 디렉터리 크롤링
 - [chokidar](https://github.com/paulmillr/chokidar) — MIT, 실시간 파일 감시
 - [Electron](https://github.com/electron/electron) 및 [electron-builder](https://github.com/electron-userland/electron-builder)
+
+## 참고한 오픈소스 설계
+
+코드를 무단 복사하지 않고 공개 기능·구조·사용 흐름을 비교해 이 프로젝트에 맞게 다시 구현했습니다.
+
+- [Sift File Search](https://github.com/MalyStern/sift-file-search) — MIT, 크로스플랫폼 로컬 검색, 저장 검색, 최근 검색, 키보드 우선 흐름 참고
+- [File-Find](https://github.com/Pixel-Master/File-Find) — GPL-3.0, 검색 캐시, 제외 목록, 로컬 전용 운영과 권한 안내 참고
+- [FilesMate](https://github.com/DieDust/FilesMate) — 공개 저장소, 폴더 범위·즐겨찾기·미리보기·작업대 중심의 파일 업무 흐름 참고
+- [fdir](https://github.com/thecodrr/fdir) — MIT, 초기 디렉터리 크롤링에 실제 사용
+- [chokidar](https://github.com/paulmillr/chokidar) — MIT, 파일 변경 감시에 실제 사용
+
+각 프로젝트의 라이선스와 원문은 링크에서 확인할 수 있습니다. 앱에 실제로 포함한 라이브러리는 위의 `fdir`, `chokidar`, Electron 계열이며, Sift/File-Find/FilesMate는 설계 비교 자료입니다.
 
 Everything/ES는 Voidtools의 별도 소프트웨어이며, 공식 CLI 사용 조건은 [Voidtools 문서](https://www.voidtools.com/en-us/support/everything/command_line_interface/)를 따릅니다.
 

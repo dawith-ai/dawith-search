@@ -60,8 +60,8 @@
       </div>
 
       <div class="header-actions">
-        <button class="btn btn-toggle" id="btnAiToggle" title="자연어 문장을 Everything 검색 문법으로 자동 변환">
-          <span class="icon">✦</span> AI 검색
+        <button class="btn btn-toggle" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
+          <span class="icon">✦</span> 자연어 검색
         </button>
         <div class="tools-menu-wrap">
           <button class="btn btn-ghost" id="btnTools" type="button" aria-expanded="false" aria-controls="toolsMenu">
@@ -90,24 +90,102 @@
       </div>
     </header>
 
+    <div class="workspace-shell">
+      <aside class="workspace-sidebar" id="workspaceSidebar" aria-label="검색 작업 공간">
+        <div class="sidebar-heading">
+          <div>
+            <span class="sidebar-eyebrow">MY WORKSPACE</span>
+            <h2>내 파일 찾기</h2>
+          </div>
+          <button class="sidebar-collapse-btn" id="btnSidebarCollapse" type="button" title="사이드바 접기">‹</button>
+        </div>
+
+        <button class="sidebar-save-btn" id="btnSaveBookmark" type="button">
+          <span>＋</span> 현재 검색 저장
+        </button>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">업무 바로가기</div>
+          <nav class="sidebar-nav" id="workPresets">
+            <button class="sidebar-nav-item active" data-query="" type="button"><span class="nav-mark">⌕</span>전체 파일</button>
+            <button class="sidebar-nav-item" data-query="doc:" type="button"><span class="nav-mark">▤</span>문서 모아보기</button>
+            <button class="sidebar-nav-item" data-query="ext:xls,xlsx,csv" type="button"><span class="nav-mark">▦</span>통계·스프레드시트</button>
+            <button class="sidebar-nav-item" data-query="ext:hwp,hwpx,pdf" type="button"><span class="nav-mark">▧</span>한글·PDF</button>
+            <button class="sidebar-nav-item" data-query="dm:today" type="button"><span class="nav-mark">◷</span>오늘 수정한 파일</button>
+            <button class="sidebar-nav-item" data-query="dm:lastweek" type="button"><span class="nav-mark">↺</span>최근 7일</button>
+            <button class="sidebar-nav-item" data-query="starred:" type="button"><span class="nav-mark">☆</span>즐겨찾기</button>
+            <button class="sidebar-nav-item" data-query="size:>100mb" type="button"><span class="nav-mark">◒</span>큰 파일 정리</button>
+          </nav>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-heading">
+            <div class="sidebar-section-title">검색 폴더</div>
+            <button class="sidebar-section-action" id="btnSidebarAddRoot" type="button" title="검색 폴더 추가">＋</button>
+          </div>
+          <div class="sidebar-list" id="sidebarRoots"></div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-heading">
+            <div class="sidebar-section-title">저장된 검색</div>
+            <span class="sidebar-count" id="bookmarkCount">0</span>
+          </div>
+          <div class="sidebar-list" id="bookmarkList">
+            <div class="sidebar-empty">자주 쓰는 검색을 저장하세요.</div>
+          </div>
+        </div>
+
+        <div class="sidebar-section sidebar-history-section">
+          <div class="sidebar-section-heading">
+            <div class="sidebar-section-title">최근 검색</div>
+            <button class="sidebar-clear-btn" id="btnClearHistory" type="button">지우기</button>
+          </div>
+          <div class="sidebar-list" id="historyList"></div>
+        </div>
+
+        <div class="sidebar-privacy">
+          <span class="privacy-icon">◇</span>
+          <div><strong>이 PC 안에서만 처리</strong><small>검색어와 파일 목록은 외부로 보내지지 않습니다.</small></div>
+        </div>
+      </aside>
+
+      <div class="workspace-main">
     <!-- Category Filter Tabs -->
     <nav class="filter-bar">
       <div class="filter-tabs" id="filterTabs">
-        <button class="tab-btn active" data-filter="">모두 (All)</button>
-        <button class="tab-btn" data-filter="doc:">📄 문서</button>
-        <button class="tab-btn" data-filter="pic:">🖼️ 사진</button>
-        <button class="tab-btn" data-filter="video:">🎬 동영상</button>
-        <button class="tab-btn" data-filter="audio:">🎵 음악</button>
-        <button class="tab-btn" data-filter="zip:">📦 압축</button>
-        <button class="tab-btn" data-filter="exe:">⚙️ 실행</button>
-        <button class="tab-btn" data-filter="folder:">📁 폴더</button>
-        <button class="tab-btn" data-filter="starred:">⭐ 즐겨찾기</button>
-        <button class="tab-btn" data-filter="dupe:">🔄 중복 파일</button>
+        <button class="tab-btn active" data-filter="">모두</button>
+        <button class="tab-btn" data-filter="doc:">문서</button>
+        <button class="tab-btn" data-filter="pic:">사진</button>
+        <button class="tab-btn" data-filter="video:">동영상</button>
+        <button class="tab-btn" data-filter="audio:">음악</button>
+        <button class="tab-btn" data-filter="zip:">압축</button>
+        <button class="tab-btn" data-filter="exe:">실행</button>
+        <button class="tab-btn" data-filter="folder:">폴더</button>
+        <button class="tab-btn" data-filter="starred:">즐겨찾기</button>
+        <button class="tab-btn" data-filter="dupe:">중복</button>
       </div>
-      <button class="syntax-hint-badge" id="syntaxHintBtn" type="button" title="Dawith Search 사용 안내">
-        사용 안내 <span aria-hidden="true">↗</span>
-      </button>
+      <div class="filter-actions">
+        <div class="active-scope" id="activeScope" hidden>
+          <span class="scope-symbol">⌂</span><span id="activeScopeLabel">현재 폴더</span>
+          <button id="btnClearScope" type="button" title="폴더 범위 해제">×</button>
+        </div>
+        <button class="syntax-hint-badge" id="syntaxHintBtn" type="button" title="Dawith Search 사용 안내">
+          사용 안내 <span aria-hidden="true">↗</span>
+        </button>
+      </div>
     </nav>
+
+    <div class="selection-bar" id="selectionBar" hidden>
+      <span class="selection-summary" id="selectionSummary">0개 선택</span>
+      <span class="selection-hint">⌘/Ctrl을 누르고 여러 항목을 선택할 수 있습니다.</span>
+      <div class="selection-actions">
+        <button class="btn btn-sm btn-ghost" id="btnCopySelectedPaths" type="button">경로 복사</button>
+        <button class="btn btn-sm btn-ghost" id="btnBatchRename" type="button">이름 일괄 변경</button>
+        <button class="btn btn-sm btn-danger" id="btnDeleteSelected" type="button">휴지통으로 이동</button>
+        <button class="selection-clear" id="btnClearSelection" type="button" title="선택 해제">×</button>
+      </div>
+    </div>
 
     <!-- Main Results Area -->
     <main class="results-container">
@@ -153,6 +231,8 @@
         <span class="key-hint"><kbd>Ctrl+K</kbd> 명령 팔레트</span>
       </div>
     </footer>
+      </div>
+    </div>
   </div>
 
   <!-- Command Palette Modal (Ctrl+K) -->
@@ -163,7 +243,8 @@
         <input type="text" id="cmdPaletteInput" placeholder="명령어를 검색하세요 (예: 재색인, 모바일, 용량, 내보내기, AI)..." />
       </div>
       <div class="cmd-list" id="cmdPaletteList">
-        <div class="cmd-item" data-action="toggle-ai">✨ AI 자연어 검색 모드 토글</div>
+        <div class="cmd-item" data-action="toggle-ai">✦ 인터넷 없이 자연어 검색 모드 토글</div>
+        <div class="cmd-item" data-action="save-bookmark">＋ 현재 검색 저장</div>
         <div class="cmd-item" data-action="open-remote">📱 모바일 원격 공유 (QR 코드)</div>
         <div class="cmd-item" data-action="open-storage">📊 스토리지 용량 & 중복 파일 분석</div>
         <div class="cmd-item" data-action="reindex">⚡ 전체 디스크 다시 색인 (Reindex)</div>
@@ -250,6 +331,7 @@
         <div class="setting-group">
           <label>색인할 드라이브 및 폴더 (Roots):</label>
           <div class="roots-list" id="rootsList"></div>
+          <button class="btn btn-sm btn-ghost mt-2" id="btnAddRoot">＋ 검색 폴더 추가</button>
           <button class="btn btn-sm btn-ghost mt-2" id="btnReindexNow">⚡ 지금 전체 다시 색인 (Reindex)</button>
         </div>
         <div class="setting-group mt-4">

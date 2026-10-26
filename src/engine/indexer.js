@@ -394,8 +394,9 @@ class Indexer extends EventEmitter {
   async search(queryString, options = {}) {
     const start = Date.now();
     const parsed = QueryParser.parse(queryString, options);
+    const scopeRoot = options.scopeRoot ? path.resolve(String(options.scopeRoot)) : null;
 
-    if (this.config.searchBackend !== 'local' && !options.forceLocal) {
+    if (this.config.searchBackend !== 'local' && !options.forceLocal && !scopeRoot) {
       const nativeResult = await this.nativeSearch.search(parsed.raw, options, this.config.roots);
       if (nativeResult.supported) {
         const nativeRecords = nativeResult.records.map(item => ({
@@ -426,6 +427,7 @@ class Indexer extends EventEmitter {
     } else {
       for (let i = 0; i < this.records.length; i++) {
         const item = this.records[i];
+        if (scopeRoot && !this.isWithinScope(getFullPath(item), scopeRoot)) continue;
         if (QueryParser.matches(item, parsed)) {
           matched.push(item);
           if (!parsed.content && matched.length >= limit) break;
@@ -438,7 +440,7 @@ class Indexer extends EventEmitter {
       const contentFiltered = [];
       for (const item of matched) {
         if (item.isDir) continue;
-        const full = path.join(item.path, item.name);
+        const full = getFullPath(item);
         const hasContent = await ContentSearcher.matchesContent(full, item.ext, parsed.content, parsed.caseSensitive);
         if (hasContent) {
           contentFiltered.push(item);
@@ -462,6 +464,13 @@ class Indexer extends EventEmitter {
       parsedQuery: parsed,
       backend: 'local'
     };
+  }
+
+  isWithinScope(fullPath, scopeRoot) {
+    const fileKey = normalizePathKey(path.resolve(fullPath));
+    const rootKey = normalizePathKey(path.resolve(scopeRoot));
+    const separator = path.sep;
+    return fileKey === rootKey || fileKey.startsWith(`${rootKey}${separator}`);
   }
 
   sortResults(items, options = {}) {

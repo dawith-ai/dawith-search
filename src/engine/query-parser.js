@@ -112,14 +112,17 @@ function translateNaturalLanguage(raw) {
     { regex: /(?:최근|지난주|지난 주)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:lastweek ' },
     { regex: /(?:어제)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:yesterday ' },
     { regex: /(?:오늘)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:today ' },
-    { regex: /(\d+)\s*(?:mb|gb|kb)\s*(?:이상|넘는|초과)/gi, replace: (m, p1) => `size:>${p1}mb ` },
-    { regex: /(\d+)\s*(?:mb|gb|kb)\s*(?:이하|미만)/gi, replace: (m, p1) => `size:<${p1}mb ` },
+    { regex: /(\d+)\s*(mb|gb|kb)\s*(?:이상|넘는|초과)/gi, replace: (m, value, unit) => `size:>${value}${unit} ` },
+    { regex: /(\d+)\s*(mb|gb|kb)\s*(?:이하|미만)/gi, replace: (m, value, unit) => `size:<${value}${unit} ` },
     { regex: /(?:대용량 파일|큰 파일)/gi, replace: 'size:huge ' },
     { regex: /(?:중복\s*파일|중복된\s*파일)/gi, replace: 'dupe:name ' },
     { regex: /(?:동영상|비디오|영상)/gi, replace: 'video: ' },
     { regex: /(?:사진|이미지|포토)/gi, replace: 'pic: ' },
     { regex: /(?:음악|오디오|노래|mp3)/gi, replace: 'audio: ' },
     { regex: /(?:문서|보고서|문서들)/gi, replace: 'doc: ' },
+    { regex: /(?:엑셀|스프레드시트)/gi, replace: 'ext:xlsx,xls ' },
+    { regex: /(?:워드|한글문서)/gi, replace: 'ext:doc,docx,hwp,hwpx ' },
+    { regex: /(?:pdf문서|pdf 파일)/gi, replace: 'ext:pdf ' },
     { regex: /(?:압축\s*파일|압축파일)/gi, replace: 'zip: ' },
     { regex: /(?:실행\s*파일|설치\s*파일)/gi, replace: 'exe: ' },
     { regex: /(?:폴더만|디렉토리만)/gi, replace: 'folder: ' }
@@ -258,10 +261,11 @@ class QueryParser {
         const pattern = cleanToken.replace(/^regex:|^r:/i, '');
         try {
           filters.regex = new RegExp(pattern, filters.caseSensitive ? '' : 'i');
+          continue;
         } catch (e) {
-          // fallback to term
+          // Treat malformed regex input as a literal search term.
+          cleanToken = pattern;
         }
-        continue;
       }
       if (lower.startsWith('ext:')) {
         const exts = cleanToken.slice(4).split(/[,;]/).map(e => e.trim().toLowerCase().replace(/^\./, '')).filter(Boolean);
@@ -352,8 +356,9 @@ class QueryParser {
       if (!parsedFilters.extensions.includes(item.ext)) return false;
     }
 
-    // Size filters
-    if (parsedFilters.sizeConditions.length > 0 && !item.isDir) {
+    // Size filters apply to files only, matching Everything's file-size semantics.
+    if (parsedFilters.sizeConditions.length > 0) {
+      if (item.isDir) return false;
       for (const cond of parsedFilters.sizeConditions) {
         if (cond.op === '>' && !(item.size > cond.bytes)) return false;
         if (cond.op === '>=' && !(item.size >= cond.bytes)) return false;
@@ -383,6 +388,7 @@ class QueryParser {
         if (cond.op === '>=' && !(ctime >= cond.time)) return false;
         if (cond.op === '<' && !(ctime < cond.time)) return false;
         if (cond.op === '<=' && !(ctime <= cond.time)) return false;
+        if (cond.op === '=' && !(Math.abs(ctime - cond.time) < 86400000)) return false;
       }
     }
 
@@ -409,13 +415,17 @@ class QueryParser {
 
     // Regex filter
     if (parsedFilters.regex) {
-      const targetStr = parsedFilters.matchPath ? (item.path + (item.path.endsWith('\\') ? '' : '\\') + item.name) : item.name;
+      const separator = item.path && item.path.includes('\\') ? '\\' : '/';
+      const targetStr = parsedFilters.matchPath
+        ? (item.path + (item.path.endsWith('\\') || item.path.endsWith('/') ? '' : separator) + item.name)
+        : item.name;
       if (!parsedFilters.regex.test(targetStr)) return false;
     }
 
     // Terms (AND groups of OR clauses)
-    const targetText = parsedFilters.matchPath 
-      ? (item.path + '\\' + item.name)
+    const separator = item.path && item.path.includes('\\') ? '\\' : '/';
+    const targetText = parsedFilters.matchPath
+      ? (item.path + (item.path.endsWith('\\') || item.path.endsWith('/') ? '' : separator) + item.name)
       : item.name;
     const cmpTarget = parsedFilters.caseSensitive ? targetText : targetText.toLowerCase();
 

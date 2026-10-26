@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   renameFile: (oldPath, newPath) => ipcRenderer.invoke('rename-file', oldPath, newPath),
   getFileContent: (filePath) => ipcRenderer.invoke('get-file-content', filePath),
   getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
+  getFileUrl: (filePath) => ipcRenderer.invoke('get-file-url', filePath),
   
   exportResults: (format, items) => ipcRenderer.invoke('export-results', format, items),
   
@@ -25,6 +26,8 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   getAllTags: () => ipcRenderer.invoke('get-all-tags'),
   
   getConfig: () => ipcRenderer.invoke('get-config'),
+  getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
+  openGuide: () => ipcRenderer.invoke('open-guide'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),
   reindex: () => ipcRenderer.invoke('reindex'),
   

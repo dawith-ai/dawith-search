@@ -1,12 +1,24 @@
 const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { pathToFileURL } = require('url');
+
+function writeCrashLog(message) {
+  try {
+    const logDir = app.isReady() ? app.getPath('logs') : path.join(os.tmpdir(), 'dawith-search');
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(path.join(logDir, 'crash.log'), `${message}\n`, 'utf8');
+  } catch (error) {
+    console.error('Unable to write crash log:', error);
+  }
+}
 
 process.on('uncaughtException', (err) => {
-  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'UNCAUGHT: ' + err.stack + '\n');
+  writeCrashLog('UNCAUGHT: ' + err.stack);
 });
 process.on('unhandledRejection', (reason) => {
-  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'REJECTION: ' + (reason && reason.stack ? reason.stack : reason) + '\n');
+  writeCrashLog('REJECTION: ' + (reason && reason.stack ? reason.stack : reason));
 });
 
 const Indexer = require('../engine/indexer');
@@ -16,6 +28,7 @@ const Exporter = require('../engine/exporter');
 const RemoteServer = require('../engine/remote-server');
 
 let mainWindow = null;
+let guideWindow = null;
 let tray = null;
 let indexer = null;
 let remoteServer = null;
@@ -32,7 +45,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false
+      webSecurity: true
     },
     show: true
   });
@@ -41,6 +54,31 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+}
+
+function openGuideWindow() {
+  if (guideWindow && !guideWindow.isDestroyed()) {
+    guideWindow.show();
+    guideWindow.focus();
+    return;
+  }
+
+  guideWindow = new BrowserWindow({
+    width: 1120,
+    height: 800,
+    minWidth: 780,
+    minHeight: 620,
+    title: 'Dawith Search 사용 안내',
+    backgroundColor: '#0a0f19',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
+  });
+  guideWindow.loadFile(path.join(__dirname, '../renderer/guide.html'));
+  guideWindow.on('closed', () => {
+    guideWindow = null;
   });
 }
 
@@ -127,6 +165,12 @@ app.whenReady().then(() => {
     }
   });
 
+  indexer.on('indexing-error', (error) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('index-status', { status: 'error', error: error.message });
+    }
+  });
+
   // If not cached, start indexing immediately in background
   if (!loaded || indexer.records.length === 0) {
     setTimeout(() => {
@@ -142,7 +186,7 @@ app.on('will-quit', () => {
 });
 
 app.on('window-all-closed', () => {
-  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'EVENT: window-all-closed\n');
+  writeCrashLog('EVENT: window-all-closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
@@ -157,8 +201,8 @@ ipcMain.handle('search', async (event, query, options) => {
 ipcMain.handle('open-file', async (event, filePath) => {
   try {
     if (fs.existsSync(filePath)) {
-      await shell.openPath(filePath);
-      return { success: true };
+      const error = await shell.openPath(filePath);
+      return error ? { success: false, error } : { success: true };
     }
     return { success: false, error: 'File not found' };
   } catch (err) {
@@ -223,6 +267,15 @@ ipcMain.handle('get-file-content', async (event, filePath) => {
       content: buffer.toString('utf8'),
       truncated: stat.size > limit
     };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('get-file-url', (event, filePath) => {
+  try {
+    if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' };
+    return { success: true, url: pathToFileURL(filePath).toString() };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -312,34 +365,44 @@ ipcMain.handle('get-config', () => {
   return indexer.config;
 });
 
+ipcMain.handle('get-backend-status', () => {
+  return indexer ? indexer.nativeSearch.getStatus() : { backend: 'local', label: '로컬 색인 모드', available: false };
+});
+
+ipcMain.handle('open-guide', () => {
+  openGuideWindow();
+  return { success: true };
+});
+
 ipcMain.handle('save-config', (event, config) => {
   indexer.config = { ...indexer.config, ...config };
+  indexer.fileWatcher.watch(indexer.config.roots);
   indexer.saveConfig();
   return { success: true };
 });
 
 ipcMain.handle('reindex', async () => {
-  if (indexer) {
-    indexer.startIndexing();
-    return { success: true };
+  try {
+    await indexer.startIndexing();
+    return { success: true, ...indexer.stats };
+  } catch (err) {
+    return { success: false, error: err.message };
   }
-  return { success: false };
 });
 
 ipcMain.handle('window-minimize', () => {
-  if (mainWindow) mainWindow.minimize();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize();
+  return { success: true };
 });
 
 ipcMain.handle('window-maximize', () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
-  }
+  if (!mainWindow || mainWindow.isDestroyed()) return { success: false };
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+  else mainWindow.maximize();
+  return { success: true, maximized: mainWindow.isMaximized() };
 });
 
 ipcMain.handle('window-close', () => {
-  if (mainWindow) mainWindow.close();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  return { success: true };
 });

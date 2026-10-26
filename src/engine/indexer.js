@@ -2,10 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const EventEmitter = require('events');
+const { fdir } = require('fdir');
 const { QueryParser } = require('./query-parser');
 const FileWatcher = require('./file-watcher');
 const TagManager = require('./tag-manager');
 const ContentSearcher = require('./content-search');
+const { NativeSearchAdapter } = require('./native-search');
+const { getFullPath, normalizePathKey } = require('./path-utils');
 
 class Indexer extends EventEmitter {
   constructor(options = {}) {
@@ -15,7 +18,12 @@ class Indexer extends EventEmitter {
     this.configFile = path.join(this.storageDir, 'config.json');
 
     this.tagManager = new TagManager(this.storageDir);
-    this.fileWatcher = new FileWatcher();
+    this.fileWatcher = new FileWatcher({ ignored: this.getIgnoredPaths() });
+    this.nativeSearch = options.nativeSearch || new NativeSearchAdapter({
+      platform: options.platform,
+      esPath: options.esPath
+    });
+    this.saveTimer = null;
 
     // In-memory index
     this.records = []; // Array of file records
@@ -54,7 +62,8 @@ class Indexer extends EventEmitter {
       ],
       excludeHidden: true,
       maxDepth: 12,
-      autoStartWatcher: true
+      autoStartWatcher: true,
+      searchBackend: 'auto'
     };
 
     if (fs.existsSync(this.configFile)) {
@@ -80,7 +89,7 @@ class Indexer extends EventEmitter {
   }
 
   getDefaultRoots() {
-    const userProfile = process.env.USERPROFILE || os.homedir();
+    const userProfile = os.homedir();
     const candidateDirs = [
       path.join(userProfile, 'Desktop'),
       path.join(userProfile, 'Documents'),
@@ -88,7 +97,7 @@ class Indexer extends EventEmitter {
       path.join(userProfile, 'Pictures'),
       path.join(userProfile, 'Videos'),
       path.join(userProfile, 'Music'),
-      'C:\\Users\\jhpar\\orca'
+      path.join(userProfile, 'Movies')
     ];
 
     const roots = [];
@@ -100,6 +109,16 @@ class Indexer extends EventEmitter {
 
     if (roots.length === 0) roots.push(userProfile);
     return roots;
+  }
+
+  getIgnoredPaths() {
+    return (filePath) => {
+      const excluded = new Set(((this.config && this.config.excludeFolders) || []).map(item => String(item).toLowerCase()));
+      const segments = filePath.split(/[\\/]/).filter(Boolean);
+      const name = path.basename(filePath);
+      if (this.config && this.config.excludeHidden && name.startsWith('.')) return true;
+      return segments.some(segment => excluded.has(segment.toLowerCase()));
+    };
   }
 
   setupWatcher() {
@@ -144,8 +163,8 @@ class Indexer extends EventEmitter {
     this.recordMap.clear();
     for (let i = 0; i < this.records.length; i++) {
       const rec = this.records[i];
-      const fullPath = path.join(rec.path, rec.name);
-      this.recordMap.set(fullPath.toLowerCase(), i);
+      const fullPath = getFullPath(rec);
+      this.recordMap.set(normalizePathKey(fullPath), i);
     }
   }
 
@@ -175,29 +194,75 @@ class Indexer extends EventEmitter {
     this.emit('indexing-started');
 
     const newRecords = [];
-    const roots = this.config.roots;
+    try {
+      for (const root of this.config.roots) {
+        if (!fs.existsSync(root)) continue;
+        await this.scanRoot(root, newRecords);
+      }
 
-    for (const root of roots) {
-      if (!fs.existsSync(root)) continue;
-      await this.scanDirectory(root, newRecords, 0, this.config.maxDepth);
+      this.records = newRecords;
+      this.rebuildMap();
+      this.updateStats();
+      this.stats.lastIndexedAt = Date.now();
+      this.saveCache();
+      this.emit('indexing-finished', {
+        totalFiles: this.stats.totalFiles,
+        totalFolders: this.stats.totalFolders,
+        totalBytes: this.stats.totalBytes
+      });
+
+      if (this.config.autoStartWatcher) {
+        this.fileWatcher.watch(this.config.roots);
+      }
+    } catch (error) {
+      this.emit('indexing-error', error);
+      throw error;
+    } finally {
+      this.isIndexing = false;
+    }
+  }
+
+  async scanRoot(root, outputArray) {
+    const crawler = new fdir()
+      .withFullPaths()
+      .withDirs()
+      .withMaxDepth(this.config.maxDepth)
+      .exclude((dirName) => this.shouldExcludeName(dirName));
+
+    const paths = await crawler.crawl(root).withPromise();
+    const records = await Promise.all(paths.map(itemPath => this.createRecord(itemPath)));
+    outputArray.push(...records.filter(Boolean));
+  }
+
+  shouldExcludeName(name) {
+    if (this.config.excludeHidden && name.startsWith('.')) return true;
+    return this.config.excludeFolders.some(excluded => name.toLowerCase() === String(excluded).toLowerCase());
+  }
+
+  async createRecord(fullPath) {
+    const name = path.basename(fullPath);
+    if (this.shouldExcludeName(name)) return null;
+
+    let stat;
+    try {
+      stat = await fs.promises.stat(fullPath);
+    } catch (error) {
+      return null;
     }
 
-    this.records = newRecords;
-    this.rebuildMap();
-    this.updateStats();
-    this.stats.lastIndexedAt = Date.now();
-    this.isIndexing = false;
-
-    this.saveCache();
-    this.emit('indexing-finished', {
-      totalFiles: this.stats.totalFiles,
-      totalFolders: this.stats.totalFolders,
-      totalBytes: this.stats.totalBytes
-    });
-
-    if (this.config.autoStartWatcher) {
-      this.fileWatcher.watch(this.config.roots);
-    }
+    const isDir = stat.isDirectory();
+    return {
+      name,
+      path: path.dirname(fullPath),
+      fullPath,
+      size: isDir ? 0 : stat.size,
+      mtime: stat.mtimeMs,
+      ctime: stat.birthtimeMs || stat.ctimeMs,
+      isDir,
+      ext: isDir ? '' : path.extname(name).replace(/^\./, '').toLowerCase(),
+      tags: this.tagManager.getTags(fullPath),
+      starred: this.tagManager.isStarred(fullPath)
+    };
   }
 
   async scanDirectory(dir, outputArray, depth, maxDepth) {
@@ -248,6 +313,7 @@ class Indexer extends EventEmitter {
       outputArray.push({
         name,
         path: dir,
+        fullPath,
         size,
         mtime,
         ctime,
@@ -269,7 +335,7 @@ class Indexer extends EventEmitter {
   }
 
   onFileCreated(fullPath, stats, isDir) {
-    const key = fullPath.toLowerCase();
+    const key = normalizePathKey(fullPath);
     if (this.recordMap.has(key)) return;
 
     const dir = path.dirname(fullPath);
@@ -279,6 +345,7 @@ class Indexer extends EventEmitter {
     const record = {
       name,
       path: dir,
+      fullPath,
       size: stats ? stats.size : 0,
       mtime: stats ? stats.mtimeMs : Date.now(),
       ctime: stats ? (stats.birthtimeMs || stats.ctimeMs) : Date.now(),
@@ -292,28 +359,31 @@ class Indexer extends EventEmitter {
     this.records.push(record);
     this.recordMap.set(key, newIdx);
     this.updateStats();
+    this.scheduleCacheSave();
     this.emit('file-updated', { type: 'created', fullPath });
   }
 
   onFileChanged(fullPath, stats) {
-    const key = fullPath.toLowerCase();
+    const key = normalizePathKey(fullPath);
     const idx = this.recordMap.get(key);
     if (idx !== undefined && this.records[idx]) {
       if (stats) {
         this.records[idx].size = stats.size;
         this.records[idx].mtime = stats.mtimeMs;
       }
+      this.scheduleCacheSave();
       this.emit('file-updated', { type: 'changed', fullPath });
     }
   }
 
   onFileDeleted(fullPath) {
-    const key = fullPath.toLowerCase();
+    const key = normalizePathKey(fullPath);
     const idx = this.recordMap.get(key);
     if (idx !== undefined && this.records[idx]) {
       this.records.splice(idx, 1);
       this.rebuildMap();
       this.updateStats();
+      this.scheduleCacheSave();
       this.emit('file-updated', { type: 'deleted', fullPath });
     }
   }
@@ -324,6 +394,28 @@ class Indexer extends EventEmitter {
   async search(queryString, options = {}) {
     const start = Date.now();
     const parsed = QueryParser.parse(queryString, options);
+
+    if (this.config.searchBackend !== 'local' && !options.forceLocal) {
+      const nativeResult = await this.nativeSearch.search(parsed.raw, options, this.config.roots);
+      if (nativeResult.supported) {
+        const nativeRecords = nativeResult.records.map(item => ({
+          ...item,
+          fullPath: getFullPath(item),
+          tags: this.tagManager.getTags(getFullPath(item)),
+          starred: this.tagManager.isStarred(getFullPath(item))
+        }));
+        const sorted = this.sortResults(nativeRecords, options);
+        return {
+          results: sorted.slice(0, options.limit || 5000),
+          totalMatches: sorted.length,
+          totalIndexed: this.records.length,
+          elapsedMs: Date.now() - start,
+          parsedQuery: parsed,
+          backend: nativeResult.backend,
+          warning: nativeResult.warning || null
+        };
+      }
+    }
 
     let matched = [];
     const limit = options.limit || 5000;
@@ -336,7 +428,7 @@ class Indexer extends EventEmitter {
         const item = this.records[i];
         if (QueryParser.matches(item, parsed)) {
           matched.push(item);
-          if (matched.length >= limit) break;
+          if (!parsed.content && matched.length >= limit) break;
         }
       }
     }
@@ -359,16 +451,7 @@ class Indexer extends EventEmitter {
     const sortBy = options.sortBy || 'name'; // 'name', 'path', 'size', 'mtime', 'ext'
     const sortOrder = options.sortOrder === 'desc' ? -1 : 1;
 
-    matched.sort((a, b) => {
-      let valA = a[sortBy];
-      let valB = b[sortBy];
-      if (typeof valA === 'string') {
-        return valA.localeCompare(valB) * sortOrder;
-      }
-      if (valA < valB) return -1 * sortOrder;
-      if (valA > valB) return 1 * sortOrder;
-      return 0;
-    });
+    matched = this.sortResults(matched, options);
 
     const elapsedMs = Date.now() - start;
     return {
@@ -376,8 +459,29 @@ class Indexer extends EventEmitter {
       totalMatches: matched.length,
       totalIndexed: this.records.length,
       elapsedMs,
-      parsedQuery: parsed
+      parsedQuery: parsed,
+      backend: 'local'
     };
+  }
+
+  sortResults(items, options = {}) {
+    const sortBy = options.sortBy || 'name';
+    const sortOrder = options.sortOrder === 'desc' ? -1 : 1;
+    return [...items].sort((a, b) => {
+      const valA = a[sortBy] ?? '';
+      const valB = b[sortBy] ?? '';
+      if (typeof valA === 'string' || typeof valB === 'string') {
+        return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: 'base' }) * sortOrder;
+      }
+      if (valA < valB) return -1 * sortOrder;
+      if (valA > valB) return 1 * sortOrder;
+      return 0;
+    });
+  }
+
+  scheduleCacheSave() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(() => this.saveCache(), 250);
   }
 
   findDuplicatesQuick(by = 'name') {

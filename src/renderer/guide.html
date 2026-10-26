@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dawith Search 사용 안내</title>
+  <link rel="stylesheet" href="guide.css">
+</head>
+<body>
+  <header class="guide-nav">
+    <a class="brand" href="#top"><span class="brand-mark">✦</span> Dawith Search</a>
+    <nav aria-label="안내 메뉴">
+      <a href="#start">시작하기</a>
+      <a href="#syntax">검색 문법</a>
+      <a href="#platforms">플랫폼</a>
+      <a href="#shortcuts">단축키</a>
+    </nav>
+    <span class="nav-badge">LOCAL-FIRST SEARCH</span>
+  </header>
+
+  <main id="top">
+    <section class="guide-hero">
+      <div class="eyebrow">DAWITH SEARCH / QUICK GUIDE</div>
+      <h1>파일이 어디 있든,<br><em>바로 찾습니다.</em></h1>
+      <p class="hero-copy">Everything의 빠른 검색 감각을 macOS와 Windows에 맞게 다시 설계했습니다. 한 단어로 시작하고, 필요한 순간에만 정교한 문법을 더하세요.</p>
+      <div class="hero-query"><span class="query-prompt">⌕</span><span>보고서</span><span class="query-caret"></span><span class="query-hint">24 ms · 로컬 색인</span></div>
+      <div class="hero-meta"><span><i class="pulse"></i> 검색 준비 완료</span><span>파일명 · 경로 · 크기 · 수정일</span></div>
+    </section>
+
+    <section class="section" id="start">
+      <div class="section-heading">
+        <span class="section-kicker">START HERE</span>
+        <h2>처음 3분 사용법</h2>
+        <p>검색창에 입력하고 결과를 선택하면 됩니다. 나머지는 필요할 때 꺼내 쓰는 도구입니다.</p>
+      </div>
+      <div class="steps">
+        <article class="step-card">
+          <span class="step-number">01</span>
+          <h3>검색 루트를 확인하세요</h3>
+          <p>설정에서 Desktop, Documents, Downloads 같은 기본 루트를 확인하고 필요한 폴더를 추가합니다.</p>
+          <code>⚙ 설정 → 색인할 폴더</code>
+        </article>
+        <article class="step-card featured">
+          <span class="step-number">02</span>
+          <h3>아는 만큼만 입력하세요</h3>
+          <p><code>report</code>처럼 이름 일부만 입력해도 됩니다. 자연어 모드를 켜면 “지난주 큰 영상”도 검색식으로 바뀝니다.</p>
+          <code>⌘/Ctrl + F → 검색창</code>
+        </article>
+        <article class="step-card">
+          <span class="step-number">03</span>
+          <h3>결과에서 바로 작업하세요</h3>
+          <p>Enter로 열고, Ctrl/⌘ + Enter로 위치를 열고, Space로 미리 봅니다. 우클릭에는 태그와 안전한 삭제가 있습니다.</p>
+          <code>Space → Quick Look</code>
+        </article>
+      </div>
+    </section>
+
+    <section class="section syntax-section" id="syntax">
+      <div class="section-heading split-heading">
+        <div><span class="section-kicker">SEARCH LANGUAGE</span><h2>검색 문법은 짧게,<br>결과는 정확하게.</h2></div>
+        <p>공백은 AND입니다. 여러 조건을 한 줄에 조합하고, 모르는 문법은 문법 도움말에서 예시를 복사해 시작하세요.</p>
+      </div>
+      <div class="syntax-grid">
+        <div class="syntax-row"><code>report 2026</code><span>보고서와 2026을 모두 포함</span></div>
+        <div class="syntax-row"><code>jpg|png</code><span>jpg 또는 png 파일</span></div>
+        <div class="syntax-row"><code>doc !draft</code><span>doc은 포함하고 draft는 제외</span></div>
+        <div class="syntax-row"><code>ext:pdf,xlsx</code><span>확장자로 제한</span></div>
+        <div class="syntax-row"><code>size:&gt;100mb</code><span>100MB보다 큰 파일</span></div>
+        <div class="syntax-row"><code>dm:today</code><span>오늘 수정한 항목</span></div>
+        <div class="syntax-row"><code>regex:^2026_</code><span>정규식으로 이름 매칭</span></div>
+        <div class="syntax-row"><code>content:계약서</code><span>지원하는 텍스트 파일의 본문 검색</span></div>
+      </div>
+      <div class="example-callout"><span class="callout-icon">✦</span><div><strong>말하듯 검색해도 됩니다.</strong><p>자연어 모드: “지난주 100GB 이상 동영상” → <code>dm:lastweek size:&gt;100gb video:</code></p></div></div>
+    </section>
+
+    <section class="section" id="platforms">
+      <div class="section-heading"><span class="section-kicker">UNDER THE HOOD</span><h2>플랫폼에 맞는 검색 엔진</h2><p>백엔드는 자동 선택됩니다. 특정 기능이 필요한 쿼리는 정확도를 위해 로컬 인덱서로 전환됩니다.</p></div>
+      <div class="platform-grid">
+        <article class="platform-card windows"><div class="platform-icon">⊞</div><div><span class="platform-label">WINDOWS</span><h3>Everything 연결</h3><p>실행 중인 Voidtools Everything과 `es.exe`가 발견되면 네이티브 인덱스를 사용합니다. 설치하지 않아도 자체 인덱서로 동작합니다.</p><code>DAWITH_ES_PATH=…\\es.exe</code></div></article>
+        <article class="platform-card mac"><div class="platform-icon">⌘</div><div><span class="platform-label">MACOS</span><h3>Spotlight + 로컬 색인</h3><p>단순 파일명 검색은 Spotlight로 빠르게 시작하고, 크기·날짜·본문·태그 조건은 로컬 색인에서 일관되게 처리합니다.</p><code>simple → Spotlight / advanced → local</code></div></article>
+      </div>
+    </section>
+
+    <section class="section shortcut-section" id="shortcuts">
+      <div class="section-heading"><span class="section-kicker">KEYBOARD FIRST</span><h2>손을 검색창에서 떼지 마세요.</h2></div>
+      <div class="shortcut-grid">
+        <div><kbd>↑</kbd><kbd>↓</kbd><span>결과 이동</span></div>
+        <div><kbd>Enter</kbd><span>기본 앱으로 열기</span></div>
+        <div><kbd>Ctrl</kbd><span>+</span><kbd>Enter</kbd><span>상위 폴더 열기</span></div>
+        <div><kbd>Space</kbd><span>Quick Look</span></div>
+        <div><kbd>F2</kbd><span>이름 변경</span></div>
+        <div><kbd>Ctrl</kbd><span>+</span><kbd>K</kbd><span>명령 팔레트</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="guide-footer"><span>DAWITH SEARCH</span><span>로컬 파일은 로컬에 남습니다.</span><span>검색 결과와 인덱스 상태는 환경에 따라 달라질 수 있습니다.</span></footer>
+</body>
+</html>

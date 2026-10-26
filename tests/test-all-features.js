@@ -9,6 +9,7 @@ const DuplicateFinder = require('../src/engine/duplicate-finder');
 const StorageAnalyzer = require('../src/engine/storage-analyzer');
 const ContentSearcher = require('../src/engine/content-search');
 const TagManager = require('../src/engine/tag-manager');
+const { NativeSearchAdapter, normalizeEverythingRecord } = require('../src/engine/native-search');
 
 console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
 
@@ -32,6 +33,32 @@ assert.strictEqual(tagMgr.isStarred(testFile), false);
 tagMgr.removeTag(testFile, '예산안');
 assert.deepStrictEqual(tagMgr.getTags(testFile), ['중요문서']);
 console.log('  ✓ Tag Manager CRUD operations and persistence passed');
+
+// 1b. Cross-platform native adapter contracts
+console.log('\n1b. Testing native backend adapters:');
+const fakeEs = new NativeSearchAdapter({
+  platform: 'win32',
+  esPath: 'C:\\Tools\\es.exe',
+  spawn: (command, args, options, callback) => callback(null, JSON.stringify([
+    { name: 'Report.txt', path: 'C:\\Users\\Dawith\\Documents', size: '1,024', date_modified: '2026-10-26T10:00:00Z' }
+  ]), '')
+});
+assert.strictEqual(fakeEs.supports('report ext:txt'), true);
+assert.strictEqual(fakeEs.supports('tag:important'), false);
+fakeEs.search('report', { limit: 10 }).then(result => {
+  assert.strictEqual(result.supported, true);
+  assert.strictEqual(result.backend, 'everything');
+  assert.strictEqual(result.records[0].size, 1024);
+  assert.strictEqual(result.records[0].ext, 'txt');
+  console.log('  ✓ Everything JSON adapter normalization and local-only filter routing passed');
+}).catch(error => {
+  console.error('Native adapter test error:', error);
+  process.exit(1);
+});
+
+const normalizedRecord = normalizeEverythingRecord({ path: '/Users/dawith/Documents/Report.md', size: 10 });
+assert.strictEqual(normalizedRecord.name, 'Report.md');
+assert.strictEqual(normalizedRecord.ext, 'md');
 
 // 2. Query Parser Complex Edge Cases
 console.log('\n2. Testing Query Parser Edge Cases:');
@@ -66,6 +93,13 @@ let qSizePreset = QueryParser.parse('size:huge');
 assert.strictEqual(QueryParser.matches({ name: 'big.zip', size: 50 * 1024 * 1024, isDir: false }, qSizePreset), true);
 assert.strictEqual(QueryParser.matches({ name: 'small.zip', size: 1024, isDir: false }, qSizePreset), false);
 console.log('  ✓ size:huge (16MB - 128MB) preset filter passed');
+
+let qSizeOnFolder = QueryParser.parse('size:>1mb');
+assert.strictEqual(QueryParser.matches({ name: 'folder', isDir: true, size: 0 }, qSizeOnFolder), false);
+let qBadRegex = QueryParser.parse('regex:[broken');
+assert.strictEqual(QueryParser.matches({ name: '[broken-report.txt', isDir: false }, qBadRegex), true);
+assert.ok(translateNaturalLanguage('100GB 이상 동영상').includes('size:>100GB'));
+console.log('  ✓ Directory size semantics, malformed regex fallback, and natural-language units passed');
 
 // 3. Duplicate Finder Edge Cases
 console.log('\n3. Testing Duplicate Finder Edge Cases:');

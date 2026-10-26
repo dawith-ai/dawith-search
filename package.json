@@ -10,8 +10,12 @@
   "scripts": {
     "start": "electron .",
     "cli": "node bin/dawith-cli.js",
+    "test": "node tests/test-all-features.js",
+    "lint": "node scripts/check-syntax.js",
+    "check": "npm run lint && npm test",
     "build": "electron-builder",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
   },
   "keywords": [
     "everything",
@@ -25,13 +29,14 @@
   "dependencies": {
     "chokidar": "^3.6.0",
     "express": "^4.21.2",
+    "fdir": "^6.5.0",
     "lucide-react": "^1.16.0",
     "qrcode": "^1.5.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "electron": "^28.3.3",
-    "electron-builder": "^24.13.3"
+    "electron": "^45.0.0",
+    "electron-builder": "^26.18.0"
   },
   "build": {
     "appId": "com.dawith.search",
@@ -45,6 +50,13 @@
         "portable"
       ],
       "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities"
     },
     "portable": {
       "artifactName": "DawithSearch-${version}-portable.exe"

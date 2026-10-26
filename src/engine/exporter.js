@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getFullPath } = require('./path-utils');
 
 class Exporter {
   static formatBytes(bytes) {
@@ -15,7 +16,7 @@ class Exporter {
     const rows = [headers.join(',')];
 
     for (const item of items) {
-      const fullPath = path.join(item.path, item.name);
+      const fullPath = getFullPath(item);
       const row = [
         `"${item.name.replace(/"/g, '""')}"`,
         `"${item.path.replace(/"/g, '""')}"`,
@@ -37,7 +38,7 @@ class Exporter {
     return JSON.stringify(items.map(item => ({
       name: item.name,
       path: item.path,
-      fullPath: path.join(item.path, item.name),
+      fullPath: getFullPath(item),
       size: item.size,
       mtime: item.mtime,
       ctime: item.ctime,
@@ -59,7 +60,7 @@ class Exporter {
     ];
 
     for (const item of items) {
-      const fullPath = path.join(item.path, item.name);
+      const fullPath = getFullPath(item);
       const mtimeWin = toWindowsFileTime(item.mtime);
       const ctimeWin = toWindowsFileTime(item.ctime);
       const attr = item.isDir ? '16' : '32'; // 16 = Directory, 32 = Archive

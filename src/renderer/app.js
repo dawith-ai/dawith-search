@@ -23,6 +23,7 @@ const statMatches = document.getElementById('statMatches');
 const statElapsed = document.getElementById('statElapsed');
 const statTotalIndexed = document.getElementById('statTotalIndexed');
 const titlebarStatus = document.getElementById('titlebarStatusText');
+const backendStatus = document.getElementById('backendStatusText');
 const statusDot = document.querySelector('.status-dot');
 
 // Modals
@@ -104,6 +105,12 @@ async function executeSearch() {
     searchResults = res.results || [];
     selectedIndex = searchResults.length > 0 ? 0 : -1;
     renderResults(searchResults, rawInput);
+
+    if (backendStatus) {
+      backendStatus.textContent = res.backend === 'everything'
+        ? 'Everything'
+        : res.backend === 'spotlight' ? 'Spotlight' : '로컬 색인';
+    }
 
     statMatches.textContent = `${res.totalMatches.toLocaleString()}개 항목 발견`;
     statElapsed.textContent = `${res.elapsedMs} ms`;
@@ -202,7 +209,12 @@ function scrollToSelected() {
 
 // File Actions
 function getFullPath(item) {
-  return item.path + (item.path.endsWith('\\') ? '' : '\\') + item.name;
+  if (item.fullPath) return item.fullPath;
+  if (!item.path) return item.name || '';
+  const separator = item.path.endsWith('\\') || item.path.endsWith('/')
+    ? ''
+    : (item.path.includes('\\') ? '\\' : '/');
+  return item.path + separator + item.name;
 }
 
 async function openItem(item) {
@@ -243,19 +255,20 @@ async function showQuickLook(item) {
   const ext = (item.ext || '').toLowerCase();
 
   // Handle Images
-  const fileUrl = 'file:///' + encodeURI(full.replace(/\\/g, '/')).replace(/#/g, '%23');
+  const fileUrlResult = await window.dawithAPI.getFileUrl(full);
+  const fileUrl = fileUrlResult.success ? fileUrlResult.url : '';
 
-  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+  if (fileUrl && ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
     bodyEl.innerHTML = `<img src="${fileUrl}" alt="Preview" />`;
     return;
   }
 
   // Handle Audio / Video
-  if (['mp4', 'webm', 'ogg'].includes(ext)) {
+  if (fileUrl && ['mp4', 'webm', 'ogg'].includes(ext)) {
     bodyEl.innerHTML = `<video controls autoplay style="max-width:100%; max-height:100%;"><source src="${fileUrl}" type="video/${ext}"></video>`;
     return;
   }
-  if (['mp3', 'wav'].includes(ext)) {
+  if (fileUrl && ['mp3', 'wav'].includes(ext)) {
     bodyEl.innerHTML = `<audio controls autoplay><source src="${fileUrl}" type="audio/${ext}"></audio>`;
     return;
   }
@@ -399,7 +412,10 @@ async function renameItemPrompt(item) {
   const oldFull = getFullPath(item);
   const newName = prompt('새 파일/폴더 이름을 입력하세요:', item.name);
   if (newName && newName !== item.name) {
-    const newFull = item.path + (item.path.endsWith('\\') ? '' : '\\') + newName;
+    const separator = item.path.endsWith('\\') || item.path.endsWith('/')
+      ? ''
+      : (item.path.includes('\\') ? '\\' : '/');
+    const newFull = item.path + separator + newName;
     const res = await window.dawithAPI.renameFile(oldFull, newFull);
     if (res.success) {
       item.name = newName;
@@ -706,7 +722,7 @@ document.getElementById('btnReindexNow').addEventListener('click', async () => {
 
 // Syntax Guide
 document.getElementById('syntaxHintBtn').addEventListener('click', () => {
-  syntaxModal.style.display = 'flex';
+  window.dawithAPI.openGuide();
 });
 document.getElementById('btnCloseSyntax').addEventListener('click', () => {
   syntaxModal.style.display = 'none';
@@ -728,8 +744,21 @@ window.dawithAPI.onIndexStatus((data) => {
     executeSearch();
   } else if (data.status === 'updated') {
     executeSearch();
+  } else if (data.status === 'error') {
+    statusDot.className = 'status-dot error';
+    titlebarStatus.textContent = '색인 오류';
   }
 });
 
+async function initBackendStatus() {
+  try {
+    const status = await window.dawithAPI.getBackendStatus();
+    if (backendStatus) backendStatus.textContent = status.label || '로컬 색인';
+  } catch (error) {
+    if (backendStatus) backendStatus.textContent = '로컬 색인';
+  }
+}
+
 // Initial Search on App Launch
+initBackendStatus();
 executeSearch();

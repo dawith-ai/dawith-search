@@ -62,9 +62,7 @@ class FileWatcher extends EventEmitter {
       .on('unlinkDir', (dirPath) => {
         this.emit('folder-deleted', dirPath);
       })
-      .on('error', (err) => {
-        // Silently swallow permission / EPERM errors
-      });
+      .on('error', (err) => this.emit('watch-error', err));
   }
 
   close() {

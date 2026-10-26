@@ -1,6 +1,13 @@
-const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, globalShortcut, Tray, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, globalShortcut, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+process.on('uncaughtException', (err) => {
+  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'UNCAUGHT: ' + err.stack + '\n');
+});
+process.on('unhandledRejection', (reason) => {
+  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'REJECTION: ' + (reason && reason.stack ? reason.stack : reason) + '\n');
+});
 
 const Indexer = require('../engine/indexer');
 const StorageAnalyzer = require('../engine/storage-analyzer');
@@ -25,16 +32,12 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false // allow local media previews
+      webSecurity: false
     },
-    show: false
+    show: true
   });
 
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -44,8 +47,10 @@ function createWindow() {
 function setupTray() {
   try {
     const iconPath = path.join(__dirname, '../assets/icon.png');
-    // If icon exists use it, or fallback
-    tray = new Tray(fs.existsSync(iconPath) ? iconPath : path.join(__dirname, '../assets/tray.png'));
+    if (!fs.existsSync(iconPath)) return;
+    const nImg = nativeImage.createFromPath(iconPath);
+    if (nImg.isEmpty()) return;
+    tray = new Tray(nImg.resize({ width: 16, height: 16 }));
     const contextMenu = Menu.buildFromTemplate([
       { label: 'Dawith Search 열기', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } else createWindow(); } },
       { label: '색인 새로고침 (Reindex)', click: () => { if (indexer) indexer.startIndexing(); } },
@@ -67,7 +72,7 @@ function setupTray() {
       }
     });
   } catch (e) {
-    // Tray optional fallback
+    console.error('Tray error ignored:', e);
   }
 }
 
@@ -137,6 +142,7 @@ app.on('will-quit', () => {
 });
 
 app.on('window-all-closed', () => {
+  fs.appendFileSync(path.join(__dirname, '../../crash.log'), 'EVENT: window-all-closed\n');
   if (process.platform !== 'darwin') {
     app.quit();
   }

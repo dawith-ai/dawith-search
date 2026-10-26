@@ -16,6 +16,8 @@ let currentContextItem = null;
 const searchInput = document.getElementById('searchInput');
 const clearBtn = document.getElementById('btnClear');
 const aiToggleBtn = document.getElementById('btnAiToggle');
+const toolsButton = document.getElementById('btnTools');
+const toolsMenu = document.getElementById('toolsMenu');
 const btnThemeToggle = document.getElementById('btnThemeToggle');
 const tableBody = document.getElementById('tableBody');
 const emptyState = document.getElementById('emptyState');
@@ -131,6 +133,14 @@ function renderResults(items, currentQuery) {
 
   if (items.length === 0) {
     emptyState.style.display = 'block';
+    const hasQuery = Boolean(currentQuery || currentFilter);
+    document.getElementById('emptyTitle').textContent = hasQuery
+      ? '검색 결과가 없습니다'
+      : '검색을 시작하세요';
+    document.getElementById('emptySub').textContent = hasQuery
+      ? '다른 키워드나 필터 조건을 사용해 보세요.'
+      : '파일명이나 폴더명을 입력하면 이 PC의 파일을 바로 찾습니다.';
+    document.getElementById('emptyExamples').style.display = hasQuery ? 'none' : 'flex';
     return;
   }
   emptyState.style.display = 'none';
@@ -288,6 +298,7 @@ const cmdPaletteInput = document.getElementById('cmdPaletteInput');
 const cmdPaletteList = document.getElementById('cmdPaletteList');
 
 function openCommandPalette() {
+  closeToolsMenu();
   cmdPaletteModal.style.display = 'flex';
   cmdPaletteInput.value = '';
   filterCmdItems('');
@@ -339,6 +350,25 @@ function handleCmdAction(action) {
   }
 }
 
+function closeToolsMenu() {
+  if (!toolsMenu || !toolsButton) return;
+  toolsMenu.hidden = true;
+  toolsButton.setAttribute('aria-expanded', 'false');
+}
+
+if (toolsButton && toolsMenu) {
+  toolsButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+    toolsMenu.hidden = !toolsMenu.hidden;
+    toolsButton.setAttribute('aria-expanded', String(!toolsMenu.hidden));
+  });
+
+  toolsMenu.addEventListener('click', closeToolsMenu);
+  document.addEventListener('click', (event) => {
+    if (!event.target.closest('.tools-menu-wrap')) closeToolsMenu();
+  });
+}
+
 // Keyboard Navigation
 document.addEventListener('keydown', (e) => {
   // If Quick Look open, Escape closes it
@@ -358,6 +388,7 @@ document.addEventListener('keydown', (e) => {
     settingsModal.style.display = 'none';
     syntaxModal.style.display = 'none';
     contextMenu.style.display = 'none';
+    closeToolsMenu();
     return;
   }
 
@@ -499,8 +530,16 @@ clearBtn.addEventListener('click', () => {
 function initTheme() {
   const savedTheme = localStorage.getItem('theme') || 'light-theme';
   document.body.className = savedTheme;
-  if (btnThemeToggle) {
-    btnThemeToggle.textContent = savedTheme === 'light-theme' ? '🌙' : '☀️';
+  updateThemeIcon(savedTheme);
+}
+
+function updateThemeIcon(theme) {
+  if (!btnThemeToggle) return;
+  const icon = btnThemeToggle.querySelector('.tool-menu-icon');
+  if (icon) {
+    icon.textContent = theme === 'light-theme' ? '◐' : '☼';
+  } else {
+    btnThemeToggle.textContent = theme === 'light-theme' ? '🌙' : '☀️';
   }
 }
 
@@ -509,7 +548,7 @@ if (btnThemeToggle) {
     const isLight = document.body.classList.contains('light-theme');
     const newTheme = isLight ? 'dark-theme' : 'light-theme';
     document.body.className = newTheme;
-    btnThemeToggle.textContent = newTheme === 'light-theme' ? '🌙' : '☀️';
+    updateThemeIcon(newTheme);
     localStorage.setItem('theme', newTheme);
   });
 }
@@ -531,6 +570,14 @@ document.getElementById('filterTabs').addEventListener('click', (e) => {
     currentFilter = e.target.dataset.filter || '';
     executeSearch();
   }
+});
+
+document.getElementById('emptyExamples').addEventListener('click', (e) => {
+  const button = e.target.closest('button[data-query]');
+  if (!button) return;
+  searchInput.value = button.dataset.query;
+  searchInput.focus();
+  executeSearch();
 });
 
 // Table Column Sorting
@@ -601,9 +648,9 @@ async function loadStorageOverview() {
   const cats = data.categories;
 
   storageBody.innerHTML = `
-    <div style="margin-bottom:14px;">
-      <h4 style="color:#f3f4f6; margin-bottom:4px;">전체 색인 파일: ${data.totalFiles.toLocaleString()}개 (${formatBytes(data.totalBytes)})</h4>
-      <p style="color:#94a3b8; font-size:11px;">카테고리별 디스크 사용량 현황입니다.</p>
+    <div class="storage-summary">
+      <h4>전체 색인 파일: ${data.totalFiles.toLocaleString()}개 (${formatBytes(data.totalBytes)})</h4>
+      <p>카테고리별 디스크 사용량 현황입니다.</p>
     </div>
     <div class="storage-category-bar">
       <div class="storage-seg seg-doc" style="width: ${(cats.documents.bytes / data.totalBytes * 100) || 0}%" title="문서"></div>
@@ -614,12 +661,12 @@ async function loadStorageOverview() {
       <div class="storage-seg seg-exe" style="width: ${(cats.executables.bytes / data.totalBytes * 100) || 0}%" title="실행"></div>
       <div class="storage-seg seg-other" style="width: ${(cats.others.bytes / data.totalBytes * 100) || 0}%" title="기타"></div>
     </div>
-    <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; margin-top:16px;">
+    <div class="storage-category-grid">
       ${Object.values(cats).map(c => `
-        <div style="background:#1e293b; padding:10px; border-radius:6px; border:1px solid #334155;">
-          <div style="font-weight:600; color:#e2e8f0;">${c.label}</div>
-          <div style="color:#38bdf8; font-size:14px; font-weight:700;">${formatBytes(c.bytes)}</div>
-          <div style="color:#64748b; font-size:11px;">${c.count.toLocaleString()}개 파일</div>
+        <div class="storage-category-card">
+          <div class="storage-category-label">${c.label}</div>
+          <div class="storage-category-size">${formatBytes(c.bytes)}</div>
+          <div class="storage-category-count">${c.count.toLocaleString()}개 파일</div>
         </div>
       `).join('')}
     </div>
@@ -634,28 +681,28 @@ document.getElementById('tabStorageOverview').addEventListener('click', (e) => {
 document.getElementById('tabDuplicates').addEventListener('click', async (e) => {
   setStorageTabActive(e.target);
   const storageBody = document.getElementById('storageBody');
-  storageBody.innerHTML = '<div style="padding:20px; text-align:center; color:#94a3b8;">중복 파일 해시 분석 중... (잠시만 기다려주세요)</div>';
+  storageBody.innerHTML = '<div class="storage-empty">중복 파일을 확인하고 있습니다…</div>';
 
   const res = await window.dawithAPI.findDuplicates({ minSize: 10240 }); // > 10KB
   if (res.groups.length === 0) {
-    storageBody.innerHTML = '<div style="padding:20px; text-align:center; color:#10b981;">축하합니다! 발견된 중복 파일이 없습니다.</div>';
+    storageBody.innerHTML = '<div class="storage-empty storage-empty-success">중복 파일이 없습니다.</div>';
     return;
   }
 
   storageBody.innerHTML = `
-    <div style="margin-bottom:12px; color:#f3f4f6;">
-      발견된 중복 그룹: <strong>${res.groups.length}개</strong> (절약 가능한 공간: <span style="color:#ef4444; font-weight:bold;">${formatBytes(res.totalWastedBytes)}</span>)
+    <div class="duplicate-summary">
+      발견된 중복 그룹: <strong>${res.groups.length}개</strong> · 절약 가능한 공간: <strong>${formatBytes(res.totalWastedBytes)}</strong>
     </div>
-    <div style="max-height:350px; overflow-y:auto; display:flex; flex-direction:column; gap:10px;">
+    <div class="duplicate-list">
       ${res.groups.map(grp => `
-        <div style="background:#1e293b; border:1px solid #334155; border-radius:6px; padding:10px;">
-          <div style="display:flex; justify-content:space-between; font-weight:600; margin-bottom:6px;">
+        <div class="duplicate-group">
+          <div class="duplicate-group-heading">
             <span>${grp.items[0].name} (${formatBytes(grp.size)})</span>
-            <span style="color:#f59e0b;">${grp.items.length}개 중복</span>
+            <span class="duplicate-count">${grp.items.length}개 중복</span>
           </div>
           ${grp.items.map(it => `
-            <div style="font-size:11px; color:#94a3b8; display:flex; justify-content:space-between; padding:3px 0; border-top:1px solid #283548;">
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:500px;" title="${getFullPath(it)}">${getFullPath(it)}</span>
+            <div class="duplicate-path-row">
+              <span class="duplicate-path" title="${getFullPath(it)}">${getFullPath(it)}</span>
               <button class="btn btn-sm btn-ghost" onclick="window.dawithAPI.openFolder('${getFullPath(it).replace(/\\/g, '\\\\')}')">위치</button>
             </div>
           `).join('')}
@@ -710,7 +757,7 @@ document.getElementById('btnSettings').addEventListener('click', async () => {
   settingsModal.style.display = 'flex';
   const cfg = await window.dawithAPI.getConfig();
   const rootsList = document.getElementById('rootsList');
-  rootsList.innerHTML = (cfg.roots || []).map(r => `<div style="padding:4px 8px; background:#1e293b; border-radius:4px; margin-bottom:4px; font-family:monospace;">📁 ${r}</div>`).join('');
+  rootsList.innerHTML = (cfg.roots || []).map(r => `<div class="root-item"><span>⌂</span><code>${escapeHtml(r)}</code></div>`).join('');
 });
 document.getElementById('btnCloseSettings').addEventListener('click', () => {
   settingsModal.style.display = 'none';

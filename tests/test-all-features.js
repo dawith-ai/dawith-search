@@ -59,6 +59,9 @@ fakeEs.search('report', { limit: 10 }).then(result => {
 const normalizedRecord = normalizeEverythingRecord({ path: '/Users/dawith/Documents/Report.md', size: 10 });
 assert.strictEqual(normalizedRecord.name, 'Report.md');
 assert.strictEqual(normalizedRecord.ext, 'md');
+const normalizedWindowsPath = normalizeEverythingRecord({ path: 'C:\\Users\\Dawith\\Documents\\Report.md', size: 10 });
+assert.strictEqual(normalizedWindowsPath.name, 'Report.md');
+assert.strictEqual(normalizedWindowsPath.fullPath, 'C:\\Users\\Dawith\\Documents\\Report.md');
 
 // 2. Query Parser Complex Edge Cases
 console.log('\n2. Testing Query Parser Edge Cases:');

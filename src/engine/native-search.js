@@ -36,13 +36,30 @@ function parseTimestamp(value) {
   return Number.isNaN(timestamp) ? 0 : timestamp;
 }
 
+function portableBasename(value) {
+  return String(value || '').replace(/[\\/]$/, '').split(/[\\/]/).pop() || '';
+}
+
+function portableDirname(value) {
+  const clean = String(value || '').replace(/[\\/]$/, '');
+  const separatorIndex = Math.max(clean.lastIndexOf('\\'), clean.lastIndexOf('/'));
+  return separatorIndex >= 0 ? clean.slice(0, separatorIndex) || clean.slice(0, 1) : '';
+}
+
+function portableJoin(directory, name) {
+  const base = String(directory || '');
+  return /\\|^[A-Za-z]:/.test(base)
+    ? path.win32.join(base, name)
+    : path.join(base, name);
+}
+
 function normalizeEverythingRecord(raw) {
-  const rawPath = raw.path || raw.full_path || raw.filename || raw.name || '';
-  const name = raw.name || raw.filename || path.basename(rawPath.replace(/[\\/]$/, ''));
+  const rawPath = String(raw.path || raw.full_path || raw.filename || raw.name || '');
+  const name = raw.name || raw.filename || portableBasename(rawPath);
   const directory = raw.path && raw.name
     ? String(raw.path).replace(/[\\/]$/, '')
-    : path.dirname(rawPath);
-  const fullPath = raw.fullPath || raw.full_path || (directory && name ? path.join(directory, name) : rawPath);
+    : portableDirname(rawPath);
+  const fullPath = raw.fullPath || raw.full_path || (directory && name ? portableJoin(directory, name) : rawPath);
   const isDir = Boolean(raw.isDir || raw.is_directory || raw.directory || raw.attributes === 16 || /[\\/]$/.test(rawPath));
 
   return {

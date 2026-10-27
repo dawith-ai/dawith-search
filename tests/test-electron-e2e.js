@@ -220,6 +220,7 @@ async function startApp(port) {
     `--user-data-dir=${userDataDir}`,
     '--disable-gpu'
   ];
+  if (process.platform === 'linux') launchArgs.push('--no-sandbox');
   if (!process.env.DAWITH_E2E_BINARY) launchArgs.push(repoRoot);
   appProcess = spawn(electronBinary, launchArgs, {
     cwd: repoRoot,
@@ -312,6 +313,10 @@ async function run() {
   await evaluate("document.querySelector('#searchInput')?.blur()");
   await evaluate("document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Space', key: ' ' }))");
   await waitForState('quick look', state => state.quickLookDisplay === 'flex');
+  await waitFor('quick look content', async () => {
+    const body = await evaluate("document.querySelector('#qlBody')?.textContent || ''");
+    return body.includes('사회복지기관') || body.includes('미리보기를');
+  });
   const quickLook = await evaluate("({ name: document.querySelector('#qlName')?.textContent, body: document.querySelector('#qlBody')?.textContent })");
   assert.ok(quickLook.name);
   assert.ok(quickLook.body.includes('사회복지기관') || quickLook.body.includes('미리보기를'));

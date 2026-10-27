@@ -1,6 +1,6 @@
 {
   "name": "dawith-search",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {
@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "cli": "node bin/dawith-cli.js",
-    "test": "node tests/test-all-features.js",
+    "test": "node tests/test-all-features.js && node tests/test-operations.js",
     "lint": "node scripts/check-syntax.js && node scripts/check-renderer-contract.js",
     "check": "npm run lint && npm test",
     "build": "electron-builder",

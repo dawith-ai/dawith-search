@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { ensurePrivateDirectory, readJsonWithBackup, writeJsonAtomic } = require('./storage-utils');
 
 const MAX_HISTORY = 40;
 
@@ -14,22 +15,16 @@ class HistoryManager {
   }
 
   ensureDir() {
-    fs.mkdirSync(this.storageDir, { recursive: true });
+    ensurePrivateDirectory(this.storageDir);
   }
 
   load() {
-    if (!fs.existsSync(this.dataFile)) return;
-    try {
-      const raw = JSON.parse(fs.readFileSync(this.dataFile, 'utf8'));
-      this.items = Array.isArray(raw.items) ? raw.items.filter(item => item && item.query) : [];
-    } catch (error) {
-      this.items = [];
-    }
+    const raw = readJsonWithBackup(this.dataFile, null);
+    this.items = raw && Array.isArray(raw.items) ? raw.items.filter(item => item && item.query) : [];
   }
 
   save() {
-    this.ensureDir();
-    fs.writeFileSync(this.dataFile, JSON.stringify({ version: 1, items: this.items }, null, 2), 'utf8');
+    writeJsonAtomic(this.dataFile, { version: 1, items: this.items });
   }
 
   list() {

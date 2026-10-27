@@ -3,6 +3,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const crypto = require('crypto');
 const QRCode = require('qrcode');
 
 class RemoteServer {
@@ -12,6 +13,8 @@ class RemoteServer {
     this.server = null;
     this.port = 8888;
     this.isRunning = false;
+    this.accessToken = null;
+    this.requestLog = new Map();
   }
 
   getLocalIP() {
@@ -27,20 +30,38 @@ class RemoteServer {
   }
 
   async start(port = 8888) {
-    if (this.isRunning) return { port: this.port, url: `http://${this.getLocalIP()}:${this.port}` };
+    if (this.isRunning) return this.getAccessInfo();
 
-    this.port = port;
+    const requestedPort = Number(port);
+    if (!Number.isInteger(requestedPort) || requestedPort < 0 || requestedPort > 65535) {
+      throw new Error('Remote server port must be between 0 and 65535.');
+    }
+
+    this.port = requestedPort;
+    this.accessToken = crypto.randomBytes(32).toString('hex');
     this.app = express();
     this.server = http.createServer(this.app);
 
-    this.app.use(express.json());
+    this.app.disable('x-powered-by');
+    this.app.use(express.json({ limit: '32kb' }));
+    this.app.use((req, res, next) => {
+      if (!this.isAuthorized(req)) {
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(401).json({ error: 'Remote access token is required.' });
+      }
+      if (!this.isRateAllowed(req)) {
+        return res.status(429).json({ error: 'Too many requests. Try again shortly.' });
+      }
+      next();
+    });
 
     // API: Search
     this.app.get('/api/search', async (req, res) => {
       try {
         const query = req.query.q || '';
-        const limit = parseInt(req.query.limit, 10) || 100;
-        const results = await this.indexer.search(query, { limit });
+        const requestedLimit = parseInt(req.query.limit, 10) || 100;
+        const limit = Math.min(Math.max(requestedLimit, 1), 100);
+        const results = await this.indexer.search(query, { limit, forceLocal: true });
         res.json(results);
       } catch (err) {
         res.status(500).json({ error: err.message });
@@ -49,24 +70,26 @@ class RemoteServer {
 
     // API: Download file
     this.app.get('/api/download', (req, res) => {
-      const filePath = req.query.path;
-      if (!filePath || !fs.existsSync(filePath)) {
+      const filePath = this.resolveAllowedFile(req.query.path);
+      if (!filePath) {
         return res.status(404).send('File not found');
       }
-      res.download(filePath);
+      res.download(filePath, path.basename(filePath), { dotfiles: 'deny' });
     });
 
     // API: Preview / Stream media
     this.app.get('/api/preview', (req, res) => {
-      const filePath = req.query.path;
-      if (!filePath || !fs.existsSync(filePath)) {
+      const filePath = this.resolveAllowedFile(req.query.path);
+      if (!filePath) {
         return res.status(404).send('File not found');
       }
-      res.sendFile(filePath);
+      res.sendFile(filePath, { dotfiles: 'deny' });
     });
 
     // Serve Mobile Web UI
     this.app.get('/', (req, res) => {
+      res.setHeader('Set-Cookie', `dawith_remote_token=${this.accessToken}; HttpOnly; SameSite=Strict; Max-Age=1800; Path=/`);
+      res.setHeader('Cache-Control', 'no-store');
       const html = this.renderMobileHtml();
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(html);
@@ -74,9 +97,9 @@ class RemoteServer {
 
     return new Promise((resolve, reject) => {
       this.server.listen(this.port, '0.0.0.0', async () => {
+        this.port = this.server.address().port;
         this.isRunning = true;
-        const localIP = this.getLocalIP();
-        const url = `http://${localIP}:${this.port}`;
+        const { url, localIP } = this.getAccessInfo();
         let qrDataUrl = '';
         try {
           qrDataUrl = await QRCode.toDataURL(url);
@@ -92,17 +115,72 @@ class RemoteServer {
     if (this.server && this.isRunning) {
       this.server.close();
       this.isRunning = false;
+      this.accessToken = null;
+      this.requestLog.clear();
     }
   }
 
   getStatus() {
+    return this.getAccessInfo();
+  }
+
+  getAccessInfo() {
     const localIP = this.getLocalIP();
+    const token = this.accessToken ? `?token=${encodeURIComponent(this.accessToken)}` : '';
     return {
       isRunning: this.isRunning,
       port: this.port,
       localIP,
-      url: `http://${localIP}:${this.port}`
+      url: `http://${localIP}:${this.port}/${token}`
     };
+  }
+
+  parseCookies(header = '') {
+    return Object.fromEntries(String(header).split(';').map(part => part.trim().split('=')));
+  }
+
+  isAuthorized(req) {
+    if (!this.accessToken) return false;
+    const cookies = this.parseCookies(req.headers.cookie);
+    const supplied = req.get('x-dawith-token') || req.query.token || cookies.dawith_remote_token;
+    return supplied === this.accessToken;
+  }
+
+  isRateAllowed(req) {
+    const key = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const windowMs = 60 * 1000;
+    const current = (this.requestLog.get(key) || []).filter(timestamp => now - timestamp < windowMs);
+    if (current.length >= 120) {
+      this.requestLog.set(key, current);
+      return false;
+    }
+    current.push(now);
+    this.requestLog.set(key, current);
+    return true;
+  }
+
+  resolveAllowedFile(filePath) {
+    if (!filePath || !this.indexer || !this.indexer.isWithinConfiguredRoot(filePath)) return null;
+    const candidate = path.resolve(String(filePath));
+    let stat;
+    try {
+      stat = fs.statSync(candidate);
+    } catch (error) {
+      return null;
+    }
+    if (!stat.isFile()) return null;
+    try {
+      const realCandidate = fs.realpathSync.native(candidate);
+      const allowed = (this.indexer.config.roots || []).some(root => {
+        const realRoot = fs.realpathSync.native(root);
+        const relative = path.relative(realRoot, realCandidate);
+        return relative === '' || (relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+      });
+      return allowed ? realCandidate : null;
+    } catch (error) {
+      return null;
+    }
   }
 
   renderMobileHtml() {

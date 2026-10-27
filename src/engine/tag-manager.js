@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { ensurePrivateDirectory, readJsonWithBackup, writeJsonAtomic } = require('./storage-utils');
 
 class TagManager {
   constructor(storageDir) {
@@ -15,32 +16,23 @@ class TagManager {
   }
 
   ensureDir() {
-    if (!fs.existsSync(this.storageDir)) {
-      try {
-        fs.mkdirSync(this.storageDir, { recursive: true });
-      } catch (e) {
-        console.error('Failed to create storage dir:', e);
-      }
+    try {
+      ensurePrivateDirectory(this.storageDir);
+    } catch (error) {
+      console.error('Failed to create storage dir:', error);
     }
   }
 
   load() {
-    if (fs.existsSync(this.dataFile)) {
-      try {
-        const raw = fs.readFileSync(this.dataFile, 'utf8');
-        this.data = JSON.parse(raw);
-        if (!this.data.tags) this.data.tags = {};
-        if (!this.data.starred) this.data.starred = {};
-      } catch (e) {
-        console.error('Failed to load metadata:', e);
-      }
-    }
+    const raw = readJsonWithBackup(this.dataFile, null);
+    if (raw && typeof raw === 'object') this.data = raw;
+    if (!this.data.tags) this.data.tags = {};
+    if (!this.data.starred) this.data.starred = {};
   }
 
   save() {
     try {
-      this.ensureDir();
-      fs.writeFileSync(this.dataFile, JSON.stringify(this.data, null, 2), 'utf8');
+      writeJsonAtomic(this.dataFile, this.data);
     } catch (e) {
       console.error('Failed to save metadata:', e);
     }

@@ -9,6 +9,7 @@ const TagManager = require('./tag-manager');
 const ContentSearcher = require('./content-search');
 const { NativeSearchAdapter } = require('./native-search');
 const { getFullPath, normalizePathKey } = require('./path-utils');
+const { ensurePrivateDirectory, readJsonWithBackup, writeJsonAtomic } = require('./storage-utils');
 
 class Indexer extends EventEmitter {
   constructor(options = {}) {
@@ -68,8 +69,8 @@ class Indexer extends EventEmitter {
 
     if (fs.existsSync(this.configFile)) {
       try {
-        const raw = fs.readFileSync(this.configFile, 'utf8');
-        return { ...defaults, ...JSON.parse(raw) };
+        const raw = readJsonWithBackup(this.configFile, null);
+        if (raw) return { ...defaults, ...raw };
       } catch (e) {
         return defaults;
       }
@@ -79,10 +80,7 @@ class Indexer extends EventEmitter {
 
   saveConfig() {
     try {
-      if (!fs.existsSync(this.storageDir)) {
-        fs.mkdirSync(this.storageDir, { recursive: true });
-      }
-      fs.writeFileSync(this.configFile, JSON.stringify(this.config, null, 2), 'utf8');
+      writeJsonAtomic(this.configFile, this.config);
     } catch (e) {
       console.error('Failed to save config:', e);
     }
@@ -132,8 +130,8 @@ class Indexer extends EventEmitter {
   loadCache() {
     if (!fs.existsSync(this.cacheFile)) return false;
     try {
-      const raw = fs.readFileSync(this.cacheFile, 'utf8');
-      const data = JSON.parse(raw);
+      const data = readJsonWithBackup(this.cacheFile, null);
+      if (!data) return false;
       this.records = data.records || [];
       this.rebuildMap();
       this.updateStats();
@@ -147,13 +145,11 @@ class Indexer extends EventEmitter {
 
   saveCache() {
     try {
-      if (!fs.existsSync(this.storageDir)) {
-        fs.mkdirSync(this.storageDir, { recursive: true });
-      }
-      fs.writeFileSync(this.cacheFile, JSON.stringify({
+      ensurePrivateDirectory(this.storageDir);
+      writeJsonAtomic(this.cacheFile, {
         savedAt: Date.now(),
         records: this.records
-      }), 'utf8');
+      });
     } catch (e) {
       console.error('Failed to save cache:', e);
     }
@@ -405,7 +401,8 @@ class Indexer extends EventEmitter {
           tags: this.tagManager.getTags(getFullPath(item)),
           starred: this.tagManager.isStarred(getFullPath(item))
         }));
-        const sorted = this.sortResults(nativeRecords, options);
+        const scopedNativeRecords = nativeRecords.filter(item => this.isWithinConfiguredRoot(getFullPath(item)));
+        const sorted = this.sortResults(scopedNativeRecords, options);
         return {
           results: sorted.slice(0, options.limit || 5000),
           totalMatches: sorted.length,
@@ -474,6 +471,10 @@ class Indexer extends EventEmitter {
     const rootKey = normalizePathKey(path.resolve(scopeRoot));
     const separator = path.sep;
     return fileKey === rootKey || fileKey.startsWith(`${rootKey}${separator}`);
+  }
+
+  isWithinConfiguredRoot(fullPath) {
+    return (this.config.roots || []).some(root => this.isWithinScope(fullPath, root));
   }
 
   sortResults(items, options = {}) {

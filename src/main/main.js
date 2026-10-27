@@ -37,6 +37,17 @@ let remoteServer = null;
 let bookmarkManager = null;
 let historyManager = null;
 
+function getAllowedPath(filePath, options = {}) {
+  const candidate = path.resolve(String(filePath || ''));
+  if (!indexer || !indexer.isWithinConfiguredRoot(candidate)) {
+    throw new Error('Path is outside the configured search folders.');
+  }
+  if (options.mustExist !== false && !fs.existsSync(candidate)) {
+    throw new Error('Path not found.');
+  }
+  return candidate;
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
@@ -279,11 +290,9 @@ ipcMain.handle('clear-search-history', () => {
 
 ipcMain.handle('open-file', async (event, filePath) => {
   try {
-    if (fs.existsSync(filePath)) {
-      const error = await shell.openPath(filePath);
-      return error ? { success: false, error } : { success: true };
-    }
-    return { success: false, error: 'File not found' };
+    const safePath = getAllowedPath(filePath);
+    const error = await shell.openPath(safePath);
+    return error ? { success: false, error } : { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -291,11 +300,9 @@ ipcMain.handle('open-file', async (event, filePath) => {
 
 ipcMain.handle('open-folder', async (event, filePath) => {
   try {
-    if (fs.existsSync(filePath)) {
-      shell.showItemInFolder(filePath);
-      return { success: true };
-    }
-    return { success: false, error: 'Path not found' };
+    const safePath = getAllowedPath(filePath);
+    shell.showItemInFolder(safePath);
+    return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -308,8 +315,8 @@ ipcMain.handle('copy-path', (event, filePath) => {
 
 ipcMain.handle('delete-file', async (event, filePath) => {
   try {
-    if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' };
-    await shell.trashItem(filePath); // Safe recycle bin deletion
+    const safePath = getAllowedPath(filePath);
+    await shell.trashItem(safePath); // Safe recycle bin deletion
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -318,8 +325,12 @@ ipcMain.handle('delete-file', async (event, filePath) => {
 
 ipcMain.handle('rename-file', async (event, oldPath, newPath) => {
   try {
-    if (!fs.existsSync(oldPath)) return { success: false, error: 'File not found' };
-    await fs.promises.rename(oldPath, newPath);
+    const safeOldPath = getAllowedPath(oldPath);
+    const safeNewPath = getAllowedPath(newPath, { mustExist: false });
+    if (path.dirname(safeOldPath) !== path.dirname(safeNewPath)) {
+      return { success: false, error: 'Renaming across folders is not allowed.' };
+    }
+    await fs.promises.rename(safeOldPath, safeNewPath);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -328,14 +339,14 @@ ipcMain.handle('rename-file', async (event, oldPath, newPath) => {
 
 ipcMain.handle('get-file-content', async (event, filePath) => {
   try {
-    if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' };
-    const stat = await fs.promises.stat(filePath);
+    const safePath = getAllowedPath(filePath);
+    const stat = await fs.promises.stat(safePath);
     if (stat.isDirectory()) return { success: false, error: 'Is directory' };
     
     // Read text preview up to 2MB
     const limit = 2 * 1024 * 1024;
     const buffer = Buffer.alloc(Math.min(stat.size, limit));
-    const fd = await fs.promises.open(filePath, 'r');
+    const fd = await fs.promises.open(safePath, 'r');
     await fd.read(buffer, 0, buffer.length, 0);
     await fd.close();
     
@@ -353,8 +364,8 @@ ipcMain.handle('get-file-content', async (event, filePath) => {
 
 ipcMain.handle('get-file-url', (event, filePath) => {
   try {
-    if (!fs.existsSync(filePath)) return { success: false, error: 'File not found' };
-    return { success: true, url: pathToFileURL(filePath).toString() };
+    const safePath = getAllowedPath(filePath);
+    return { success: true, url: pathToFileURL(safePath).toString() };
   } catch (err) {
     return { success: false, error: err.message };
   }
@@ -362,8 +373,8 @@ ipcMain.handle('get-file-url', (event, filePath) => {
 
 ipcMain.handle('get-file-stats', async (event, filePath) => {
   try {
-    if (!fs.existsSync(filePath)) return null;
-    const stat = await fs.promises.stat(filePath);
+    const safePath = getAllowedPath(filePath);
+    const stat = await fs.promises.stat(safePath);
     return {
       size: stat.size,
       mtime: stat.mtimeMs,

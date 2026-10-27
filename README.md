@@ -12,6 +12,10 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 
 네이티브 백엔드가 없거나 해당 쿼리를 지원하지 않으면 자동으로 로컬 색인으로 폴백합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
 
+### Windows 공유 폴더
+
+설정 → 색인할 폴더 → 검색 폴더 추가에서 `\\서버\공유폴더` 같은 UNC 경로를 선택하면 접근 가능한 Windows 네트워크 공유도 색인·검색할 수 있습니다. 공유 폴더가 Everything 색인에 없더라도 Dawith Search의 로컬 색인이 결과를 보완합니다. 공유 권한이 있는 동일한 Windows 사용자로 앱을 실행해야 하며, 연결이 끊긴 공유는 다시 연결한 뒤 설정에서 전체 재색인을 실행하세요. 매핑 드라이브는 관리자 권한 앱과 일반 앱의 드라이브 매핑이 다를 수 있으므로 UNC 경로 사용을 권장합니다.
+
 ## 지원 기능
 
 - Everything 계열 문법: AND, OR(`|`), NOT(`!`/`-`), 와일드카드, `regex:`, `ext:`, `size:`, `dm:`, `dc:`, `content:`, `tag:`, `starred:`
@@ -48,6 +52,8 @@ npm start
 - [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
 - [Everything 다운로드](https://www.voidtools.com/ko-kr/downloads/)
 - [Everything 공식 도움말](https://www.voidtools.com/support/everything/)
+
+공유 폴더 경계와 Everything 미색인 UNC 폴더 보완 경로는 `npm test`의 Windows UNC 회귀 케이스로 검증합니다. 실제 사내 공유 서버 접근 여부는 해당 Windows 계정의 네트워크 권한과 연결 상태에 따라 달라집니다.
 
 검증 명령:
 

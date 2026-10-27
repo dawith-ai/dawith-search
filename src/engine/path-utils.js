@@ -1,6 +1,14 @@
 const os = require('os');
 const path = require('path');
 
+function isWindowsPath(filePath) {
+  return os.platform() === 'win32' || /^[A-Za-z]:[\\/]/.test(String(filePath || '')) || /^\\\\/.test(String(filePath || ''));
+}
+
+function getPathModule(...values) {
+  return values.some(isWindowsPath) ? path.win32 : path;
+}
+
 function getFullPath(record) {
   if (!record) return '';
   if (record.fullPath) return record.fullPath;
@@ -15,8 +23,18 @@ function getFullPath(record) {
 }
 
 function normalizePathKey(filePath) {
-  const normalized = path.normalize(filePath);
-  return os.platform() === 'win32' ? normalized.toLowerCase() : normalized;
+  const pathModule = getPathModule(filePath);
+  const normalized = pathModule.normalize(String(filePath || ''));
+  return isWindowsPath(filePath) ? normalized.toLowerCase() : normalized;
+}
+
+function isPathWithinRoot(filePath, rootPath) {
+  if (!filePath || !rootPath) return false;
+  const pathModule = getPathModule(filePath, rootPath);
+  const candidate = pathModule.resolve(String(filePath));
+  const root = pathModule.resolve(String(rootPath));
+  const relative = pathModule.relative(root, candidate);
+  return relative === '' || (!relative.startsWith('..') && !pathModule.isAbsolute(relative));
 }
 
 function getPathSeparator(filePath) {
@@ -26,5 +44,7 @@ function getPathSeparator(filePath) {
 module.exports = {
   getFullPath,
   normalizePathKey,
-  getPathSeparator
+  getPathSeparator,
+  isPathWithinRoot,
+  isWindowsPath
 };

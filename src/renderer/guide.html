@@ -91,7 +91,7 @@
     <section class="section" id="platforms">
       <div class="section-heading"><span class="section-kicker">UNDER THE HOOD</span><h2>플랫폼에 맞는 검색 엔진</h2><p>백엔드는 자동 선택됩니다. 특정 기능이 필요한 쿼리는 정확도를 위해 로컬 인덱서로 전환됩니다.</p></div>
       <div class="platform-grid">
-        <article class="platform-card windows"><div class="platform-icon">⊞</div><div><span class="platform-label">WINDOWS</span><h3>Everything 연결</h3><p>실행 중인 Voidtools Everything과 `es.exe`가 발견되면 네이티브 인덱스를 사용합니다. 설치하지 않아도 자체 인덱서로 동작합니다.</p><code>DAWITH_ES_PATH=…\\es.exe</code></div></article>
+        <article class="platform-card windows"><div class="platform-icon">⊞</div><div><span class="platform-label">WINDOWS</span><h3>Everything + 공유 폴더</h3><p>실행 중인 Voidtools Everything과 `es.exe`가 발견되면 네이티브 인덱스를 사용합니다. `\\\\서버\\공유폴더`를 검색 루트로 추가하면 Everything에 없는 접근 가능한 공유 폴더도 자체 색인으로 보완합니다.</p><code>DAWITH_ES_PATH=…\\es.exe</code></div></article>
         <article class="platform-card mac"><div class="platform-icon">⌘</div><div><span class="platform-label">MACOS</span><h3>Spotlight + 로컬 색인</h3><p>단순 파일명 검색은 Spotlight로 빠르게 시작하고, 크기·날짜·본문·태그 조건은 로컬 색인에서 일관되게 처리합니다.</p><code>simple → Spotlight / advanced → local</code></div></article>
       </div>
       <div class="download-panel">

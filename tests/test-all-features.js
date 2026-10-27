@@ -8,6 +8,7 @@ const Exporter = require('../src/engine/exporter');
 const DuplicateFinder = require('../src/engine/duplicate-finder');
 const StorageAnalyzer = require('../src/engine/storage-analyzer');
 const ContentSearcher = require('../src/engine/content-search');
+const { isPathWithinRoot, normalizePathKey } = require('../src/engine/path-utils');
 const TagManager = require('../src/engine/tag-manager');
 const BookmarkManager = require('../src/engine/bookmark-manager');
 const HistoryManager = require('../src/engine/history-manager');
@@ -86,6 +87,36 @@ const scopeIndexer = new Indexer({
 });
 assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'scope', 'report.pdf'), path.join(testDir, 'scope')), true);
 assert.strictEqual(scopeIndexer.isWithinScope(path.join(testDir, 'other', 'report.pdf'), path.join(testDir, 'scope')), false);
+
+assert.strictEqual(isPathWithinRoot('\\\\server\\share\\department\\report.pdf', '\\\\server\\share'), true);
+assert.strictEqual(isPathWithinRoot('\\\\server\\share-other\\report.pdf', '\\\\server\\share'), false);
+assert.strictEqual(normalizePathKey('\\\\SERVER\\SHARE\\Report.PDF'), '\\\\server\\share\\report.pdf');
+console.log('  ✓ Windows UNC shared-folder path boundaries passed');
+
+const sharedIndexer = new Indexer({
+  storageDir: path.join(testDir, 'shared-index'),
+  nativeSearch: { search: async () => ({ supported: true, backend: 'everything', records: [] }) }
+});
+sharedIndexer.config = { ...sharedIndexer.config, roots: ['\\\\server\\share'], searchBackend: 'auto' };
+sharedIndexer.records = [{
+  name: 'share-report.txt',
+  path: '\\\\server\\share\\department',
+  fullPath: '\\\\server\\share\\department\\share-report.txt',
+  isDir: false,
+  ext: 'txt',
+  size: 12,
+  mtime: Date.now(),
+  ctime: Date.now()
+}];
+sharedIndexer.search('share-report').then(result => {
+  assert.strictEqual(result.results.length, 1);
+  assert.strictEqual(result.results[0].fullPath, '\\\\server\\share\\department\\share-report.txt');
+  console.log('  ✓ Everything fallback merge for unindexed Windows UNC shares passed');
+}).catch(error => {
+  console.error('UNC shared-folder merge test error:', error);
+  process.exit(1);
+});
+sharedIndexer.fileWatcher.close();
 const scopeRoot = path.join(testDir, 'scope');
 scopeIndexer.records = [
   { name: 'report.pdf', path: scopeRoot, fullPath: path.join(scopeRoot, 'report.pdf'), isDir: false, size: 10 },

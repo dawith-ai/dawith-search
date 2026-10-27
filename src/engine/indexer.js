@@ -8,7 +8,7 @@ const FileWatcher = require('./file-watcher');
 const TagManager = require('./tag-manager');
 const ContentSearcher = require('./content-search');
 const { NativeSearchAdapter } = require('./native-search');
-const { getFullPath, normalizePathKey } = require('./path-utils');
+const { getFullPath, normalizePathKey, isPathWithinRoot } = require('./path-utils');
 const { ensurePrivateDirectory, readJsonWithBackup, writeJsonAtomic } = require('./storage-utils');
 
 class Indexer extends EventEmitter {
@@ -402,7 +402,32 @@ class Indexer extends EventEmitter {
           starred: this.tagManager.isStarred(getFullPath(item))
         }));
         const scopedNativeRecords = nativeRecords.filter(item => this.isWithinConfiguredRoot(getFullPath(item)));
-        const sorted = this.sortResults(scopedNativeRecords, options);
+
+        // Everything can only return files that are present in its own index.
+        // A configured Windows UNC share may be reachable to this app while
+        // missing from Everything's index, so merge matching local-index
+        // records for network roots instead of silently returning zero files.
+        const networkRoots = (this.config.roots || []).filter(root => /^\\\\/.test(String(root)));
+        const localNetworkRecords = networkRoots.length === 0 ? [] : this.records
+          .filter(item => {
+            const fullPath = getFullPath(item);
+            return networkRoots.some(root => this.isWithinScope(fullPath, root));
+          })
+          .map(item => {
+            const fullPath = getFullPath(item);
+            return {
+              ...item,
+              tags: this.tagManager.getTags(fullPath),
+              starred: this.tagManager.isStarred(fullPath)
+            };
+          })
+          .filter(item => QueryParser.matches(item, parsed));
+
+        const byPath = new Map();
+        for (const item of [...scopedNativeRecords, ...localNetworkRecords]) {
+          byPath.set(normalizePathKey(getFullPath(item)), item);
+        }
+        const sorted = this.sortResults([...byPath.values()], options);
         return {
           results: sorted.slice(0, options.limit || 5000),
           totalMatches: sorted.length,
@@ -427,9 +452,18 @@ class Indexer extends EventEmitter {
     } else {
       for (let i = 0; i < this.records.length; i++) {
         const item = this.records[i];
-        if (scopeRoot && !this.isWithinScope(getFullPath(item), scopeRoot)) continue;
-        if (QueryParser.matches(item, parsed)) {
-          matched.push(item);
+        const fullPath = getFullPath(item);
+        // Tags and starred state can change without rebuilding the file index.
+        // Hydrate them for every local search so a just-toggled result is
+        // immediately searchable and cannot be overwritten by stale cache data.
+        const searchableItem = {
+          ...item,
+          tags: this.tagManager.getTags(fullPath),
+          starred: this.tagManager.isStarred(fullPath)
+        };
+        if (scopeRoot && !this.isWithinScope(fullPath, scopeRoot)) continue;
+        if (QueryParser.matches(searchableItem, parsed)) {
+          matched.push(searchableItem);
           if (!parsed.content && matched.length >= limit) break;
         }
       }
@@ -467,10 +501,7 @@ class Indexer extends EventEmitter {
   }
 
   isWithinScope(fullPath, scopeRoot) {
-    const fileKey = normalizePathKey(path.resolve(fullPath));
-    const rootKey = normalizePathKey(path.resolve(scopeRoot));
-    const separator = path.sep;
-    return fileKey === rootKey || fileKey.startsWith(`${rootKey}${separator}`);
+    return isPathWithinRoot(fullPath, scopeRoot);
   }
 
   isWithinConfiguredRoot(fullPath) {

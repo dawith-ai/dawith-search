@@ -4,6 +4,7 @@
 
 // State
 let searchResults = [];
+let searchRequestId = 0;
 let selectedIndex = -1;
 let selectedIndexes = new Set();
 let currentFilter = '';
@@ -234,6 +235,7 @@ function getActiveQuery() {
 }
 
 async function executeSearch() {
+  const requestId = ++searchRequestId;
   const rawInput = searchInput.value.trim();
   const query = (currentFilter ? currentFilter + ' ' : '') + rawInput;
 
@@ -247,6 +249,10 @@ async function executeSearch() {
       limit: 1000,
       scopeRoot: scopeRoot || undefined
     });
+
+    // Index-status events and debounced input can overlap. Never let an older
+    // response overwrite the result for the latest user query.
+    if (requestId !== searchRequestId) return;
 
     searchResults = res.results || [];
     selectedIndex = searchResults.length > 0 ? 0 : -1;

@@ -14,6 +14,7 @@
 ## 2. 검색 품질 게이트
 
 - Everything `es.exe`가 있으면 Windows 네이티브 검색 사용
+- Windows 설정에서 추가한 UNC 공유 폴더(`\\server\share`)는 접근 가능한 경우 자체 색인으로 읽고, Everything 미색인 결과도 보완
 - macOS 단순 검색은 Spotlight, 복합 조건은 로컬 인덱서 사용
 - 네이티브 검색 결과도 설정된 검색 루트 밖으로 노출하지 않음
 - Everything 문법, 한국어 조건, 날짜·크기·본문·중복·태그 조건 회귀 테스트

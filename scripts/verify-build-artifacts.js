@@ -30,7 +30,7 @@ const listing = execFileSync(npx, ['--no-install', 'asar', 'list', asarPath], {
   // Windows exposes npx as a .cmd shim, which requires a shell when spawned
   // from Node's execFileSync API.
   shell: process.platform === 'win32'
-});
+}).replace(/\\/g, '/');
 assert.ok(listing.includes(expectedEntry), `Packaged app is missing ${expectedEntry}`);
 assert.ok(listing.includes(expectedAnalyzer), `Packaged app is missing ${expectedAnalyzer}`);
 console.log(`Build artifact verification passed on ${process.platform}: ${path.relative(root, asarPath)}`);

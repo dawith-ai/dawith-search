@@ -1233,8 +1233,13 @@ document.getElementById('btnSaveNetworkRoot').addEventListener('click', async ()
   renderSettingsRoots(roots);
   networkRootStatus.textContent = `${inspected.label} 연결 확인 완료. 색인을 시작합니다.`;
   networkRootStatus.classList.add('success');
-  await window.dawithAPI.reindex();
   closeNetworkRootForm();
+  // Do not keep the settings form blocked while a large or remote share is indexed.
+  // The main process owns the long-running scan and will continue to publish status
+  // events even when the user returns to the search workspace.
+  window.dawithAPI.reindex().catch(error => {
+    console.error('Failed to reindex after adding root:', error);
+  });
 });
 networkRootInput.addEventListener('keydown', event => {
   if (event.key === 'Enter') document.getElementById('btnSaveNetworkRoot').click();

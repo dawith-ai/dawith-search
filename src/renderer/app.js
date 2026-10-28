@@ -153,7 +153,7 @@ function renderSidebarRoots(roots = []) {
 
 function getRootKindLabel(root) {
   if (/^\\\\[^\\/]+[\\/][^\\/]+/.test(root)) return 'Windows 공유폴더';
-  if (/^[A-Za-z]:[\\/]/.test(root)) return 'Windows 네트워크 드라이브';
+  if (/^[A-Za-z]:[\\/]/.test(root)) return 'Windows 드라이브·공유 경로';
   if (/^\/Volumes(?:\/|$)/.test(root)) return 'macOS 연결된 공유폴더';
   return '로컬 폴더';
 }

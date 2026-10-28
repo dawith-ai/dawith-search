@@ -17,7 +17,9 @@ function isMountedMacPath(value) {
 function classifyRoot(value) {
   const input = String(value || '').trim();
   if (isUncPath(input)) return { kind: 'windows-unc', label: 'Windows 공유폴더', path: input };
-  if (isWindowsDrivePath(input)) return { kind: 'windows-drive', label: 'Windows 네트워크 드라이브', path: input };
+  // A drive-letter path can be a local volume or a mapped share. The path
+  // itself does not reveal which one, so keep the label accurate for both.
+  if (isWindowsDrivePath(input)) return { kind: 'windows-drive', label: 'Windows 드라이브·공유 경로', path: input };
   if (isMountedMacPath(input)) return { kind: 'mac-mounted-share', label: 'macOS 연결된 공유폴더', path: input };
   if (path.isAbsolute(input)) return { kind: 'local-folder', label: '로컬 폴더', path: path.resolve(input) };
   return { kind: 'invalid', label: '알 수 없음', path: input };

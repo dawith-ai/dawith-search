@@ -395,7 +395,9 @@ async function run() {
     await waitFor('shared root saved', async () => {
       const formHidden = await evaluate("document.querySelector('#networkRootForm')?.hidden");
       const roots = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
-      return formHidden === true && roots.includes('로컬 폴더') && roots.includes(fixtureRoot);
+      const hasWindowsDriveLabel = roots.includes('Windows 드라이브·공유 경로');
+      const hasLocalLabel = roots.includes('로컬 폴더');
+      return formHidden === true && (hasLocalLabel || hasWindowsDriveLabel) && roots.includes(fixtureRoot);
     });
   } catch (error) {
     const sharedRootState = await evaluate(`({

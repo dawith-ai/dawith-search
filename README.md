@@ -43,8 +43,8 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.4-universal.dmg)
+- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.4-portable.exe)
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 
 릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서는 Everything이 설치되어 있으면 `es.exe` 네이티브 검색을 사용하고, 없으면 Dawith Search 로컬 색인으로 동작합니다.

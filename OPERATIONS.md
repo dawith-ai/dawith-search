@@ -80,7 +80,7 @@ npm run build:mac
 npm run build:win
 ```
 
-현재 릴리스: [v1.0.3](https://github.com/dawith-ai/dawith-search/releases/tag/v1.0.3)
+현재 릴리스: [v1.0.4](https://github.com/dawith-ai/dawith-search/releases/tag/v1.0.4)
 
 ## 운영 경계
 

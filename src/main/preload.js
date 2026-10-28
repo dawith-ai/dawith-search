@@ -25,6 +25,8 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   getRemoteServerStatus: () => ipcRenderer.invoke('get-remote-server-status'),
   
   getStorageAnalysis: () => ipcRenderer.invoke('get-storage-analysis'),
+  analyzePath: (filePath, options) => ipcRenderer.invoke('analyze-path', filePath, options),
+  saveAnalysisReport: () => ipcRenderer.invoke('save-analysis-report'),
   findDuplicates: (options) => ipcRenderer.invoke('find-duplicates', options),
   
   addTag: (filePath, tag) => ipcRenderer.invoke('add-tag', filePath, tag),

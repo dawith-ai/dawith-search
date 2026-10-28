@@ -10,7 +10,7 @@
   "scripts": {
     "start": "electron .",
     "cli": "node bin/dawith-cli.js",
-    "test": "node tests/test-all-features.js && node tests/test-operations.js",
+    "test": "node tests/test-all-features.js && node tests/test-operations.js && node tests/test-evidence-analyzer.js",
     "test:e2e": "node tests/test-electron-e2e.js",
     "lint": "node scripts/check-syntax.js && node scripts/check-renderer-contract.js",
     "check": "npm run lint && npm test",

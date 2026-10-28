@@ -65,6 +65,9 @@ function createFixture() {
   fs.writeFileSync(path.join(fixtureRoot, 'duplicate-a.bin'), duplicateContent);
   fs.writeFileSync(path.join(fixtureRoot, 'nested', 'duplicate-b.bin'), duplicateContent);
   fs.writeFileSync(path.join(fixtureRoot, 'nested', 'case-note.md'), '# 사례관리 기록\n보호자 상담 일정\n', 'utf8');
+  fs.mkdirSync(path.join(fixtureRoot, 'app'), { recursive: true });
+  fs.writeFileSync(path.join(fixtureRoot, 'app', 'main.js'), "const { BrowserWindow } = require('electron');\nconst { open } = require('./preload');\nipcMain.handle('open', () => open());\nnew BrowserWindow({ preload: './preload.js' });\n", 'utf8');
+  fs.writeFileSync(path.join(fixtureRoot, 'app', 'preload.js'), "const { contextBridge, ipcRenderer } = require('electron');\ncontextBridge.exposeInMainWorld('dawithAPI', { open: () => ipcRenderer.invoke('open') });\n", 'utf8');
 
   fs.writeFileSync(path.join(tempHome, '.dawith-search', 'config.json'), JSON.stringify({
     roots: [fixtureRoot],
@@ -192,6 +195,7 @@ async function pageState() {
     quickLookDisplay: document.querySelector('#quickLookModal')?.style.display,
     remoteDisplay: document.querySelector('#remoteModal')?.style.display,
     storageDisplay: document.querySelector('#storageModal')?.style.display,
+    evidenceDisplay: document.querySelector('#evidenceModal')?.style.display,
     settingsDisplay: document.querySelector('#settingsModal')?.style.display,
     commandDisplay: document.querySelector('#cmdPaletteModal')?.style.display,
     selectionHidden: document.querySelector('#selectionBar')?.hidden,
@@ -388,6 +392,20 @@ async function run() {
   await waitFor('largest files', async () => (await evaluate("document.querySelector('#storageBody')?.textContent || ''")).includes('duplicate-a.bin'));
   record('대용량 파일 목록', 'TOP 50 탭 완료');
   await evaluate("document.querySelector('#btnCloseStorage').click()");
+
+  await click('#btnTools');
+  await click('#btnEvidenceAnalyzer');
+  await waitForState('evidence analyzer', state => state.evidenceDisplay === 'flex');
+  await click('#btnRunEvidence');
+  await waitFor('evidence report', async () => {
+    const text = await evaluate("document.querySelector('#evidenceBody')?.textContent || ''");
+    return text.includes('SHA-256') && text.includes('Electron 경계');
+  }, 20000);
+  const evidenceText = await evaluate("document.querySelector('#evidenceBody')?.textContent || ''");
+  assert.ok(evidenceText.includes('소스 관계'));
+  assert.ok(evidenceText.includes('로컬 처리'));
+  record('REA 기반 구조·증거 분석', '파일 식별자·import 관계·Electron 경계 보고서 확인');
+  await click('#btnCloseEvidence');
 
   await click('#btnTools');
   await click('#btnRemoteServer');

@@ -47,6 +47,7 @@ const remoteModal = document.getElementById('remoteModal');
 const storageModal = document.getElementById('storageModal');
 const settingsModal = document.getElementById('settingsModal');
 const syntaxModal = document.getElementById('syntaxModal');
+const evidenceModal = document.getElementById('evidenceModal');
 const contextMenu = document.getElementById('contextMenu');
 
 // Utilities
@@ -539,6 +540,8 @@ function handleCmdAction(action) {
     document.getElementById('btnRemoteServer').click();
   } else if (action === 'open-storage') {
     document.getElementById('btnStorageAnalyzer').click();
+  } else if (action === 'open-evidence') {
+    document.getElementById('btnEvidenceAnalyzer').click();
   } else if (action === 'reindex') {
     window.dawithAPI.reindex();
   } else if (action === 'export-csv') {
@@ -589,6 +592,7 @@ document.addEventListener('keydown', (e) => {
     storageModal.style.display = 'none';
     settingsModal.style.display = 'none';
     syntaxModal.style.display = 'none';
+    evidenceModal.style.display = 'none';
     contextMenu.style.display = 'none';
     closeToolsMenu();
     return;
@@ -952,6 +956,95 @@ document.getElementById('btnStorageAnalyzer').addEventListener('click', async ()
 });
 document.getElementById('btnCloseStorage').addEventListener('click', () => {
   storageModal.style.display = 'none';
+});
+
+const evidenceRootSelect = document.getElementById('evidenceRootSelect');
+const evidenceBody = document.getElementById('evidenceBody');
+const btnSaveEvidence = document.getElementById('btnSaveEvidence');
+let lastEvidenceReport = null;
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function renderEvidenceReport(report) {
+  lastEvidenceReport = report;
+  btnSaveEvidence.disabled = false;
+  const summary = report.summary || {};
+  const coverage = report.coverage || {};
+  const statusLabel = coverage.status === 'complete' ? '범위 내 분석 완료' : '부분 분석 · 제한 있음';
+  const relationships = (report.relationships || []).slice(0, 80);
+  const observations = (report.observations || []).filter(item => item.kind && item.kind.startsWith('electron.')).slice(0, 60);
+  const unknowns = (report.unknowns || []).slice(0, 60);
+  const relationItems = relationships.length
+    ? relationships.map(item => `<li><span class="evidence-code">${escapeHtml(item.source)}</span> → ${escapeHtml(item.target || item.specifier)} <small>(${escapeHtml(item.resolution)})</small></li>`).join('')
+    : '<li>정적 import 관계가 없습니다.</li>';
+  const boundaryItems = observations.length
+    ? observations.map(item => `<li><span class="evidence-code">${escapeHtml(item.location && item.location.path)}</span><br>${escapeHtml(item.description)}</li>`).join('')
+    : '<li>Electron 경계 후보가 발견되지 않았습니다.</li>';
+  const unknownItems = unknowns.length
+    ? unknowns.map(item => `<li><span class="evidence-code">${escapeHtml(item.path || item.kind)}</span> · ${escapeHtml(item.reason || 'unknown')}</li>`).join('')
+    : '<li>현재 범위에서 미확인 항목이 없습니다.</li>';
+
+  evidenceBody.innerHTML = `
+    <div class="evidence-summary-grid">
+      <div class="evidence-stat"><span class="evidence-stat-label">범위</span><strong class="evidence-stat-value"><span class="evidence-status ${coverage.status === 'complete' ? '' : 'partial'}">${statusLabel}</span></strong></div>
+      <div class="evidence-stat"><span class="evidence-stat-label">파일</span><strong class="evidence-stat-value">${formatNumber(summary.files)}</strong></div>
+      <div class="evidence-stat"><span class="evidence-stat-label">소스</span><strong class="evidence-stat-value">${formatNumber(summary.sourceFiles)}</strong></div>
+      <div class="evidence-stat"><span class="evidence-stat-label">import</span><strong class="evidence-stat-value">${formatNumber(summary.resolvedImports)} / ${formatNumber(summary.imports)}</strong></div>
+      <div class="evidence-stat"><span class="evidence-stat-label">Electron 경계</span><strong class="evidence-stat-value">${formatNumber(summary.electronBoundaries)}</strong></div>
+    </div>
+    <div class="evidence-columns">
+      <section class="evidence-panel"><h4>소스 관계 · ${formatNumber(summary.imports)}건</h4><ul class="evidence-list">${relationItems}</ul></section>
+      <section class="evidence-panel"><h4>Electron 경계 · ${formatNumber(summary.electronBoundaries)}건</h4><ul class="evidence-list">${boundaryItems}</ul></section>
+      <section class="evidence-panel"><h4>미확인 · ${formatNumber(coverage.unknowns)}</h4><ul class="evidence-list">${unknownItems}</ul></section>
+      <section class="evidence-panel"><h4>식별 정보</h4><ul class="evidence-list"><li>대상: <span class="evidence-code">${escapeHtml(report.subject && report.subject.path)}</span></li><li>SHA-256: <span class="evidence-code">${escapeHtml(report.subject && report.subject.sha256)}</span></li><li>소요 시간: ${formatNumber(report.durationMs)} ms</li><li>로컬 처리 · 외부 전송 없음 · AI 미사용</li></ul></section>
+    </div>
+    <p class="evidence-footnote">정적 후보는 실행을 증명하지 않습니다. 동적 import, 생성 코드, 제외 디렉터리와 예산 초과 항목은 미확인/제외로 표시됩니다.</p>
+  `;
+}
+
+function populateEvidenceRoots(roots) {
+  evidenceRootSelect.innerHTML = '';
+  (roots || []).forEach(root => {
+    const option = document.createElement('option');
+    option.value = root;
+    option.textContent = root;
+    option.title = root;
+    evidenceRootSelect.appendChild(option);
+  });
+  if (scopeRoot && (roots || []).includes(scopeRoot)) evidenceRootSelect.value = scopeRoot;
+}
+
+document.getElementById('btnEvidenceAnalyzer').addEventListener('click', async () => {
+  const config = await window.dawithAPI.getConfig();
+  populateEvidenceRoots(config.roots || []);
+  evidenceBody.innerHTML = '<div class="evidence-empty">검색 폴더를 선택하고 분석을 시작하세요.</div>';
+  btnSaveEvidence.disabled = true;
+  evidenceModal.style.display = 'flex';
+});
+document.getElementById('btnCloseEvidence').addEventListener('click', () => {
+  evidenceModal.style.display = 'none';
+});
+document.getElementById('btnRunEvidence').addEventListener('click', async () => {
+  const root = evidenceRootSelect.value;
+  if (!root) {
+    evidenceBody.innerHTML = '<div class="evidence-empty">먼저 설정에서 검색 폴더를 추가하세요.</div>';
+    return;
+  }
+  evidenceBody.innerHTML = '<div class="evidence-empty">파일 목록과 증거를 수집하는 중입니다…</div>';
+  const result = await window.dawithAPI.analyzePath(root);
+  if (!result.success) {
+    evidenceBody.innerHTML = `<div class="evidence-empty">분석 실패: ${escapeHtml(result.error)}</div>`;
+    return;
+  }
+  renderEvidenceReport(result.report);
+});
+btnSaveEvidence.addEventListener('click', async () => {
+  if (!lastEvidenceReport) return;
+  const result = await window.dawithAPI.saveAnalysisReport();
+  if (result.success) alert(`증거 보고서를 저장했습니다.\n${result.filePath}`);
+  else if (!result.canceled) alert(`저장 실패: ${result.error}`);
 });
 
 async function loadStorageOverview() {

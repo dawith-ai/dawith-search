@@ -28,6 +28,7 @@ const Exporter = require('../engine/exporter');
 const RemoteServer = require('../engine/remote-server');
 const BookmarkManager = require('../engine/bookmark-manager');
 const HistoryManager = require('../engine/history-manager');
+const EvidenceAnalyzer = require('../engine/evidence-analyzer');
 
 let mainWindow = null;
 let guideWindow = null;
@@ -36,6 +37,7 @@ let indexer = null;
 let remoteServer = null;
 let bookmarkManager = null;
 let historyManager = null;
+let lastEvidenceReport = null;
 
 function getAllowedPath(filePath, options = {}) {
   const candidate = path.resolve(String(filePath || ''));
@@ -428,6 +430,33 @@ ipcMain.handle('get-remote-server-status', () => {
 ipcMain.handle('get-storage-analysis', () => {
   if (!indexer) return null;
   return StorageAnalyzer.analyze(indexer.records);
+});
+
+ipcMain.handle('analyze-path', async (event, filePath, options) => {
+  try {
+    const safePath = getAllowedPath(filePath);
+    const report = await EvidenceAnalyzer.analyzePath(safePath, options);
+    lastEvidenceReport = report;
+    return { success: true, report };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('save-analysis-report', async () => {
+  if (!lastEvidenceReport) return { success: false, error: '먼저 분석을 실행하세요.' };
+  try {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: '증거 분석 보고서 저장',
+      defaultPath: 'dawith-evidence-report.json',
+      filters: [{ name: 'JSON Evidence Bundle', extensions: ['json'] }]
+    });
+    if (!filePath) return { canceled: true };
+    await fs.promises.writeFile(filePath, JSON.stringify(lastEvidenceReport, null, 2), 'utf8');
+    return { success: true, filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
 
 ipcMain.handle('find-duplicates', async (event, options) => {

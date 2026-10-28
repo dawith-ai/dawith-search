@@ -76,6 +76,9 @@
             <button class="tool-menu-item" id="btnStorageAnalyzer" title="디스크 용량 분석 및 중복 파일 찾기">
               <span class="tool-menu-icon">◒</span><span><strong>용량·중복 분석</strong><small>큰 파일과 중복 파일 확인</small></span>
             </button>
+            <button class="tool-menu-item" id="btnEvidenceAnalyzer" title="폴더 구조와 소스 관계를 증거 기반으로 분석">
+              <span class="tool-menu-icon">⌘</span><span><strong>구조·증거 분석</strong><small>파일 관계와 Electron 경계 확인</small></span>
+            </button>
             <button class="tool-menu-item" id="btnExport" title="검색 결과 내보내기">
               <span class="tool-menu-icon">⇩</span><span><strong>검색 결과 내보내기</strong><small>CSV 파일로 저장</small></span>
             </button>
@@ -248,6 +251,7 @@
         <div class="cmd-item" data-action="save-bookmark">＋ 현재 검색 저장</div>
         <div class="cmd-item" data-action="open-remote">📱 모바일 원격 공유 (QR 코드)</div>
         <div class="cmd-item" data-action="open-storage">📊 스토리지 용량 & 중복 파일 분석</div>
+        <div class="cmd-item" data-action="open-evidence">⌘ 폴더 구조·소스 관계 증거 분석</div>
         <div class="cmd-item" data-action="reindex">⚡ 전체 디스크 다시 색인 (Reindex)</div>
         <div class="cmd-item" data-action="export-csv">💾 검색 결과 CSV로 내보내기</div>
         <div class="cmd-item" data-action="export-efu">💾 검색 결과 Everything EFU로 내보내기</div>
@@ -317,6 +321,31 @@
       </div>
       <div class="modal-body" id="storageBody">
         <!-- Dynamic storage tabs content -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Evidence Analyzer Modal -->
+  <div class="modal-overlay" id="evidenceModal" style="display: none;">
+    <div class="modal-dialog modal-large evidence-dialog">
+      <div class="modal-header">
+        <div>
+          <span class="modal-kicker">LOCAL EVIDENCE</span>
+          <h3>구조·증거 분석</h3>
+        </div>
+        <button class="modal-close" id="btnCloseEvidence" type="button">×</button>
+      </div>
+      <div class="modal-body evidence-body">
+        <div class="evidence-toolbar">
+          <label class="evidence-root-label" for="evidenceRootSelect">분석할 검색 폴더</label>
+          <select id="evidenceRootSelect" class="evidence-root-select"></select>
+          <button class="btn btn-primary" id="btnRunEvidence" type="button">분석 시작</button>
+          <button class="btn btn-ghost" id="btnSaveEvidence" type="button" disabled>JSON 저장</button>
+        </div>
+        <p class="modal-desc evidence-note">파일 목록, SHA-256 식별자, 정적 import 관계와 Electron 경계를 이 PC 안에서만 확인합니다. 실행 여부와 동적 코드는 미확인으로 남깁니다.</p>
+        <div id="evidenceBody">
+          <div class="evidence-empty">검색 폴더를 선택하고 분석을 시작하세요.</div>
+        </div>
       </div>
     </div>
   </div>

@@ -1642,3 +1642,31 @@ input:focus-visible,
     transition-duration: 0.01ms !important;
   }
 }
+
+.evidence-dialog { max-width: 960px; }
+.evidence-body { min-height: 420px; }
+.evidence-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.evidence-root-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.evidence-root-select { flex: 1 1 260px; min-width: 220px; height: 36px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; background: var(--surface); color: var(--text); }
+.evidence-note { margin: 14px 0 18px; }
+.evidence-empty { display: grid; place-items: center; min-height: 240px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); background: var(--surface-muted); }
+.evidence-summary-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+.evidence-stat { padding: 13px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.evidence-stat-label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+.evidence-stat-value { display: block; font-size: 18px; font-weight: 760; color: var(--text); }
+.evidence-status { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.evidence-status.partial { background: #fff7ed; color: #c2410c; }
+.evidence-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.evidence-panel { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.evidence-panel h4 { margin: 0; padding: 11px 13px; border-bottom: 1px solid var(--line); font-size: 12px; }
+.evidence-list { max-height: 190px; overflow: auto; padding: 8px 13px; margin: 0; list-style: none; }
+.evidence-list li { padding: 6px 0; border-bottom: 1px solid var(--line-soft); font-size: 11px; line-height: 1.45; color: var(--muted); word-break: break-word; }
+.evidence-list li:last-child { border-bottom: 0; }
+.evidence-code { color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.evidence-footnote { margin-top: 14px; color: var(--muted); font-size: 11px; }
+
+@media (max-width: 720px) {
+  .evidence-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .evidence-columns { grid-template-columns: 1fr; }
+  .evidence-toolbar .btn { flex: 1 1 auto; }
+}

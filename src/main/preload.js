@@ -36,6 +36,7 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   
   getConfig: () => ipcRenderer.invoke('get-config'),
   chooseRoot: () => ipcRenderer.invoke('choose-root'),
+  inspectRoot: (rootPath) => ipcRenderer.invoke('inspect-root', rootPath),
   getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
   openGuide: () => ipcRenderer.invoke('open-guide'),
   saveConfig: (config) => ipcRenderer.invoke('save-config', config),

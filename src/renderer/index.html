@@ -359,9 +359,22 @@
       </div>
       <div class="modal-body">
         <div class="setting-group">
-          <label>색인할 드라이브 및 폴더 (Roots):</label>
+          <label>검색할 위치</label>
+          <p class="setting-help">로컬 폴더, Windows 네트워크 드라이브와 UNC 공유폴더, macOS에 연결된 공유폴더를 추가할 수 있습니다.</p>
           <div class="roots-list" id="rootsList"></div>
-          <button class="btn btn-sm btn-ghost mt-2" id="btnAddRoot">＋ 검색 폴더 추가</button>
+          <div class="root-actions">
+            <button class="btn btn-sm btn-ghost mt-2" id="btnAddRoot">＋ 로컬·연결된 폴더 선택</button>
+            <button class="btn btn-sm btn-ghost mt-2" id="btnAddNetworkRoot">⌁ 공유 경로 직접 입력</button>
+          </div>
+          <div class="network-root-form" id="networkRootForm" hidden>
+            <label for="networkRootInput">공유 폴더 경로</label>
+            <div class="network-root-input-row">
+              <input id="networkRootInput" type="text" spellcheck="false" autocomplete="off" placeholder="Windows: \\\\server\\share  ·  macOS: /Volumes/공유폴더" />
+              <button class="btn btn-sm btn-primary" id="btnSaveNetworkRoot" type="button">연결 확인 후 추가</button>
+              <button class="btn btn-sm btn-ghost" id="btnCancelNetworkRoot" type="button">취소</button>
+            </div>
+            <p class="setting-help" id="networkRootStatus">Windows 공유폴더는 현재 Windows 계정의 접근 권한으로 확인합니다. macOS는 Finder에서 연결한 뒤 /Volumes 경로를 사용하세요.</p>
+          </div>
           <button class="btn btn-sm btn-ghost mt-2" id="btnReindexNow">⚡ 지금 전체 다시 색인 (Reindex)</button>
         </div>
         <div class="setting-group mt-4">

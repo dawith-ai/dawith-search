@@ -29,6 +29,7 @@ const RemoteServer = require('../engine/remote-server');
 const BookmarkManager = require('../engine/bookmark-manager');
 const HistoryManager = require('../engine/history-manager');
 const EvidenceAnalyzer = require('../engine/evidence-analyzer');
+const RootManager = require('../engine/root-manager');
 
 let mainWindow = null;
 let guideWindow = null;
@@ -492,6 +493,10 @@ ipcMain.handle('choose-root', async () => {
   return result.canceled || result.filePaths.length === 0
     ? { canceled: true, path: null }
     : { canceled: false, path: result.filePaths[0] };
+});
+
+ipcMain.handle('inspect-root', async (event, rootPath) => {
+  return await RootManager.inspectRoot(rootPath);
 });
 
 ipcMain.handle('get-backend-status', () => {

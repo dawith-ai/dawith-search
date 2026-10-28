@@ -151,6 +151,29 @@ function renderSidebarRoots(roots = []) {
   });
 }
 
+function getRootKindLabel(root) {
+  if (/^\\\\[^\\/]+[\\/][^\\/]+/.test(root)) return 'Windows 공유폴더';
+  if (/^[A-Za-z]:[\\/]/.test(root)) return 'Windows 네트워크 드라이브';
+  if (/^\/Volumes(?:\/|$)/.test(root)) return 'macOS 연결된 공유폴더';
+  return '로컬 폴더';
+}
+
+function renderSettingsRoots(roots = []) {
+  const rootsList = document.getElementById('rootsList');
+  if (!rootsList) return;
+  if (!roots.length) {
+    rootsList.innerHTML = '<div class="roots-empty">등록된 검색 위치가 없습니다.</div>';
+    return;
+  }
+  rootsList.innerHTML = roots.map(root => `
+    <div class="root-item" data-root-item="${escapeHtml(root)}">
+      <span class="root-item-icon">⌂</span>
+      <span class="root-item-copy"><strong>${escapeHtml(getRootKindLabel(root))}</strong><code>${escapeHtml(root)}</code></span>
+      <button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="검색 위치에서 제거">×</button>
+    </div>
+  `).join('');
+}
+
 async function refreshBookmarks() {
   if (!bookmarkList || !window.dawithAPI.listBookmarks) return;
   const bookmarks = await window.dawithAPI.listBookmarks();
@@ -220,6 +243,7 @@ async function addSearchRoot() {
   const roots = Array.from(new Set([...(config.roots || []), result.path]));
   await window.dawithAPI.saveConfig({ roots });
   renderSidebarRoots(roots);
+  renderSettingsRoots(roots);
   await window.dawithAPI.reindex();
 }
 
@@ -1165,11 +1189,72 @@ document.getElementById('btnExport').addEventListener('click', async () => {
 document.getElementById('btnSettings').addEventListener('click', async () => {
   settingsModal.style.display = 'flex';
   const cfg = await window.dawithAPI.getConfig();
-  const rootsList = document.getElementById('rootsList');
-  rootsList.innerHTML = (cfg.roots || []).map(r => `<div class="root-item"><span>⌂</span><code>${escapeHtml(r)}</code></div>`).join('');
+  renderSettingsRoots(cfg.roots || []);
 });
 document.getElementById('btnCloseSettings').addEventListener('click', () => {
   settingsModal.style.display = 'none';
+});
+
+const networkRootForm = document.getElementById('networkRootForm');
+const networkRootInput = document.getElementById('networkRootInput');
+const networkRootStatus = document.getElementById('networkRootStatus');
+
+function closeNetworkRootForm() {
+  networkRootForm.hidden = true;
+  networkRootInput.value = '';
+  networkRootStatus.textContent = 'Windows 공유폴더는 현재 Windows 계정의 접근 권한으로 확인합니다. macOS는 Finder에서 연결한 뒤 /Volumes 경로를 사용하세요.';
+  networkRootStatus.classList.remove('error', 'success');
+}
+
+document.getElementById('btnAddNetworkRoot').addEventListener('click', () => {
+  networkRootForm.hidden = false;
+  networkRootInput.focus();
+});
+document.getElementById('btnCancelNetworkRoot').addEventListener('click', closeNetworkRootForm);
+document.getElementById('btnSaveNetworkRoot').addEventListener('click', async () => {
+  const input = networkRootInput.value.trim();
+  if (!input) {
+    networkRootStatus.textContent = '공유 폴더 경로를 입력하세요.';
+    networkRootStatus.classList.add('error');
+    return;
+  }
+  networkRootStatus.textContent = '공유 폴더 연결과 권한을 확인하는 중입니다…';
+  networkRootStatus.classList.remove('error', 'success');
+  const inspected = await window.dawithAPI.inspectRoot(input);
+  if (!inspected.success) {
+    networkRootStatus.textContent = inspected.error;
+    networkRootStatus.classList.add('error');
+    return;
+  }
+  const config = await window.dawithAPI.getConfig();
+  const roots = Array.from(new Set([...(config.roots || []), inspected.path]));
+  await window.dawithAPI.saveConfig({ roots });
+  renderSidebarRoots(roots);
+  renderSettingsRoots(roots);
+  networkRootStatus.textContent = `${inspected.label} 연결 확인 완료. 색인을 시작합니다.`;
+  networkRootStatus.classList.add('success');
+  await window.dawithAPI.reindex();
+  closeNetworkRootForm();
+});
+networkRootInput.addEventListener('keydown', event => {
+  if (event.key === 'Enter') document.getElementById('btnSaveNetworkRoot').click();
+  if (event.key === 'Escape') closeNetworkRootForm();
+});
+
+document.getElementById('rootsList').addEventListener('click', async event => {
+  const button = event.target.closest('[data-remove-root]');
+  if (!button) return;
+  const root = button.dataset.removeRoot;
+  const config = await window.dawithAPI.getConfig();
+  const roots = (config.roots || []).filter(item => item !== root);
+  if (!roots.length) {
+    alert('검색 위치는 한 곳 이상 필요합니다. 다른 위치를 먼저 추가하세요.');
+    return;
+  }
+  await window.dawithAPI.saveConfig({ roots });
+  renderSidebarRoots(roots);
+  renderSettingsRoots(roots);
+  await window.dawithAPI.reindex();
 });
 document.getElementById('btnReindexNow').addEventListener('click', async () => {
   await window.dawithAPI.reindex();

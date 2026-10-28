@@ -1475,6 +1475,25 @@ kbd {
   color: var(--accent);
 }
 
+.root-item-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.root-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.root-item-copy strong {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .root-item code {
   min-width: 0;
   overflow: hidden;
@@ -1482,6 +1501,36 @@ kbd {
   font-family: Consolas, monospace;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.root-remove {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.root-remove:hover { background: var(--bg-hover); color: var(--danger); }
+.roots-empty { padding: 12px; color: var(--text-muted); font-size: 11px; text-align: center; }
+.setting-help { margin: 5px 0 9px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
+.root-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.network-root-form { margin-top: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-main); }
+.network-root-form[hidden] { display: none; }
+.network-root-form > label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
+.network-root-input-row { display: flex; gap: 6px; align-items: center; }
+.network-root-input-row input { min-width: 0; flex: 1; height: 32px; padding: 0 9px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface); color: var(--text-main); font: inherit; font-size: 11px; }
+.network-root-input-row input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.setting-help.error { color: var(--danger); }
+.setting-help.success { color: var(--success); }
+
+@media (max-width: 600px) {
+  .network-root-input-row { align-items: stretch; flex-direction: column; }
+  .network-root-input-row .btn { width: 100%; }
 }
 
 .storage-seg {

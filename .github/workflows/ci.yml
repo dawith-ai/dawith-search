@@ -64,3 +64,12 @@ jobs:
         run: npm ci
       - name: Build installer
         run: ${{ matrix.command }}
+      - name: Verify packaged app contents
+        run: node scripts/verify-build-artifacts.js
+      - name: Upload verified installer artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dawith-search-${{ matrix.os }}-${{ github.sha }}
+          path: dist/*1.0.4*
+          if-no-files-found: error
+          retention-days: 14

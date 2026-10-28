@@ -381,6 +381,27 @@ async function run() {
   await click('#btnCloseSettings');
 
   await click('#btnTools');
+  await click('#btnSettings');
+  await waitForState('shared root settings', state => state.settingsDisplay === 'flex');
+  await click('#btnAddNetworkRoot');
+  await evaluate(`(() => {
+    const input = document.querySelector('#networkRootInput');
+    input.value = ${JSON.stringify(fixtureRoot)};
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return input.value;
+  })()`);
+  await click('#btnSaveNetworkRoot');
+  await waitFor('shared root saved', async () => {
+    const formHidden = await evaluate("document.querySelector('#networkRootForm')?.hidden");
+    const roots = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
+    return formHidden === true && roots.includes('로컬 폴더') && roots.includes(fixtureRoot);
+  });
+  const uncInspection = await evaluate(`window.dawithAPI.inspectRoot(${JSON.stringify('\\\\server\\share')})`, true);
+  assert.strictEqual(uncInspection.success, process.platform === 'win32' ? uncInspection.success : false);
+  record('공유폴더 경로 지정·권한 확인', '직접 경로 입력, 연결 확인, UNC 안내 API 확인');
+  await click('#btnCloseSettings');
+
+  await click('#btnTools');
   await click('#btnStorageAnalyzer');
   await waitForState('storage analyzer', state => state.storageDisplay === 'flex');
   await waitFor('storage summary', async () => (await evaluate("document.querySelector('#storageBody')?.textContent || ''")).includes('전체 색인 파일'));

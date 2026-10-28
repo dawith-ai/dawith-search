@@ -391,11 +391,22 @@ async function run() {
     return input.value;
   })()`);
   await click('#btnSaveNetworkRoot');
-  await waitFor('shared root saved', async () => {
-    const formHidden = await evaluate("document.querySelector('#networkRootForm')?.hidden");
-    const roots = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
-    return formHidden === true && roots.includes('로컬 폴더') && roots.includes(fixtureRoot);
-  });
+  try {
+    await waitFor('shared root saved', async () => {
+      const formHidden = await evaluate("document.querySelector('#networkRootForm')?.hidden");
+      const roots = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
+      return formHidden === true && roots.includes('로컬 폴더') && roots.includes(fixtureRoot);
+    });
+  } catch (error) {
+    const sharedRootState = await evaluate(`({
+      input: document.querySelector('#networkRootInput')?.value || '',
+      hidden: document.querySelector('#networkRootForm')?.hidden,
+      status: document.querySelector('#networkRootStatus')?.textContent || '',
+      roots: document.querySelector('#rootsList')?.textContent || ''
+    })`);
+    error.message += `\nShared root state: ${JSON.stringify(sharedRootState)}`;
+    throw error;
+  }
   const uncInspection = await evaluate(`window.dawithAPI.inspectRoot(${JSON.stringify('\\\\server\\share')})`, true);
   assert.strictEqual(uncInspection.success, process.platform === 'win32' ? uncInspection.success : false);
   record('공유폴더 경로 지정·권한 확인', '직접 경로 입력, 연결 확인, UNC 안내 API 확인');

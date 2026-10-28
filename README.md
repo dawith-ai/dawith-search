@@ -41,6 +41,7 @@ npm start
 
 ### 현재 공개 앱 주소
 
+- [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
 - [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest)
 - [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest)

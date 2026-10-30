@@ -548,6 +548,11 @@ body {
   position: relative;
 }
 
+.btn-add-root {
+  white-space: nowrap;
+  box-shadow: 0 7px 16px var(--accent-glow);
+}
+
 .btn {
   height: 36px;
   padding: 0 12px;
@@ -1522,6 +1527,24 @@ kbd {
 .network-root-form { margin-top: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-main); }
 .network-root-form[hidden] { display: none; }
 .network-root-form > label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
+
+.root-setting-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.root-setting-summary strong {
+  color: var(--accent);
+  font-size: 12px;
+}
 .network-root-input-row { display: flex; gap: 6px; align-items: center; }
 .network-root-input-row input { min-width: 0; flex: 1; height: 32px; padding: 0 9px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-surface); color: var(--text-main); font: inherit; font-size: 11px; }
 .network-root-input-row input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }

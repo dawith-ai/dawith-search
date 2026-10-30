@@ -160,7 +160,9 @@ function getRootKindLabel(root) {
 
 function renderSettingsRoots(roots = []) {
   const rootsList = document.getElementById('rootsList');
+  const rootCount = document.getElementById('rootCount');
   if (!rootsList) return;
+  if (rootCount) rootCount.textContent = `${roots.length}곳`;
   if (!roots.length) {
     rootsList.innerHTML = '<div class="roots-empty">등록된 검색 위치가 없습니다.</div>';
     return;
@@ -236,15 +238,36 @@ async function saveCurrentBookmark() {
   await refreshBookmarks();
 }
 
+async function refreshSettingsRoots() {
+  const config = await window.dawithAPI.getConfig();
+  renderSettingsRoots(config.roots || []);
+  return config;
+}
+
+function setRootStatus(message, state = 'ready') {
+  titlebarStatus.textContent = message;
+  statusDot.className = state === 'error' ? 'status-dot error' : 'status-dot';
+}
+
 async function addSearchRoot() {
   const result = await window.dawithAPI.chooseRoot();
   if (!result || result.canceled || !result.path) return;
-  const config = await window.dawithAPI.getConfig();
-  const roots = Array.from(new Set([...(config.roots || []), result.path]));
-  await window.dawithAPI.saveConfig({ roots });
-  renderSidebarRoots(roots);
-  renderSettingsRoots(roots);
-  await window.dawithAPI.reindex();
+  try {
+    const config = await window.dawithAPI.getConfig();
+    const roots = Array.from(new Set([...(config.roots || []), result.path]));
+    await window.dawithAPI.saveConfig({ roots });
+    renderSidebarRoots(roots);
+    renderSettingsRoots(roots);
+    setRootStatus('검색 위치가 추가되었습니다. 색인 중…');
+    window.dawithAPI.reindex().catch(error => {
+      console.error('Failed to reindex after adding root:', error);
+      setRootStatus('검색 위치는 저장됐지만 색인에 실패했습니다.', 'error');
+    });
+  } catch (error) {
+    console.error('Failed to add search root:', error);
+    setRootStatus('검색 위치를 추가하지 못했습니다.', 'error');
+    alert(`검색 위치를 추가하지 못했습니다.\n${error.message || error}`);
+  }
 }
 
 async function initWorkspace() {
@@ -893,6 +916,11 @@ document.getElementById('btnClearHistory').addEventListener('click', async () =>
   await refreshHistory();
 });
 document.getElementById('btnSidebarAddRoot').addEventListener('click', addSearchRoot);
+document.getElementById('btnAddRootPrimary').addEventListener('click', async () => {
+  settingsModal.style.display = 'flex';
+  await refreshSettingsRoots();
+  document.getElementById('rootsList')?.scrollIntoView({ block: 'nearest' });
+});
 document.getElementById('btnAddRoot').addEventListener('click', addSearchRoot);
 document.getElementById('btnClearScope').addEventListener('click', () => {
   scopeRoot = '';

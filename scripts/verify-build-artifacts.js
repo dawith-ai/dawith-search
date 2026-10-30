@@ -4,6 +4,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 
 const root = path.join(__dirname, '..');
+const version = require(path.join(root, 'package.json')).version;
 const expectedEntry = 'src/engine/root-manager.js';
 const expectedAnalyzer = 'src/engine/evidence-analyzer.js';
 
@@ -18,10 +19,10 @@ const asarPath = process.platform === 'darwin'
 
 requireFile(asarPath);
 if (process.platform === 'darwin') {
-  requireFile(path.join(root, 'dist', 'Dawith Search-1.0.4-universal.dmg'));
-  requireFile(path.join(root, 'dist', 'Dawith Search-1.0.4-universal-mac.zip'));
+  requireFile(path.join(root, 'dist', `Dawith Search-${version}-universal.dmg`));
+  requireFile(path.join(root, 'dist', `Dawith Search-${version}-universal-mac.zip`));
 } else if (process.platform === 'win32') {
-  requireFile(path.join(root, 'dist', 'DawithSearch-1.0.4-portable.exe'));
+  requireFile(path.join(root, 'dist', `DawithSearch-${version}-portable.exe`));
 }
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';

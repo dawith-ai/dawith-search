@@ -374,11 +374,20 @@ async function run() {
   await waitForState('settings modal', state => state.settingsDisplay === 'flex');
   const settingsRoot = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
   assert.ok(settingsRoot.includes(path.basename(fixtureRoot)));
+  const rootCount = await evaluate("document.querySelector('#rootCount')?.textContent || ''");
+  assert.match(rootCount, /[1-9]\d*곳/);
   record('설정·검색 루트 표시', '격리 fixture root 확인');
   await click('#btnReindexNow');
   await waitForState('manual reindex', state => state.settingsDisplay === 'none' && /색인 항목:\s*[1-9]\d*개/.test(state.indexed));
   record('수동 전체 재색인', '설정의 Reindex 완료');
   await click('#btnCloseSettings');
+
+  await click('#btnAddRootPrimary');
+  await waitForState('primary root settings', state => state.settingsDisplay === 'flex');
+  const primaryRootButton = await evaluate("document.querySelector('#btnAddRootPrimary')?.textContent || ''");
+  assert.ok(primaryRootButton.includes('검색 위치 추가'));
+  await click('#btnCloseSettings');
+  record('메인 화면 검색 위치 추가 진입', '헤더의 명확한 추가 버튼과 설정 연결 확인');
 
   await click('#btnTools');
   await click('#btnSettings');

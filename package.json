@@ -1,6 +1,6 @@
 {
   "name": "dawith-search",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {

@@ -128,8 +128,8 @@ function updateScopeUI() {
 
 function updateSearchTargetUI() {
   if (!searchTargetSummary || !searchTargetTitle || !searchTargetDetail) return;
-  const localCount = configuredRoots.filter(root => getRootKindLabel(root) === '로컬 폴더').length;
-  const sharedCount = configuredRoots.length - localCount;
+  const sharedCount = configuredRoots.filter(isSharedRootPath).length;
+  const localCount = configuredRoots.length - sharedCount;
   const allRootsButton = document.getElementById('btnAllRootsScope');
 
   if (scopeRoot) {
@@ -213,6 +213,10 @@ function getRootKindLabel(root) {
   if (/^[A-Za-z]:[\\/]/.test(root)) return 'Windows 드라이브·공유 경로';
   if (/^\/Volumes(?:\/|$)/.test(root)) return 'macOS 연결된 공유폴더';
   return '로컬 폴더';
+}
+
+function isSharedRootPath(root) {
+  return /^\\\\[^\\/]+[\\/][^\\/]+/.test(String(root || '')) || /^\/Volumes(?:\/|$)/.test(String(root || ''));
 }
 
 function renderSettingsRoots(roots = []) {

@@ -86,8 +86,12 @@ h1 em, h2 em { color: var(--teal); font-style: normal; }
 .version-chip { color: var(--teal); font: 10px var(--mono); letter-spacing: .08em; }
 .download-card h3 { margin-top: 35px; color: var(--navy); font-size: 23px; letter-spacing: -.05em; }
 .download-card p { margin-top: 8px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.card-actions { display: grid; gap: 8px; margin-top: auto; }
 .card-button { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding: 12px 14px; border-radius: 8px; color: var(--white); background: var(--navy); font-size: 13px; font-weight: 750; }
 .card-button:hover { background: var(--teal); }
+.card-actions .card-button { margin-top: 0; }
+.card-button.drive-button { color: var(--navy); background: transparent; border: 1px solid var(--line); }
+.card-button.drive-button:hover { color: var(--white); background: var(--teal); border-color: var(--teal); }
 .download-card small { margin-top: 10px; color: #899a92; font-size: 11px; line-height: 1.5; }
 .steps-section { display: grid; grid-template-columns: .6fr 1.4fr; gap: 72px; padding-top: 88px; padding-bottom: 100px; }
 .compact-intro h2 { font-size: clamp(30px, 3.2vw, 44px); }

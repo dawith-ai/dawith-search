@@ -15,6 +15,7 @@ let searchDebounceTimer = null;
 let historyDebounceTimer = null;
 let currentContextItem = null;
 let scopeRoot = '';
+let configuredRoots = [];
 
 // UI Elements
 const searchInput = document.getElementById('searchInput');
@@ -40,6 +41,10 @@ const historyList = document.getElementById('historyList');
 const sidebarRoots = document.getElementById('sidebarRoots');
 const selectionBar = document.getElementById('selectionBar');
 const selectionSummary = document.getElementById('selectionSummary');
+const searchTargetSummary = document.getElementById('searchTargetSummary');
+const searchTargetTitle = document.getElementById('searchTargetTitle');
+const searchTargetDetail = document.getElementById('searchTargetDetail');
+const allRootsScopeDetail = document.getElementById('allRootsScopeDetail');
 
 // Modals
 const quickLookModal = document.getElementById('quickLookModal');
@@ -113,6 +118,55 @@ function updateScopeUI() {
   activeScope.hidden = !scopeRoot;
   activeScopeLabel.textContent = scopeRoot ? getPathLabel(scopeRoot) : '';
   activeScopeLabel.title = scopeRoot || '';
+  updateSearchTargetUI();
+  sidebarRoots?.querySelectorAll('[data-root]').forEach(button => {
+    const active = button.dataset.root === scopeRoot;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+function updateSearchTargetUI() {
+  if (!searchTargetSummary || !searchTargetTitle || !searchTargetDetail) return;
+  const localCount = configuredRoots.filter(root => getRootKindLabel(root) === '로컬 폴더').length;
+  const sharedCount = configuredRoots.length - localCount;
+  const allRootsButton = document.getElementById('btnAllRootsScope');
+
+  if (scopeRoot) {
+    searchTargetSummary.classList.add('is-scoped');
+    searchTargetTitle.textContent = '선택한 폴더만 검색';
+    searchTargetDetail.textContent = `${getPathLabel(scopeRoot)} · 다른 위치는 제외됩니다.`;
+    if (allRootsButton) {
+      allRootsButton.classList.remove('active');
+      allRootsButton.setAttribute('aria-pressed', 'false');
+    }
+    if (allRootsScopeDetail) allRootsScopeDetail.textContent = '클릭하면 모든 위치를 검색합니다';
+    return;
+  }
+
+  searchTargetSummary.classList.remove('is-scoped');
+  if (!configuredRoots.length) {
+    searchTargetTitle.textContent = '검색 위치가 없습니다';
+    searchTargetDetail.textContent = '검색 위치 추가에서 폴더를 등록하세요.';
+  } else if (localCount > 0 && sharedCount > 0) {
+    searchTargetTitle.textContent = '로컬 + 공유 폴더 전체';
+    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
+  } else if (sharedCount > 0) {
+    searchTargetTitle.textContent = '공유 폴더 전체';
+    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
+  } else {
+    searchTargetTitle.textContent = '로컬 폴더 전체';
+    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
+  }
+  if (allRootsScopeDetail) {
+    allRootsScopeDetail.textContent = configuredRoots.length
+      ? `${searchTargetTitle.textContent} · ${configuredRoots.length}곳`
+      : '검색 위치를 먼저 추가하세요';
+  }
+  if (allRootsButton) {
+    allRootsButton.classList.add('active');
+    allRootsButton.setAttribute('aria-pressed', 'true');
+  }
 }
 
 function setActivePreset(query) {
@@ -135,7 +189,9 @@ function applyWorkspaceQuery(query, options = {}) {
 
 function renderSidebarRoots(roots = []) {
   if (!sidebarRoots) return;
+  configuredRoots = Array.isArray(roots) ? roots.slice() : [];
   sidebarRoots.innerHTML = '';
+  updateSearchTargetUI();
   if (!roots.length) {
     sidebarRoots.innerHTML = '<div class="sidebar-empty">설정에서 검색 폴더를 추가하세요.</div>';
     return;
@@ -143,8 +199,9 @@ function renderSidebarRoots(roots = []) {
   roots.forEach(root => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'sidebar-list-item';
+    button.className = `sidebar-list-item${scopeRoot === root ? ' active' : ''}`;
     button.dataset.root = root;
+    button.setAttribute('aria-pressed', scopeRoot === root ? 'true' : 'false');
     button.title = root;
     button.innerHTML = `<span class="nav-mark">⌂</span><span class="sidebar-item-label">${escapeHtml(getPathLabel(root))}<small>${escapeHtml(root)}</small></span>`;
     sidebarRoots.appendChild(button);
@@ -162,6 +219,8 @@ function renderSettingsRoots(roots = []) {
   const rootsList = document.getElementById('rootsList');
   const rootCount = document.getElementById('rootCount');
   if (!rootsList) return;
+  configuredRoots = Array.isArray(roots) ? roots.slice() : [];
+  updateSearchTargetUI();
   if (rootCount) rootCount.textContent = `${roots.length}곳`;
   if (!roots.length) {
     rootsList.innerHTML = '<div class="roots-empty">등록된 검색 위치가 없습니다.</div>';
@@ -916,6 +975,13 @@ document.getElementById('btnClearHistory').addEventListener('click', async () =>
   await refreshHistory();
 });
 document.getElementById('btnSidebarAddRoot').addEventListener('click', addSearchRoot);
+document.getElementById('btnAllRootsScope').addEventListener('click', () => {
+  scopeRoot = '';
+  renderSidebarRoots(configuredRoots);
+  updateScopeUI();
+  setActivePreset(searchInput.value.trim());
+  executeSearch();
+});
 document.getElementById('btnAddRootPrimary').addEventListener('click', async () => {
   settingsModal.style.display = 'flex';
   await refreshSettingsRoots();
@@ -924,6 +990,7 @@ document.getElementById('btnAddRootPrimary').addEventListener('click', async () 
 document.getElementById('btnAddRoot').addEventListener('click', addSearchRoot);
 document.getElementById('btnClearScope').addEventListener('click', () => {
   scopeRoot = '';
+  renderSidebarRoots(configuredRoots);
   updateScopeUI();
   setActivePreset(searchInput.value.trim());
   executeSearch();

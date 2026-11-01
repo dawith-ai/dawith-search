@@ -287,6 +287,26 @@ async function run() {
   assert.strictEqual(initialState.title, 'Dawith Search');
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
 
+  const initialSearchTarget = await evaluate(`({
+    title: document.querySelector('#searchTargetTitle')?.textContent || '',
+    detail: document.querySelector('#searchTargetDetail')?.textContent || '',
+    allDetail: document.querySelector('#allRootsScopeDetail')?.textContent || ''
+  })`);
+  assert.strictEqual(initialSearchTarget.title, '로컬 폴더 전체');
+  assert.ok(initialSearchTarget.detail.includes('1곳을 합쳐 검색합니다.'));
+  assert.ok(initialSearchTarget.allDetail.includes('로컬 폴더 전체'));
+  record('검색 대상 요약', '로컬 폴더 전체 대상임을 메인 화면에서 확인');
+
+  await click('#sidebarRoots [data-root]');
+  await waitFor('single-folder scope', async () => (await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''")) === '선택한 폴더만 검색');
+  const singleScopeDetail = await evaluate("document.querySelector('#searchTargetDetail')?.textContent || ''");
+  assert.ok(singleScopeDetail.includes('다른 위치는 제외됩니다.'));
+  record('단일 폴더 범위', '선택한 폴더만 검색하고 다른 위치를 제외한다고 표시');
+
+  await click('#btnAllRootsScope');
+  await waitFor('all-folder scope', async () => (await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''")) === '로컬 폴더 전체');
+  record('전체 검색 위치 복귀', '모든 검색 위치 버튼으로 전체 대상 복귀');
+
   await setSearch('contract');
   await waitForState('search results', state => state.rows > 0 && state.rowText.includes('contract-agreement.txt'));
   record('파일명 검색', 'contract-agreement.txt 검색 결과 확인');
@@ -421,6 +441,19 @@ async function run() {
   const uncInspection = await evaluate(`window.dawithAPI.inspectRoot(${JSON.stringify('\\\\server\\share')})`, true);
   assert.strictEqual(uncInspection.success, process.platform === 'win32' ? uncInspection.success : false);
   record('공유폴더 경로 지정·권한 확인', '직접 경로 입력, 연결 확인, UNC 안내 API 확인');
+  await click('#btnCloseSettings');
+
+  const mixedRoots = JSON.stringify([fixtureRoot, '\\\\server\\share']);
+  await evaluate(`window.dawithAPI.saveConfig({ roots: ${mixedRoots} })`, true);
+  await click('#btnTools');
+  await click('#btnSettings');
+  await waitForState('mixed root summary', state => state.settingsDisplay === 'flex');
+  const mixedRootSummary = await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''");
+  assert.strictEqual(mixedRootSummary, '로컬 + 공유 폴더 전체');
+  const mixedRootDetail = await evaluate("document.querySelector('#searchTargetDetail')?.textContent || ''");
+  assert.ok(mixedRootDetail.includes('2곳을 합쳐 검색합니다.'));
+  record('로컬·공유 폴더 합산 대상', '두 위치를 모두 검색하는 상태를 명시적으로 표시');
+  await evaluate(`window.dawithAPI.saveConfig({ roots: [${JSON.stringify(fixtureRoot)}] })`, true);
   await click('#btnCloseSettings');
 
   await click('#btnTools');

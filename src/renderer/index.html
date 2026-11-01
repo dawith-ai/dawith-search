@@ -58,6 +58,10 @@
           <span>예: <code>doc: 계약서 dm:today</code></span>
           <span>빠른 검색은 <kbd>Enter</kbd>로 파일을 엽니다</span>
         </div>
+        <div class="search-target-summary" id="searchTargetSummary" aria-live="polite">
+          <span class="search-target-badge">검색 대상</span>
+          <span class="search-target-copy"><strong id="searchTargetTitle">모든 검색 위치</strong><small id="searchTargetDetail">로컬·공유 폴더 전체</small></span>
+        </div>
       </div>
 
       <div class="header-actions">
@@ -130,6 +134,10 @@
             <div class="sidebar-section-title">검색 위치</div>
             <button class="sidebar-section-action" id="btnSidebarAddRoot" type="button" title="검색 위치 추가">＋</button>
           </div>
+          <button class="scope-all-button active" id="btnAllRootsScope" type="button" aria-pressed="true">
+            <span class="scope-all-icon" aria-hidden="true">◎</span>
+            <span class="scope-all-copy"><strong>모든 검색 위치</strong><small id="allRootsScopeDetail">로컬·공유 폴더 전체</small></span>
+          </button>
           <div class="sidebar-list" id="sidebarRoots"></div>
         </div>
 

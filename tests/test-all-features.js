@@ -22,6 +22,15 @@ const testDir = path.join(os.tmpdir(), 'dawith-test-' + Date.now());
 fs.mkdirSync(testDir, { recursive: true });
 const tagMgr = new TagManager(testDir);
 
+const defaultIndexer = new Indexer({
+  storageDir: path.join(testDir, 'default-index'),
+  nativeSearch: { search: async () => ({ supported: false }) }
+});
+assert.strictEqual(defaultIndexer.config.autoLocalRoots, true);
+assert.ok(Array.isArray(defaultIndexer.config.localRoots) && defaultIndexer.config.localRoots.length > 0);
+assert.deepStrictEqual(defaultIndexer.config.roots, defaultIndexer.config.localRoots);
+console.log('  ✓ Local roots default to automatic whole-device scope; external roots remain opt-in');
+
 const testFile = 'C:\\test\\document.pdf';
 tagMgr.addTag(testFile, '중요문서');
 tagMgr.addTag(testFile, '#예산안');

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Dawith">
+  <defs>
+    <linearGradient id="dawith-ci" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0e8c5d" />
+      <stop offset="1" stop-color="#7c3aed" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#dawith-ci)" />
+  <path d="M142 116h91c92 0 150 55 150 140s-58 140-150 140h-91V116Zm72 63v154h20c47 0 76-27 76-77s-29-77-76-77h-20Z" fill="#fff" />
+  <circle cx="382" cy="121" r="24" fill="#fff" opacity=".9" />
+</svg>

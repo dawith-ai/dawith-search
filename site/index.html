@@ -39,7 +39,7 @@
           <div class="proof-row" aria-label="제품 정보">
             <span><strong>macOS</strong> Apple Silicon + Intel</span>
             <span><strong>Windows</strong> x64 Portable</span>
-            <span><strong>v1.0.6</strong> 검증 릴리스</span>
+            <span><strong>v1.0.7</strong> 검증 릴리스</span>
           </div>
         </div>
         <div class="hero-window" aria-label="Dawith Search 화면 미리보기">
@@ -71,7 +71,7 @@
         <div class="section-intro">
           <p class="eyebrow">01 / INSTALL</p>
           <h2>운영체제에 맞는<br />파일을 받으세요.</h2>
-          <p>다운로드 후 설치하고, 처음 실행할 때 검색할 폴더를 선택하면 됩니다. 기관 파일은 외부 서버로 전송하지 않습니다.</p>
+            <p>다운로드 후 설치하세요. 로컬 파일은 처음부터 자동 검색하고, 기관 공유폴더나 외부 디스크만 필요할 때 추가합니다.</p>
         </div>
         <div class="download-grid">
           <article class="download-card featured-card">
@@ -79,7 +79,7 @@
             <h3>macOS</h3>
             <p>Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다.</p>
             <div class="card-actions">
-              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.6-universal.dmg" target="_blank" rel="noreferrer">DMG 다운로드 <span>↗</span></a>
+              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.7-universal.dmg" target="_blank" rel="noreferrer">DMG 다운로드 <span>↗</span></a>
             </div>
             <small>설치 후 Applications 폴더로 이동</small>
           </article>
@@ -88,7 +88,7 @@
             <h3>Windows</h3>
             <p>설치 없이 실행할 수 있는 portable EXE입니다.</p>
             <div class="card-actions">
-              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.6-portable.exe" target="_blank" rel="noreferrer">EXE 다운로드 <span>↗</span></a>
+              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.7-portable.exe" target="_blank" rel="noreferrer">EXE 다운로드 <span>↗</span></a>
               <a class="card-button drive-button" href="https://drive.google.com/open?id=1QMuxJsmiu6quevK3eP4o3zIk3cFuwq8D" target="_blank" rel="noreferrer">Google Drive 미러 <span>↗</span></a>
             </div>
             <small>다운로드 후 파일을 실행</small>
@@ -103,7 +103,7 @@
         </div>
         <div class="steps-grid">
           <article class="step"><span>01</span><h3>앱을 실행하세요</h3><p>macOS는 DMG에서 앱을 Applications로 옮기고, Windows는 portable EXE를 바로 실행합니다.</p></article>
-          <article class="step"><span>02</span><h3>검색 폴더를 정하세요</h3><p>설정에서 문서, 바탕화면, 기관 폴더와 접근 가능한 공유 폴더를 추가합니다.</p></article>
+          <article class="step"><span>02</span><h3>외부 폴더만 추가하세요</h3><p>로컬 파일은 자동으로 검색합니다. 기관 공유폴더나 외부 디스크만 설정에서 추가합니다.</p></article>
           <article class="step"><span>03</span><h3>검색하고 바로 여세요</h3><p>파일명·경로·본문·크기·수정일을 조합하고 Enter 또는 Space로 작업을 이어갑니다.</p></article>
         </div>
       </section>
@@ -126,7 +126,8 @@
         <div class="section-intro compact-intro"><p class="eyebrow">04 / FAQ</p><h2>설치 전에 확인하세요.</h2></div>
         <div class="faq-grid">
           <details open><summary>Windows에서 Everything이 꼭 필요한가요?</summary><p>아닙니다. Everything과 es.exe가 있으면 더 빠른 네이티브 검색을 사용하고, 없으면 Dawith Search 자체 로컬 색인으로 동작합니다.</p></details>
-          <details><summary>공유 폴더는 어떻게 추가하나요?</summary><p>설정 → 색인할 폴더 → 검색 폴더 추가에서 <code>\\서버\공유폴더</code>를 선택하세요. Windows 계정에 해당 공유 권한이 있어야 합니다.</p></details>
+          <details><summary>공유 폴더는 어떻게 추가하나요?</summary><p>로컬 파일은 기본으로 자동 검색합니다. 설정 → 검색 범위 → 외부 폴더 추가에서 <code>\\서버\공유폴더</code> 또는 연결된 외부 경로를 추가하세요.</p></details>
+          <details><summary>패치 업데이트는 어떻게 하나요?</summary><p>새 버전이 있으면 앱 상단에 업데이트 버튼이 나타납니다. Windows는 portable 패치를 내려받아 재실행하고, macOS는 universal DMG를 열어 설치를 완료합니다.</p></details>
           <details><summary>파일이 외부로 전송되나요?</summary><p>검색과 자연어 보조는 로컬 규칙과 색인으로 처리합니다. 검색 대상 파일을 외부 AI 서버로 보내지 않습니다.</p></details>
           <details><summary>처음 실행할 때 경고가 표시되나요?</summary><p>현재 배포본은 코드 서명 인증서 없이 빌드되어 macOS Gatekeeper 또는 Windows SmartScreen 경고가 표시될 수 있습니다. 공식 릴리스에서 받은 파일인지 확인한 뒤 운영체제 안내에 따라 실행하세요.</p></details>
         </div>

@@ -16,6 +16,7 @@ let historyDebounceTimer = null;
 let currentContextItem = null;
 let scopeRoot = '';
 let configuredRoots = [];
+let configuredLocalRoots = [];
 
 // UI Elements
 const searchInput = document.getElementById('searchInput');
@@ -45,6 +46,8 @@ const searchTargetSummary = document.getElementById('searchTargetSummary');
 const searchTargetTitle = document.getElementById('searchTargetTitle');
 const searchTargetDetail = document.getElementById('searchTargetDetail');
 const allRootsScopeDetail = document.getElementById('allRootsScopeDetail');
+const updateButton = document.getElementById('btnUpdate');
+const updateButtonLabel = document.getElementById('btnUpdateLabel');
 
 // Modals
 const quickLookModal = document.getElementById('quickLookModal');
@@ -128,8 +131,7 @@ function updateScopeUI() {
 
 function updateSearchTargetUI() {
   if (!searchTargetSummary || !searchTargetTitle || !searchTargetDetail) return;
-  const sharedCount = configuredRoots.filter(isSharedRootPath).length;
-  const localCount = configuredRoots.length - sharedCount;
+  const externalRoots = configuredRoots.filter(root => !configuredLocalRoots.includes(root));
   const allRootsButton = document.getElementById('btnAllRootsScope');
 
   if (scopeRoot) {
@@ -147,25 +149,72 @@ function updateSearchTargetUI() {
   searchTargetSummary.classList.remove('is-scoped');
   if (!configuredRoots.length) {
     searchTargetTitle.textContent = '검색 위치가 없습니다';
-    searchTargetDetail.textContent = '검색 위치 추가에서 폴더를 등록하세요.';
-  } else if (localCount > 0 && sharedCount > 0) {
-    searchTargetTitle.textContent = '로컬 + 공유 폴더 전체';
-    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
-  } else if (sharedCount > 0) {
-    searchTargetTitle.textContent = '공유 폴더 전체';
-    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
+    searchTargetDetail.textContent = '로컬 자동 검색 범위를 불러오는 중입니다.';
+  } else if (externalRoots.length > 0) {
+    searchTargetTitle.textContent = '내 PC 로컬 + 외부 폴더 전체';
+    searchTargetDetail.textContent = `로컬 전체 + 외부 ${externalRoots.length}곳을 합쳐 검색합니다.`;
   } else {
-    searchTargetTitle.textContent = '로컬 폴더 전체';
-    searchTargetDetail.textContent = `${configuredRoots.length}곳을 합쳐 검색합니다.`;
+    searchTargetTitle.textContent = '내 PC 로컬 파일 전체';
+    searchTargetDetail.textContent = '폴더를 따로 지정하지 않아도 로컬 전체를 자동 검색합니다.';
   }
   if (allRootsScopeDetail) {
     allRootsScopeDetail.textContent = configuredRoots.length
-      ? `${searchTargetTitle.textContent} · ${configuredRoots.length}곳`
-      : '검색 위치를 먼저 추가하세요';
+      ? (externalRoots.length > 0 ? `로컬 전체 + 외부 ${externalRoots.length}곳` : '로컬 전체 자동 검색')
+      : '로컬 자동 검색 준비 중';
   }
   if (allRootsButton) {
     allRootsButton.classList.add('active');
     allRootsButton.setAttribute('aria-pressed', 'true');
+  }
+}
+
+let availableUpdate = null;
+
+function renderUpdateButton(update) {
+  availableUpdate = update && update.available ? update : null;
+  if (!updateButton || !updateButtonLabel) return;
+  if (!availableUpdate) {
+    updateButton.hidden = true;
+    return;
+  }
+  updateButton.hidden = false;
+  updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
+  updateButton.title = `${availableUpdate.latestVersion} 패치를 내려받아 적용합니다.`;
+}
+
+async function checkForUpdates(showMessage = false) {
+  if (!window.dawithAPI.checkForUpdates) return;
+  try {
+    const update = await window.dawithAPI.checkForUpdates();
+    renderUpdateButton(update);
+    if (showMessage && (!update || !update.available)) alert('현재 최신 버전입니다.');
+  } catch (error) {
+    if (showMessage) alert(`업데이트를 확인하지 못했습니다.\n${error.message || error}`);
+  }
+}
+
+async function downloadAvailableUpdate() {
+  if (!availableUpdate || !updateButton || !updateButtonLabel) return;
+  updateButton.disabled = true;
+  updateButtonLabel.textContent = '다운로드 중…';
+  try {
+    const result = await window.dawithAPI.downloadUpdate();
+    if (!result.success) {
+      alert(`업데이트를 적용하지 못했습니다.\n${result.error || '알 수 없는 오류'}`);
+      updateButton.disabled = false;
+      updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
+      return;
+    }
+    updateButtonLabel.textContent = result.action === 'relaunch' ? '재실행 중…' : '설치 파일 열림';
+    updateButton.hidden = result.action !== 'relaunch';
+    if (result.action === 'open-installer') {
+      alert('최신 설치 파일을 열었습니다. 설치를 완료한 뒤 앱을 다시 실행하세요.');
+      updateButton.disabled = false;
+    }
+  } catch (error) {
+    alert(`업데이트를 적용하지 못했습니다.\n${error.message || error}`);
+    updateButton.disabled = false;
+    updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
   }
 }
 
@@ -187,9 +236,10 @@ function applyWorkspaceQuery(query, options = {}) {
   executeSearch();
 }
 
-function renderSidebarRoots(roots = []) {
+function renderSidebarRoots(roots = [], localRoots = configuredLocalRoots) {
   if (!sidebarRoots) return;
   configuredRoots = Array.isArray(roots) ? roots.slice() : [];
+  if (Array.isArray(localRoots)) configuredLocalRoots = localRoots.slice();
   sidebarRoots.innerHTML = '';
   updateSearchTargetUI();
   if (!roots.length) {
@@ -199,16 +249,20 @@ function renderSidebarRoots(roots = []) {
   roots.forEach(root => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `sidebar-list-item${scopeRoot === root ? ' active' : ''}`;
+    const isAutoLocal = isLocalAutoRoot(root);
+    button.className = `sidebar-list-item${scopeRoot === root ? ' active' : ''}${isAutoLocal ? ' is-auto-local' : ''}`;
     button.dataset.root = root;
     button.setAttribute('aria-pressed', scopeRoot === root ? 'true' : 'false');
     button.title = root;
-    button.innerHTML = `<span class="nav-mark">⌂</span><span class="sidebar-item-label">${escapeHtml(getPathLabel(root))}<small>${escapeHtml(root)}</small></span>`;
+    const label = isAutoLocal ? '내 PC 로컬 전체' : `외부 · ${getPathLabel(root)}`;
+    const detail = isAutoLocal ? '폴더 지정 없이 자동 검색' : root;
+    button.innerHTML = `<span class="nav-mark">${isAutoLocal ? '⌂' : '⌁'}</span><span class="sidebar-item-label">${escapeHtml(label)}<small>${escapeHtml(detail)}</small></span>`;
     sidebarRoots.appendChild(button);
   });
 }
 
 function getRootKindLabel(root) {
+  if (isLocalAutoRoot(root)) return '로컬 자동 전체';
   if (/^\\\\[^\\/]+[\\/][^\\/]+/.test(root)) return 'Windows 공유폴더';
   if (/^[A-Za-z]:[\\/]/.test(root)) return 'Windows 드라이브·공유 경로';
   if (/^\/Volumes(?:\/|$)/.test(root)) return 'macOS 연결된 공유폴더';
@@ -219,24 +273,32 @@ function isSharedRootPath(root) {
   return /^\\\\[^\\/]+[\\/][^\\/]+/.test(String(root || '')) || /^\/Volumes(?:\/|$)/.test(String(root || ''));
 }
 
-function renderSettingsRoots(roots = []) {
+function isLocalAutoRoot(root) {
+  return configuredLocalRoots.includes(root);
+}
+
+function renderSettingsRoots(roots = [], localRoots = configuredLocalRoots) {
   const rootsList = document.getElementById('rootsList');
   const rootCount = document.getElementById('rootCount');
   if (!rootsList) return;
   configuredRoots = Array.isArray(roots) ? roots.slice() : [];
+  if (Array.isArray(localRoots)) configuredLocalRoots = localRoots.slice();
   updateSearchTargetUI();
-  if (rootCount) rootCount.textContent = `${roots.length}곳`;
+  const externalCount = roots.filter(root => !isLocalAutoRoot(root)).length;
+  if (rootCount) rootCount.textContent = `${configuredLocalRoots.length ? '로컬 자동' : '로컬'} + 외부 ${externalCount}곳`;
   if (!roots.length) {
     rootsList.innerHTML = '<div class="roots-empty">등록된 검색 위치가 없습니다.</div>';
     return;
   }
-  rootsList.innerHTML = roots.map(root => `
-    <div class="root-item" data-root-item="${escapeHtml(root)}">
-      <span class="root-item-icon">⌂</span>
+  rootsList.innerHTML = roots.map(root => {
+    const isAutoLocal = isLocalAutoRoot(root);
+    return `
+    <div class="root-item${isAutoLocal ? ' is-auto-local' : ''}" data-root-item="${escapeHtml(root)}">
+      <span class="root-item-icon">${isAutoLocal ? '⌂' : '⌁'}</span>
       <span class="root-item-copy"><strong>${escapeHtml(getRootKindLabel(root))}</strong><code>${escapeHtml(root)}</code></span>
-      <button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="검색 위치에서 제거">×</button>
+      ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="외부 검색 위치에서 제거">×</button>`}
     </div>
-  `).join('');
+  `; }).join('');
 }
 
 async function refreshBookmarks() {
@@ -303,7 +365,7 @@ async function saveCurrentBookmark() {
 
 async function refreshSettingsRoots() {
   const config = await window.dawithAPI.getConfig();
-  renderSettingsRoots(config.roots || []);
+  renderSettingsRoots(config.roots || [], config.localRoots || []);
   return config;
 }
 
@@ -317,6 +379,10 @@ async function addSearchRoot() {
   if (!result || result.canceled || !result.path) return;
   try {
     const config = await window.dawithAPI.getConfig();
+    if ((config.localRoots || []).some(root => isPathWithinRoot(result.path, root))) {
+      setRootStatus('로컬 폴더는 자동 검색 중입니다. 외부·공유 폴더만 추가하면 됩니다.');
+      return;
+    }
     const roots = Array.from(new Set([...(config.roots || []), result.path]));
     await window.dawithAPI.saveConfig({ roots });
     renderSidebarRoots(roots);
@@ -335,9 +401,18 @@ async function addSearchRoot() {
 
 async function initWorkspace() {
   const config = await window.dawithAPI.getConfig();
-  renderSidebarRoots(config.roots || []);
+  renderSidebarRoots(config.roots || [], config.localRoots || []);
   await Promise.all([refreshBookmarks(), refreshHistory()]);
   updateScopeUI();
+}
+
+function isPathWithinRoot(candidatePath, rootPath) {
+  const candidate = String(candidatePath || '').replace(/[\\/]$/, '');
+  const root = String(rootPath || '').replace(/[\\/]$/, '');
+  if (!candidate || !root) return false;
+  const normalizedCandidate = /^[A-Za-z]:|^\\\\/.test(candidate) ? candidate.toLowerCase() : candidate;
+  const normalizedRoot = /^[A-Za-z]:|^\\\\/.test(root) ? root.toLowerCase() : root;
+  return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}${normalizedRoot.includes('\\') ? '\\' : '/'}`);
 }
 
 // Perform Search
@@ -974,6 +1049,8 @@ historyList.addEventListener('click', (e) => {
 });
 
 document.getElementById('btnSaveBookmark').addEventListener('click', saveCurrentBookmark);
+updateButton?.addEventListener('click', downloadAvailableUpdate);
+document.getElementById('btnCheckUpdates')?.addEventListener('click', () => checkForUpdates(true));
 document.getElementById('btnClearHistory').addEventListener('click', async () => {
   await window.dawithAPI.clearSearchHistory();
   await refreshHistory();
@@ -1408,3 +1485,4 @@ async function initBackendStatus() {
 initBackendStatus();
 initWorkspace();
 executeSearch();
+setTimeout(() => checkForUpdates(false), 1200);

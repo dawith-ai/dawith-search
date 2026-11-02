@@ -2,7 +2,7 @@
 
 macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하는 Electron 데스크톱 앱입니다. 검색 문법, 실시간 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
 
-사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
+사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 기본값은 내 PC 로컬 전체 자동 검색이며, 공유폴더·외부 경로만 직접 추가합니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
 
 ## 검색 백엔드
 
@@ -11,6 +11,14 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 - 기타 플랫폼: `fdir` 기반 초기 색인과 `chokidar` 기반 변경 감시를 사용합니다.
 
 네이티브 백엔드가 없거나 해당 쿼리를 지원하지 않으면 자동으로 로컬 색인으로 폴백합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
+
+### 기본 로컬 검색과 외부 폴더
+
+앱을 처음 실행하면 macOS·Linux에서는 사용자 홈 폴더 전체를, Windows에서는 감지된 로컬 드라이브 전체를 자동 검색합니다. Desktop·Documents처럼 폴더를 하나씩 지정할 필요가 없습니다. 외부 디스크나 공유폴더는 설정에서 직접 추가한 경로만 색인합니다.
+
+### 패치 업데이트
+
+앱은 실행 후 GitHub 최신 릴리스를 확인하고 새 패치가 있으면 상단에 `vX.Y.Z 업데이트` 버튼을 표시합니다. Windows는 최신 portable EXE를 내려받아 앱을 재실행하고, macOS는 universal DMG를 열어 설치를 이어갑니다. 설치 파일에 GitHub SHA-256 digest가 제공되면 다운로드 후 무결성을 확인합니다.
 
 ### Windows 공유 폴더
 
@@ -43,8 +51,8 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.6-universal.dmg)
-- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.6-portable.exe)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.7-universal.dmg)
+- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.7-portable.exe)
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 

@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, shell, clipboard, dialog, globalShortcut, T
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+const { spawn } = require('child_process');
 const { pathToFileURL } = require('url');
 
 function writeCrashLog(message) {
@@ -30,6 +31,7 @@ const BookmarkManager = require('../engine/bookmark-manager');
 const HistoryManager = require('../engine/history-manager');
 const EvidenceAnalyzer = require('../engine/evidence-analyzer');
 const RootManager = require('../engine/root-manager');
+const UpdateManager = require('./update-manager');
 
 let mainWindow = null;
 let guideWindow = null;
@@ -503,6 +505,57 @@ ipcMain.handle('get-backend-status', () => {
   return indexer ? indexer.nativeSearch.getStatus() : { backend: 'local', label: '로컬 색인 모드', available: false };
 });
 
+ipcMain.handle('check-for-updates', async () => {
+  if (process.env.DAWITH_DISABLE_UPDATE_CHECK === '1') {
+    return { supported: false, available: false, reason: 'disabled-for-test' };
+  }
+  try {
+    return await UpdateManager.checkForUpdates(app.getVersion(), process.platform);
+  } catch (error) {
+    return { supported: false, available: false, reason: error.message };
+  }
+});
+
+ipcMain.handle('download-update', async () => {
+  if (process.env.DAWITH_DISABLE_UPDATE_CHECK === '1') {
+    return { success: false, error: '업데이트 확인이 테스트 모드에서 비활성화되어 있습니다.' };
+  }
+  try {
+    const update = await UpdateManager.checkForUpdates(app.getVersion(), process.platform);
+    if (!update.available) return { success: false, error: '현재 최신 버전입니다.' };
+
+    const updateDir = path.join(app.getPath('downloads'), 'Dawith Search Updates');
+    const destination = path.join(updateDir, update.asset.name);
+    await UpdateManager.downloadAndVerify(update, destination);
+
+    if (process.platform === 'win32') {
+      const scriptPath = path.join(updateDir, `launch-${update.latestVersion}.cmd`);
+      const script = [
+        '@echo off',
+        'timeout /t 2 /nobreak >nul',
+        `start "" "${destination.replace(/"/g, '""')}"`,
+        'del "%~f0"'
+      ].join('\r\n');
+      fs.writeFileSync(scriptPath, script, 'utf8');
+      const launcher = spawn('cmd.exe', ['/d', '/s', '/c', scriptPath], {
+        detached: true,
+        windowsHide: true,
+        stdio: 'ignore'
+      });
+      launcher.unref();
+      app.isQuitting = true;
+      app.quit();
+      return { success: true, action: 'relaunch', path: destination, version: update.latestVersion };
+    }
+
+    const openError = await shell.openPath(destination);
+    if (openError) return { success: false, error: openError };
+    return { success: true, action: 'open-installer', path: destination, version: update.latestVersion };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('open-guide', () => {
   openGuideWindow();
   return { success: true };
@@ -510,6 +563,7 @@ ipcMain.handle('open-guide', () => {
 
 ipcMain.handle('save-config', (event, config) => {
   indexer.config = { ...indexer.config, ...config };
+  indexer.normalizeConfig();
   indexer.fileWatcher.watch(indexer.config.roots);
   indexer.saveConfig();
   return { success: true };

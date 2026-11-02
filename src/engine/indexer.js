@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { execFileSync } = require('child_process');
 const EventEmitter = require('events');
 const { fdir } = require('fdir');
 const { QueryParser } = require('./query-parser');
@@ -44,8 +45,11 @@ class Indexer extends EventEmitter {
   }
 
   loadConfig() {
+    const localRoots = this.getDefaultRoots();
     const defaults = {
-      roots: this.getDefaultRoots(),
+      roots: localRoots,
+      localRoots,
+      autoLocalRoots: true,
       excludeFolders: [
         'node_modules',
         '.git',
@@ -70,7 +74,19 @@ class Indexer extends EventEmitter {
     if (fs.existsSync(this.configFile)) {
       try {
         const raw = readJsonWithBackup(this.configFile, null);
-        if (raw) return { ...defaults, ...raw };
+        if (raw) {
+          const rawRoots = Array.isArray(raw.roots) ? raw.roots : [];
+          const legacyRoots = this.getLegacyDefaultRoots();
+          const autoLocalRoots = raw.autoLocalRoots !== false;
+          const effectiveLocalRoots = autoLocalRoots
+            ? localRoots
+            : (Array.isArray(raw.localRoots) ? raw.localRoots : []);
+          const externalRoots = rawRoots.filter(root => !legacyRoots.includes(root) && !localRoots.includes(root));
+          const roots = autoLocalRoots
+            ? Array.from(new Set([...localRoots, ...externalRoots]))
+            : rawRoots;
+          return { ...defaults, ...raw, localRoots: effectiveLocalRoots, autoLocalRoots, roots };
+        }
       } catch (e) {
         return defaults;
       }
@@ -80,6 +96,7 @@ class Indexer extends EventEmitter {
 
   saveConfig() {
     try {
+      this.normalizeConfig();
       writeJsonAtomic(this.configFile, this.config);
     } catch (e) {
       console.error('Failed to save config:', e);
@@ -88,7 +105,16 @@ class Indexer extends EventEmitter {
 
   getDefaultRoots() {
     const userProfile = os.homedir();
-    const candidateDirs = [
+    if (process.platform === 'win32') {
+      const drives = this.getWindowsLocalDrives();
+      if (drives.length > 0) return drives;
+    }
+    return [userProfile];
+  }
+
+  getLegacyDefaultRoots() {
+    const userProfile = os.homedir();
+    return [
       path.join(userProfile, 'Desktop'),
       path.join(userProfile, 'Documents'),
       path.join(userProfile, 'Downloads'),
@@ -97,16 +123,36 @@ class Indexer extends EventEmitter {
       path.join(userProfile, 'Music'),
       path.join(userProfile, 'Movies')
     ];
+  }
 
-    const roots = [];
-    for (const d of candidateDirs) {
-      if (fs.existsSync(d) && !roots.includes(d)) {
-        roots.push(d);
-      }
+  getWindowsLocalDrives() {
+    try {
+      const output = execFileSync('powershell.exe', [
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        'Get-CimInstance Win32_LogicalDisk | Where-Object { $_.DriveType -eq 2 -or $_.DriveType -eq 3 } | Select-Object -ExpandProperty DeviceID'
+      ], { encoding: 'utf8', windowsHide: true, timeout: 5000 });
+      return String(output).split(/\r?\n/)
+        .map(value => value.trim())
+        .filter(value => /^[A-Za-z]:$/.test(value))
+        .map(value => `${value}\\`);
+    } catch (error) {
+      return [];
     }
+  }
 
-    if (roots.length === 0) roots.push(userProfile);
-    return roots;
+  normalizeConfig() {
+    if (this.config.autoLocalRoots === false) return this.config;
+    const localRoots = Array.isArray(this.config.localRoots) && this.config.localRoots.length > 0
+      ? this.config.localRoots
+      : this.getDefaultRoots();
+    this.config.localRoots = localRoots;
+    this.config.roots = Array.from(new Set([
+      ...localRoots,
+      ...(Array.isArray(this.config.roots) ? this.config.roots : [])
+    ]));
+    return this.config;
   }
 
   getIgnoredPaths() {
@@ -132,6 +178,7 @@ class Indexer extends EventEmitter {
     try {
       const data = readJsonWithBackup(this.cacheFile, null);
       if (!data) return false;
+      if (!Array.isArray(data.roots) || JSON.stringify(data.roots) !== JSON.stringify(this.config.roots)) return false;
       this.records = data.records || [];
       this.rebuildMap();
       this.updateStats();
@@ -148,6 +195,7 @@ class Indexer extends EventEmitter {
       ensurePrivateDirectory(this.storageDir);
       writeJsonAtomic(this.cacheFile, {
         savedAt: Date.now(),
+        roots: this.config.roots,
         records: this.records
       });
     } catch (e) {

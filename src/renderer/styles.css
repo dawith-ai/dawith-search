@@ -99,9 +99,10 @@ body {
 }
 
 .logo-icon {
-  color: var(--accent);
-  font-size: 20px;
-  line-height: 1;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 6px;
   filter: drop-shadow(0 0 8px var(--accent-glow));
 }
 
@@ -667,6 +668,16 @@ body.dark-theme .search-target-summary.is-scoped {
   gap: 8px;
   position: relative;
 }
+
+.btn-update {
+  border-color: #b7ead7;
+  background: #effcf6;
+  color: #087f5b;
+  font-weight: 800;
+}
+
+.btn-update:hover { border-color: #76d7b4; background: #dff8ec; }
+.btn-update:disabled { cursor: wait; opacity: .7; }
 
 .btn-add-root {
   white-space: nowrap;
@@ -1600,6 +1611,11 @@ kbd {
   color: var(--accent);
 }
 
+.root-item.is-auto-local {
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border-color));
+  background: color-mix(in srgb, var(--success) 8%, var(--bg-main));
+}
+
 .root-item-icon {
   flex: 0 0 auto;
   color: var(--accent);
@@ -1641,6 +1657,15 @@ kbd {
 }
 
 .root-remove:hover { background: var(--bg-hover); color: var(--danger); }
+.root-auto-badge {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  font-size: 10px;
+  font-weight: 800;
+}
 .roots-empty { padding: 12px; color: var(--text-muted); font-size: 11px; text-align: center; }
 .setting-help { margin: 5px 0 9px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
 .root-actions { display: flex; gap: 6px; flex-wrap: wrap; }

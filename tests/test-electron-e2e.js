@@ -71,6 +71,8 @@ function createFixture() {
 
   fs.writeFileSync(path.join(tempHome, '.dawith-search', 'config.json'), JSON.stringify({
     roots: [fixtureRoot],
+    localRoots: [fixtureRoot],
+    autoLocalRoots: false,
     excludeFolders: [],
     excludeHidden: false,
     maxDepth: 12,
@@ -235,7 +237,8 @@ async function startApp(port) {
       APPDATA: path.join(tempHome, 'AppData', 'Roaming'),
       LOCALAPPDATA: path.join(tempHome, 'AppData', 'Local'),
       ELECTRON_ENABLE_LOGGING: '1',
-      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+      ELECTRON_DISABLE_SECURITY_WARNINGS: 'true',
+      DAWITH_DISABLE_UPDATE_CHECK: '1'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -292,10 +295,10 @@ async function run() {
     detail: document.querySelector('#searchTargetDetail')?.textContent || '',
     allDetail: document.querySelector('#allRootsScopeDetail')?.textContent || ''
   })`);
-  assert.strictEqual(initialSearchTarget.title, '로컬 폴더 전체');
-  assert.ok(initialSearchTarget.detail.includes('1곳을 합쳐 검색합니다.'));
-  assert.ok(initialSearchTarget.allDetail.includes('로컬 폴더 전체'));
-  record('검색 대상 요약', '로컬 폴더 전체 대상임을 메인 화면에서 확인');
+  assert.strictEqual(initialSearchTarget.title, '내 PC 로컬 파일 전체');
+  assert.ok(initialSearchTarget.detail.includes('로컬 전체를 자동 검색합니다.'));
+  assert.ok(initialSearchTarget.allDetail.includes('로컬 전체 자동 검색'));
+  record('검색 대상 요약', '폴더를 따로 지정하지 않아도 로컬 전체를 자동 검색한다고 표시');
 
   await click('#sidebarRoots [data-root]');
   await waitFor('single-folder scope', async () => (await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''")) === '선택한 폴더만 검색');
@@ -304,7 +307,7 @@ async function run() {
   record('단일 폴더 범위', '선택한 폴더만 검색하고 다른 위치를 제외한다고 표시');
 
   await click('#btnAllRootsScope');
-  await waitFor('all-folder scope', async () => (await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''")) === '로컬 폴더 전체');
+  await waitFor('all-folder scope', async () => (await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''")) === '내 PC 로컬 파일 전체');
   record('전체 검색 위치 복귀', '모든 검색 위치 버튼으로 전체 대상 복귀');
 
   await setSearch('contract');
@@ -395,7 +398,7 @@ async function run() {
   const settingsRoot = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
   assert.ok(settingsRoot.includes(path.basename(fixtureRoot)));
   const rootCount = await evaluate("document.querySelector('#rootCount')?.textContent || ''");
-  assert.match(rootCount, /[1-9]\d*곳/);
+  assert.ok(rootCount.includes('로컬 자동'));
   record('설정·검색 루트 표시', '격리 fixture root 확인');
   await click('#btnReindexNow');
   await waitForState('manual reindex', state => state.settingsDisplay === 'none' && /색인 항목:\s*[1-9]\d*개/.test(state.indexed));
@@ -405,7 +408,7 @@ async function run() {
   await click('#btnAddRootPrimary');
   await waitForState('primary root settings', state => state.settingsDisplay === 'flex');
   const primaryRootButton = await evaluate("document.querySelector('#btnAddRootPrimary')?.textContent || ''");
-  assert.ok(primaryRootButton.includes('검색 위치 추가'));
+  assert.ok(primaryRootButton.includes('외부 폴더 추가'));
   await click('#btnCloseSettings');
   record('메인 화면 검색 위치 추가 진입', '헤더의 명확한 추가 버튼과 설정 연결 확인');
 
@@ -425,7 +428,7 @@ async function run() {
       const formHidden = await evaluate("document.querySelector('#networkRootForm')?.hidden");
       const roots = await evaluate("document.querySelector('#rootsList')?.textContent || ''");
       const hasWindowsDriveLabel = roots.includes('Windows 드라이브·공유 경로');
-      const hasLocalLabel = roots.includes('로컬 폴더');
+      const hasLocalLabel = roots.includes('로컬 자동 전체') || roots.includes('로컬 폴더');
       return formHidden === true && (hasLocalLabel || hasWindowsDriveLabel) && roots.includes(fixtureRoot);
     });
   } catch (error) {
@@ -449,9 +452,9 @@ async function run() {
   await click('#btnSettings');
   await waitForState('mixed root summary', state => state.settingsDisplay === 'flex');
   const mixedRootSummary = await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''");
-  assert.strictEqual(mixedRootSummary, '로컬 + 공유 폴더 전체');
+  assert.strictEqual(mixedRootSummary, '내 PC 로컬 + 외부 폴더 전체');
   const mixedRootDetail = await evaluate("document.querySelector('#searchTargetDetail')?.textContent || ''");
-  assert.ok(mixedRootDetail.includes('2곳을 합쳐 검색합니다.'));
+  assert.ok(mixedRootDetail.includes('로컬 전체 + 외부 1곳을 합쳐 검색합니다.'));
   record('로컬·공유 폴더 합산 대상', '두 위치를 모두 검색하는 상태를 명시적으로 표시');
   await evaluate(`window.dawithAPI.saveConfig({ roots: [${JSON.stringify(fixtureRoot)}] })`, true);
   await click('#btnCloseSettings');

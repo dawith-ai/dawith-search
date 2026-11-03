@@ -15,15 +15,21 @@
   <body>
     <header class="site-header">
       <a class="brand" href="#top" aria-label="Dawith Search 홈">
-        <span class="brand-mark" aria-hidden="true">D</span>
+        <img class="brand-mark-image" src="./favicon.svg" alt="" aria-hidden="true" />
         <span>Dawith Search</span>
       </a>
       <nav class="nav-links" aria-label="페이지 메뉴">
-        <a href="#install">설치</a>
+        <a href="#install">다운로드</a>
         <a href="#features">기능</a>
+        <a href="#howto">사용 방법</a>
+        <a href="#help">도움말</a>
         <a href="#faq">자주 묻는 질문</a>
+        <a href="#donate">후원</a>
       </nav>
-      <a class="header-link" href="https://github.com/dawith-ai/dawith-search/releases/latest" target="_blank" rel="noreferrer">최신 릴리스 ↗</a>
+      <div class="header-actions">
+        <a class="header-link quiet-header-link" href="#faq">FAQ</a>
+        <a class="header-link" href="https://github.com/dawith-ai/dawith-search/releases/latest" target="_blank" rel="noreferrer">최신 릴리스 ↗</a>
+      </div>
     </header>
 
     <main id="top">
@@ -40,6 +46,9 @@
             <span><strong>macOS</strong> Apple Silicon + Intel</span>
             <span><strong>Windows</strong> x64 Portable</span>
             <span><strong>v1.0.7</strong> 검증 릴리스</span>
+          </div>
+          <div class="hero-route" aria-label="사용 흐름">
+            <span><b>01</b> 실행</span><i>→</i><span><b>02</b> 검색</span><i>→</i><span><b>03</b> 외부 폴더만 추가</span>
           </div>
         </div>
         <div class="hero-window" aria-label="Dawith Search 화면 미리보기">
@@ -96,9 +105,9 @@
         </div>
       </section>
 
-      <section class="steps-section shell">
+      <section class="steps-section shell" id="howto">
         <div class="section-intro compact-intro">
-          <p class="eyebrow">02 / FIRST RUN</p>
+          <p class="eyebrow">02 / HOW TO USE</p>
           <h2>처음 3분이면 충분합니다.</h2>
         </div>
         <div class="steps-grid">
@@ -122,8 +131,21 @@
         </div>
       </section>
 
+      <section class="help-section shell" id="help">
+        <div class="section-intro">
+          <p class="eyebrow">04 / HELP</p>
+          <h2>막히는 지점마다<br /><em>다음 행동을 적었습니다.</em></h2>
+          <p>기능 이름보다 사용자가 누를 버튼과 확인할 위치를 먼저 안내합니다.</p>
+        </div>
+        <div class="help-grid">
+          <a class="help-card" href="#install"><span class="help-number">01</span><h3>처음 설치하기</h3><p>macOS DMG와 Windows EXE 중 내 운영체제에 맞는 파일을 선택합니다.</p><span class="help-link">설치 파일 보기 ↗</span></a>
+          <a class="help-card" href="#howto"><span class="help-number">02</span><h3>검색 범위 이해하기</h3><p>로컬 파일은 자동 검색하고, 공유폴더·외부 디스크만 직접 추가합니다.</p><span class="help-link">사용 순서 보기 ↗</span></a>
+          <a class="help-card" href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer"><span class="help-number">03</span><h3>Everything 참고하기</h3><p>Windows 네이티브 검색과 검색 문법을 더 깊게 확인할 때 공식 도움말을 엽니다.</p><span class="help-link">Voidtools 공식 사이트 ↗</span></a>
+        </div>
+      </section>
+
       <section class="faq-section shell" id="faq">
-        <div class="section-intro compact-intro"><p class="eyebrow">04 / FAQ</p><h2>설치 전에 확인하세요.</h2></div>
+        <div class="section-intro compact-intro"><p class="eyebrow">05 / FAQ</p><h2>설치 전에<br />확인하세요.</h2></div>
         <div class="faq-grid">
           <details open><summary>Windows에서 Everything이 꼭 필요한가요?</summary><p>아닙니다. Everything과 es.exe가 있으면 더 빠른 네이티브 검색을 사용하고, 없으면 Dawith Search 자체 로컬 색인으로 동작합니다.</p></details>
           <details><summary>공유 폴더는 어떻게 추가하나요?</summary><p>로컬 파일은 기본으로 자동 검색합니다. 설정 → 검색 범위 → 외부 폴더 추가에서 <code>\\서버\공유폴더</code> 또는 연결된 외부 경로를 추가하세요.</p></details>
@@ -133,12 +155,27 @@
         </div>
       </section>
 
+      <section class="donate-section shell" id="donate">
+        <div class="donate-panel">
+          <div>
+            <p class="eyebrow">06 / SUPPORT</p>
+            <h2>지역 기관의 시간을<br /><em>함께 줄여 주세요.</em></h2>
+            <p class="donate-lead">Dawith Search는 광고나 외부 AI 없이 운영되는 로컬 검색 도구입니다. 사회복지기관에서 계속 쓸 수 있도록 후원·기관 도입·테스트 의견을 받습니다.</p>
+          </div>
+          <div class="donate-actions">
+            <a class="button button-primary" href="https://github.com/dawith-ai/dawith-search/issues/new?title=%5B%ED%9B%84%EC%9B%90%5D%20Dawith%20Search%20후원%20및%20기관%20도입%20문의&body=후원%20또는%20기관%20도입%20문의입니다.%0A%0A기관명%3A%0A문의%20내용%3A" target="_blank" rel="noreferrer">후원·기관 도입 문의 ↗</a>
+            <a class="button button-quiet" href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">코드로 돕기 ↗</a>
+          </div>
+          <p class="donate-note">후원 방식과 영수증 안내는 문의 내용을 확인한 뒤 운영자가 직접 안내합니다.</p>
+        </div>
+      </section>
+
       <section class="final-cta shell">
         <div><p class="eyebrow">READY WHEN YOU ARE</p><h2>파일을 찾는 시간을<br /><em>오늘부터 줄이세요.</em></h2></div>
         <a class="button button-primary" href="#install">설치 파일 선택하기 <span aria-hidden="true">↓</span></a>
       </section>
     </main>
 
-    <footer class="site-footer shell"><span class="footer-brand">Dawith Search</span><span>로컬 파일은 로컬에 남습니다.</span><span><a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything 공식 사이트</a></span></footer>
+    <footer class="site-footer shell"><span class="footer-brand">Dawith Search</span><span>로컬 파일은 로컬에 남습니다.</span><span><a href="#help">도움말</a> · <a href="#donate">후원</a> · <a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything 공식 사이트</a></span></footer>
   </body>
 </html>

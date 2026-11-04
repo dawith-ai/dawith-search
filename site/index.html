@@ -3,179 +3,68 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#f5f7f2" />
-    <meta name="description" content="macOS와 Windows에서 기관 문서를 빠르게 찾는 로컬 파일 검색 앱, Dawith Search 설치 안내." />
-    <meta property="og:title" content="Dawith Search — 파일을 찾는 시간을 줄이세요" />
-    <meta property="og:description" content="Everything 스타일의 로컬 파일 검색을 macOS와 Windows에서 사용하세요." />
+    <meta name="theme-color" content="#f4f7f4" />
+    <meta name="description" content="Dawith Search macOS·Windows 설치 안내와 검색 범위, 도움말, FAQ를 한 곳에서 확인하세요." />
+    <meta property="og:title" content="Dawith Search · 기관 파일 검색 작업대" />
+    <meta property="og:description" content="로컬 파일은 자동으로, 공유 폴더는 지정해서. Dawith Search 설치 안내." />
     <meta property="og:type" content="website" />
-    <title>Dawith Search — 설치 안내</title>
+    <title>Dawith Search 사용 안내</title>
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <a class="brand" href="#top" aria-label="Dawith Search 홈">
-        <img class="brand-mark-image" src="./favicon.svg" alt="" aria-hidden="true" />
-        <span>Dawith Search</span>
-      </a>
-      <nav class="nav-links" aria-label="페이지 메뉴">
-        <a href="#install">다운로드</a>
-        <a href="#features">기능</a>
-        <a href="#howto">사용 방법</a>
-        <a href="#help">도움말</a>
-        <a href="#faq">자주 묻는 질문</a>
-        <a href="#donate">후원</a>
-      </nav>
-      <div class="header-actions">
-        <a class="header-link quiet-header-link" href="#faq">FAQ</a>
-        <a class="header-link" href="https://github.com/dawith-ai/dawith-search/releases/latest" target="_blank" rel="noreferrer">최신 릴리스 ↗</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Dawith Search 메뉴">
+        <a class="brand" href="#home" aria-label="Dawith Search 홈"><img src="./favicon.svg" alt="" aria-hidden="true" /><span>Dawith <small>Search · 파일 작업대</small></span></a>
+        <nav class="side-nav">
+          <p class="nav-label">작업 공간</p>
+          <a class="side-link active" href="#home"><span class="nav-icon">⌂</span><span>시작 화면</span></a>
+          <a class="side-link" href="#install"><span class="nav-icon">↓</span><span>설치 파일</span></a>
+          <a class="side-link" href="#scope"><span class="nav-icon">▣</span><span>검색 범위</span></a>
+          <a class="side-link" href="#features"><span class="nav-icon">✦</span><span>주요 기능</span></a>
+          <p class="nav-label nav-label-spaced">지원 센터</p>
+          <a class="side-link" href="#howto"><span class="nav-icon">01</span><span>사용 방법</span></a>
+          <a class="side-link" href="#help"><span class="nav-icon">?</span><span>도움말</span></a>
+          <a class="side-link" href="#faq"><span class="nav-icon">≡</span><span>FAQ</span></a>
+          <a class="side-link" href="#donate"><span class="nav-icon">♡</span><span>후원·기관 도입</span></a>
+        </nav>
+        <div class="sidebar-footer">
+          <div class="local-status"><span class="status-dot"></span><div><strong>로컬 우선 운영</strong><small>파일 내용은 외부로 보내지 않음</small></div></div>
+          <div class="sidebar-meta"><span>현재 릴리스</span><strong>v1.0.7</strong></div>
+          <a class="sidebar-github" href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub 저장소 ↗</a>
+        </div>
+      </aside>
+
+      <div class="app-main">
+        <header class="topbar">
+          <div class="breadcrumb"><span>Dawith Search</span><i>/</i><strong>파일 검색 작업대</strong></div>
+          <div class="topbar-actions"><span class="release-pill"><span class="status-dot"></span> v1.0.7 검증 릴리스</span><a class="topbar-link" href="https://github.com/dawith-ai/dawith-search/releases/latest" target="_blank" rel="noreferrer">릴리스 노트 ↗</a><a class="topbar-button" href="#install">다운로드</a></div>
+        </header>
+
+        <main id="home">
+          <section class="dashboard-head">
+            <div><p class="eyebrow">DAWITH SEARCH / WORKSPACE</p><h1>파일을 찾는 업무를<br /><em>더 단순하게.</em></h1><p class="dashboard-lead">로컬 파일은 자동으로 찾고, 공유 폴더나 외부 디스크는 필요한 만큼만 지정합니다. 기관에서 매일 쓰는 검색 흐름을 한 화면에 정리했습니다.</p></div>
+            <div class="head-boundary"><span class="boundary-mark">●</span><div><strong>로컬 검색 경계</strong><small>검색어·색인·파일 목록은 이 기기에서 처리</small></div></div>
+          </section>
+          <section class="quick-start" aria-label="빠른 시작"><div class="quick-start-mark">START</div><div class="quick-start-copy"><p class="eyebrow">처음 설치한다면 여기부터</p><h2>내 PC 전체 검색은 자동으로 시작됩니다.</h2><p>앱을 실행한 뒤 검색어를 입력하세요. 공유폴더·NAS·외부 디스크만 검색 범위에서 추가하면 됩니다.</p></div><a class="quick-start-button" href="#install">내 운영체제 설치 <span>→</span></a></section>
+          <section class="kpi-grid" aria-label="제품 요약"><article class="kpi-card"><span class="kpi-icon green">⌂</span><div><small>기본 검색 범위</small><strong>로컬 전체 자동</strong><p>폴더를 하나씩 고르지 않아도 됩니다.</p></div></article><article class="kpi-card"><span class="kpi-icon blue">▣</span><div><small>외부 경로</small><strong>공유폴더 지정</strong><p>UNC·연결 디스크를 직접 추가합니다.</p></div></article><article class="kpi-card"><span class="kpi-icon amber">⌘</span><div><small>지원 플랫폼</small><strong>macOS · Windows</strong><p>Universal DMG와 x64 Portable EXE.</p></div></article><article class="kpi-card"><span class="kpi-icon violet">↻</span><div><small>패치 적용</small><strong>앱에서 업데이트</strong><p>새 버전 알림 후 바로 적용합니다.</p></div></article></section>
+
+          <div class="dashboard-grid">
+            <section class="workspace-panel" id="scope"><div class="section-heading"><div><p class="eyebrow">검색 범위</p><h2>어떤 파일을 찾을까요?</h2></div><span class="section-note">설정에서 언제든 변경</span></div><div class="scope-list"><article class="scope-row scope-primary"><span class="scope-icon">⌂</span><div><strong>내 PC 로컬 전체</strong><p>사용자 홈과 연결된 로컬 저장소를 자동으로 검색합니다.</p></div><span class="scope-badge">기본 켜짐</span></article><article class="scope-row"><span class="scope-icon">▣</span><div><strong>외부·공유 폴더</strong><p><code>\\서버\\공유폴더</code>, NAS, 외장 디스크를 경로로 추가합니다.</p></div><span class="scope-badge muted">직접 지정</span></article><article class="scope-row"><span class="scope-icon">+</span><div><strong>로컬 + 외부 함께</strong><p>자동 검색 범위와 추가한 외부 경로를 한 번에 검색합니다.</p></div><span class="scope-badge muted">혼합 검색</span></article></div><a class="panel-link" href="#howto">검색 범위 설정 순서 보기 <span>→</span></a></section>
+            <aside class="operation-panel"><p class="eyebrow">오늘의 설치 상태</p><h2>3단계로 바로 시작</h2><div class="operation-flow"><div class="flow-step active"><b>01</b><span>앱 실행</span></div><i>→</i><div class="flow-step"><b>02</b><span>검색</span></div><i>→</i><div class="flow-step"><b>03</b><span>외부 폴더 추가</span></div></div><div class="operation-checks"><span><i>✓</i> 파일명·경로 검색</span><span><i>✓</i> 본문·확장자·크기 필터</span><span><i>✓</i> Enter 열기 · Space 미리보기</span></div><a class="operation-button" href="#install">설치 파일 선택 <span>→</span></a></aside>
+          </div>
+
+          <section class="search-preview-panel" aria-label="검색 화면 미리보기"><div class="preview-heading"><div><p class="eyebrow">SEARCH WORKSPACE</p><h2>검색 결과는 이런 흐름으로 보입니다.</h2></div><span class="preview-status"><i></i> 검색 준비 완료</span></div><div class="search-preview-window"><aside class="preview-sidebar"><div class="preview-brand"><span>D</span><strong>Search</strong></div><div class="preview-side-item active">⌕ <span>전체 검색</span></div><div class="preview-side-item">▣ <span>저장 검색</span></div><div class="preview-side-item">☆ <span>즐겨찾기</span></div><div class="preview-side-spacer"></div><div class="preview-side-item">⚙ <span>설정</span></div></aside><div class="preview-content"><div class="fake-search"><span>⌕</span><strong>2026 보고서</strong><small>로컬 색인 · 준비됨</small></div><div class="result-summary"><strong>검색 결과</strong><span>14개 항목</span></div><div class="result-list"><div class="result-row selected"><span class="file-icon blue">DOC</span><span><b>2026년 사업계획서.docx</b><small>문서 / 복지사업 / 2026</small></span><time>오늘 09:24</time></div><div class="result-row"><span class="file-icon green">XLS</span><span><b>2026_실적_보고서.xlsx</b><small>문서 / 운영자료 / 통계</small></span><time>어제 16:08</time></div><div class="result-row"><span class="file-icon red">PDF</span><span><b>2026년 상반기 보고서.pdf</b><small>공유폴더 / 회의자료</small></span><time>10월 24일</time></div></div><div class="preview-footer"><span><i class="status-dot"></i> 로컬 검색 준비 완료</span><span>Space 미리보기 · Enter 열기</span></div></div></div></section>
+
+          <section class="content-section" id="install"><div class="section-intro"><p class="eyebrow">01 / INSTALL</p><h2>운영체제에 맞는<br />파일을 받으세요.</h2><p>다운로드 후 실행하세요. Windows는 portable EXE, macOS는 Universal DMG입니다.</p></div><div class="download-grid"><article class="download-card featured-card"><div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip">UNIVERSAL</span></div><h3>macOS</h3><p>Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다.</p><a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.7-universal.dmg" target="_blank" rel="noreferrer">DMG 다운로드 <span>↗</span></a><small>설치 후 Applications 폴더로 이동</small></article><article class="download-card"><div class="card-topline"><span class="platform-icon windows">⊞</span><span class="version-chip">X64</span></div><h3>Windows</h3><p>설치 없이 실행할 수 있는 portable EXE입니다.</p><a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.7-portable.exe" target="_blank" rel="noreferrer">EXE 다운로드 <span>↗</span></a><a class="card-button drive-button" href="https://drive.google.com/file/d/1xEYzS14rwohTZo22rTy3cKyBdBxaX3eb/view?usp=drivesdk" target="_blank" rel="noreferrer">Google Drive 미러 <span>↗</span></a><small>다운로드 후 파일을 실행</small></article></div></section>
+          <section class="content-section" id="howto"><div class="section-intro compact-intro"><p class="eyebrow">02 / HOW TO USE</p><h2>처음 3분이면 충분합니다.</h2></div><div class="steps-grid"><article class="step"><span>01</span><h3>앱을 실행하세요</h3><p>macOS는 DMG에서 앱을 Applications로 옮기고, Windows는 portable EXE를 바로 실행합니다.</p></article><article class="step"><span>02</span><h3>외부 폴더만 추가하세요</h3><p>로컬 파일은 기본으로 자동 검색합니다. 공유폴더나 외부 디스크만 설정에서 추가합니다.</p></article><article class="step"><span>03</span><h3>검색하고 바로 여세요</h3><p>파일명·경로·본문·크기·수정일을 조합하고 Enter 또는 Space로 작업을 이어갑니다.</p></article></div></section>
+          <section class="content-section" id="features"><div class="section-intro"><p class="eyebrow">03 / WORKFLOW</p><h2>기관 업무에 필요한<br />검색을 한 곳에.</h2></div><div class="feature-list"><article class="feature-row"><div class="feature-index">A</div><div><h3>Everything 감각, 플랫폼에 맞는 엔진</h3><p>Windows에서는 Everything과 es.exe가 있으면 네이티브 인덱스를 사용하고, macOS에서는 Spotlight와 로컬 인덱서를 조합합니다.</p></div><span class="feature-tag">macOS · Windows</span></article><article class="feature-row"><div class="feature-index">B</div><div><h3>공유 폴더도 검색 범위에 포함</h3><p>Windows 설정에 UNC 경로를 추가하면 접근 가능한 공유폴더를 자체 인덱스로 보완합니다.</p></div><span class="feature-tag">UNC READY</span></article><article class="feature-row"><div class="feature-index">C</div><div><h3>AI 없이도 읽히는 검색 문법</h3><p><code>ext:pdf size:&gt;10mb dm:today</code>처럼 규칙으로 검색합니다. 검색 내용과 인덱스는 로컬에 남습니다.</p></div><span class="feature-tag">LOCAL ONLY</span></article><article class="feature-row"><div class="feature-index">D</div><div><h3>찾은 뒤의 업무까지 한 화면에서</h3><p>미리보기, 저장 검색, 즐겨찾기, 중복 분석, 대용량 파일 확인, 안전한 휴지통 삭제를 지원합니다.</p></div><span class="feature-tag">WORKSPACE</span></article></div></section>
+          <section class="content-section" id="help"><div class="section-intro"><p class="eyebrow">04 / HELP</p><h2>막히는 지점마다<br /><em>다음 행동을 적었습니다.</em></h2><p>기능 이름보다 사용자가 누를 버튼과 확인할 위치를 먼저 안내합니다.</p></div><div class="help-grid"><a class="help-card" href="#install"><span class="help-number">01</span><h3>처음 설치하기</h3><p>macOS DMG와 Windows EXE 중 내 운영체제에 맞는 파일을 선택합니다.</p><span class="help-link">설치 파일 보기 ↗</span></a><a class="help-card" href="#scope"><span class="help-number">02</span><h3>검색 범위 이해하기</h3><p>로컬 파일은 자동 검색하고, 공유폴더·외부 디스크만 직접 추가합니다.</p><span class="help-link">범위 보기 ↗</span></a><a class="help-card" href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer"><span class="help-number">03</span><h3>Everything 참고하기</h3><p>Windows 네이티브 검색과 문법을 더 깊게 확인할 때 공식 도움말을 엽니다.</p><span class="help-link">Voidtools 공식 사이트 ↗</span></a></div></section>
+          <section class="content-section" id="faq"><div class="section-intro compact-intro"><p class="eyebrow">05 / FAQ</p><h2>설치 전에<br />확인하세요.</h2></div><div class="faq-grid"><details open><summary>Windows에서 Everything이 꼭 필요한가요?</summary><p>아닙니다. Everything과 es.exe가 있으면 더 빠른 네이티브 검색을 사용하고, 없으면 Dawith Search 자체 로컬 색인으로 동작합니다.</p></details><details><summary>공유 폴더는 어떻게 추가하나요?</summary><p>설정 → 검색 범위 → 외부 폴더 추가에서 <code>\\서버\\공유폴더</code> 또는 연결된 외부 경로를 추가하세요.</p></details><details><summary>패치 업데이트는 어떻게 하나요?</summary><p>새 버전이 있으면 앱 상단에 업데이트 버튼이 나타납니다. Windows는 portable 패치를 내려받아 재실행하고, macOS는 universal DMG를 열어 설치를 완료합니다.</p></details><details><summary>파일이 외부로 전송되나요?</summary><p>검색과 보조 기능은 로컬 규칙과 색인으로 처리합니다. 검색 대상 파일을 외부 AI 서버로 보내지 않습니다.</p></details><details><summary>처음 실행할 때 경고가 표시되나요?</summary><p>현재 배포본은 코드 서명 인증서 없이 빌드되어 macOS Gatekeeper 또는 Windows SmartScreen 경고가 표시될 수 있습니다. 공식 릴리스에서 받은 파일인지 확인한 뒤 운영체제 안내에 따라 실행하세요.</p></details></div></section>
+          <section class="support-section" id="donate"><div class="support-panel"><div><p class="eyebrow">06 / SUPPORT</p><h2>지역 기관의 시간을<br /><em>함께 줄여 주세요.</em></h2><p class="support-lead">Dawith Search는 광고나 외부 AI 없이 운영되는 로컬 검색 도구입니다. 후원·기관 도입·테스트 의견을 받습니다.</p></div><div class="support-actions"><a class="button button-primary" href="https://github.com/dawith-ai/dawith-search/issues/new?title=%5B%ED%9B%84%EC%9B%90%5D%20Dawith%20Search%20후원%20및%20기관%20도입%20문의&body=후원%20또는%20기관%20도입%20문의입니다.%0A%0A기관명%3A%0A문의%20내용%3A" target="_blank" rel="noreferrer">후원·기관 도입 문의 ↗</a><a class="button button-quiet" href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">코드로 돕기 ↗</a></div><p class="support-note">후원 방식과 영수증 안내는 문의 내용을 확인한 뒤 운영자가 직접 안내합니다.</p></div></section>
+        </main>
+        <footer class="site-footer"><span class="footer-brand">Dawith Search</span><span>로컬 파일은 로컬에 남습니다.</span><span><a href="#help">도움말</a> · <a href="#donate">후원</a> · <a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything 공식 사이트</a></span></footer>
       </div>
-    </header>
-
-    <main id="top">
-      <section class="hero shell">
-        <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot"></span> LOCAL-FIRST FILE SEARCH</p>
-          <h1>찾는 일은 짧게,<br /><em>업무는 계속.</em></h1>
-          <p class="hero-lead">Dawith Search는 기관 문서와 공유 폴더를 빠르게 찾는 데 집중한 macOS·Windows용 데스크톱 검색 도구입니다.</p>
-          <div class="hero-actions">
-            <a class="button button-primary" href="#install">내 운영체제 설치하기 <span aria-hidden="true">↓</span></a>
-            <a class="button button-quiet" href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub에서 살펴보기 ↗</a>
-          </div>
-          <div class="proof-row" aria-label="제품 정보">
-            <span><strong>macOS</strong> Apple Silicon + Intel</span>
-            <span><strong>Windows</strong> x64 Portable</span>
-            <span><strong>v1.0.7</strong> 검증 릴리스</span>
-          </div>
-          <div class="hero-route" aria-label="사용 흐름">
-            <span><b>01</b> 실행</span><i>→</i><span><b>02</b> 검색</span><i>→</i><span><b>03</b> 외부 폴더만 추가</span>
-          </div>
-        </div>
-        <div class="hero-window" aria-label="Dawith Search 화면 미리보기">
-          <div class="window-bar"><span></span><span></span><span></span><small>DAWITH SEARCH</small></div>
-          <div class="window-body">
-            <aside class="window-sidebar">
-              <div class="sidebar-logo"><span class="mini-mark">D</span><span>Search</span></div>
-              <div class="sidebar-item active"><i>⌕</i> 전체 검색</div>
-              <div class="sidebar-item"><i>▣</i> 저장 검색</div>
-              <div class="sidebar-item"><i>☆</i> 즐겨찾기</div>
-              <div class="sidebar-spacer"></div>
-              <div class="sidebar-item"><i>⚙</i> 설정</div>
-            </aside>
-            <div class="window-content">
-              <div class="fake-search"><span>⌕</span><strong>2026 보고서</strong><small>로컬 색인 · 준비됨</small></div>
-              <div class="result-summary"><strong>검색 결과</strong><span>14개 항목</span></div>
-              <div class="result-list">
-                <div class="result-row selected"><span class="file-icon blue">DOC</span><span><b>2026년 사업계획서.docx</b><small>문서 / 복지사업 / 2026</small></span><time>오늘 09:24</time></div>
-                <div class="result-row"><span class="file-icon green">XLS</span><span><b>2026_실적_보고서.xlsx</b><small>문서 / 운영자료 / 통계</small></span><time>어제 16:08</time></div>
-                <div class="result-row"><span class="file-icon red">PDF</span><span><b>2026년 상반기 보고서.pdf</b><small>공유폴더 / 회의자료</small></span><time>10월 24일</time></div>
-              </div>
-              <div class="window-footer"><span><i class="status-dot"></i> 검색 준비 완료</span><span>Space 미리보기&nbsp; · &nbsp;Enter 열기</span></div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="install-section shell" id="install">
-        <div class="section-intro">
-          <p class="eyebrow">01 / INSTALL</p>
-          <h2>운영체제에 맞는<br />파일을 받으세요.</h2>
-            <p>다운로드 후 설치하세요. 로컬 파일은 처음부터 자동 검색하고, 기관 공유폴더나 외부 디스크만 필요할 때 추가합니다.</p>
-        </div>
-        <div class="download-grid">
-          <article class="download-card featured-card">
-            <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip">UNIVERSAL</span></div>
-            <h3>macOS</h3>
-            <p>Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다.</p>
-            <div class="card-actions">
-              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.0.7-universal.dmg" target="_blank" rel="noreferrer">DMG 다운로드 <span>↗</span></a>
-            </div>
-            <small>설치 후 Applications 폴더로 이동</small>
-          </article>
-          <article class="download-card">
-            <div class="card-topline"><span class="platform-icon windows">⊞</span><span class="version-chip">X64</span></div>
-            <h3>Windows</h3>
-            <p>설치 없이 실행할 수 있는 portable EXE입니다.</p>
-            <div class="card-actions">
-              <a class="card-button" href="https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.0.7-portable.exe" target="_blank" rel="noreferrer">EXE 다운로드 <span>↗</span></a>
-              <a class="card-button drive-button" href="https://drive.google.com/file/d/1xEYzS14rwohTZo22rTy3cKyBdBxaX3eb/view?usp=drivesdk" target="_blank" rel="noreferrer">Google Drive 미러 <span>↗</span></a>
-            </div>
-            <small>다운로드 후 파일을 실행</small>
-          </article>
-        </div>
-      </section>
-
-      <section class="steps-section shell" id="howto">
-        <div class="section-intro compact-intro">
-          <p class="eyebrow">02 / HOW TO USE</p>
-          <h2>처음 3분이면 충분합니다.</h2>
-        </div>
-        <div class="steps-grid">
-          <article class="step"><span>01</span><h3>앱을 실행하세요</h3><p>macOS는 DMG에서 앱을 Applications로 옮기고, Windows는 portable EXE를 바로 실행합니다.</p></article>
-          <article class="step"><span>02</span><h3>외부 폴더만 추가하세요</h3><p>로컬 파일은 자동으로 검색합니다. 기관 공유폴더나 외부 디스크만 설정에서 추가합니다.</p></article>
-          <article class="step"><span>03</span><h3>검색하고 바로 여세요</h3><p>파일명·경로·본문·크기·수정일을 조합하고 Enter 또는 Space로 작업을 이어갑니다.</p></article>
-        </div>
-      </section>
-
-      <section class="feature-section shell" id="features">
-        <div class="section-intro">
-          <p class="eyebrow">03 / WORKFLOW</p>
-          <h2>기관 업무에 필요한<br />검색만 남겼습니다.</h2>
-        </div>
-        <div class="feature-list">
-          <article class="feature-row"><div class="feature-index">A</div><div><h3>Everything 감각, 플랫폼에 맞는 엔진</h3><p>Windows에서는 Everything과 es.exe가 있으면 네이티브 인덱스를 사용하고, macOS에서는 Spotlight와 로컬 인덱서를 조합합니다.</p></div><span class="feature-tag">macOS · Windows</span></article>
-          <article class="feature-row"><div class="feature-index">B</div><div><h3>구조·증거 분석까지 한 곳에서</h3><p>REA의 evidence-first 원칙을 반영해 파일 식별자, 소스 관계, Electron 경계와 미확인 범위를 로컬 JSON 보고서로 남깁니다.</p></div><span class="feature-tag">LOCAL · NO AI</span></article>
-          <article class="feature-row"><div class="feature-index">C</div><div><h3>공유 폴더도 검색 범위에 포함</h3><p>Windows 설정에 <code>\\서버\공유폴더</code>를 추가하면 Everything에 색인되지 않은 접근 가능한 UNC 폴더도 자체 인덱스로 보완합니다.</p></div><span class="feature-tag">UNC READY</span></article>
-          <article class="feature-row"><div class="feature-index">D</div><div><h3>AI 없이도 읽히는 검색 문법</h3><p><code>ext:pdf size:&gt;10mb dm:today</code>처럼 규칙으로 검색합니다. 검색 내용과 인덱스는 로컬에 남습니다.</p></div><span class="feature-tag">LOCAL ONLY</span></article>
-          <article class="feature-row"><div class="feature-index">E</div><div><h3>찾은 뒤의 업무까지 한 화면에서</h3><p>Quick Look, 저장 검색, 즐겨찾기, 중복 분석, 대용량 파일 확인, 안전한 휴지통 삭제를 지원합니다.</p></div><span class="feature-tag">WORKSPACE</span></article>
-        </div>
-      </section>
-
-      <section class="help-section shell" id="help">
-        <div class="section-intro">
-          <p class="eyebrow">04 / HELP</p>
-          <h2>막히는 지점마다<br /><em>다음 행동을 적었습니다.</em></h2>
-          <p>기능 이름보다 사용자가 누를 버튼과 확인할 위치를 먼저 안내합니다.</p>
-        </div>
-        <div class="help-grid">
-          <a class="help-card" href="#install"><span class="help-number">01</span><h3>처음 설치하기</h3><p>macOS DMG와 Windows EXE 중 내 운영체제에 맞는 파일을 선택합니다.</p><span class="help-link">설치 파일 보기 ↗</span></a>
-          <a class="help-card" href="#howto"><span class="help-number">02</span><h3>검색 범위 이해하기</h3><p>로컬 파일은 자동 검색하고, 공유폴더·외부 디스크만 직접 추가합니다.</p><span class="help-link">사용 순서 보기 ↗</span></a>
-          <a class="help-card" href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer"><span class="help-number">03</span><h3>Everything 참고하기</h3><p>Windows 네이티브 검색과 검색 문법을 더 깊게 확인할 때 공식 도움말을 엽니다.</p><span class="help-link">Voidtools 공식 사이트 ↗</span></a>
-        </div>
-      </section>
-
-      <section class="faq-section shell" id="faq">
-        <div class="section-intro compact-intro"><p class="eyebrow">05 / FAQ</p><h2>설치 전에<br />확인하세요.</h2></div>
-        <div class="faq-grid">
-          <details open><summary>Windows에서 Everything이 꼭 필요한가요?</summary><p>아닙니다. Everything과 es.exe가 있으면 더 빠른 네이티브 검색을 사용하고, 없으면 Dawith Search 자체 로컬 색인으로 동작합니다.</p></details>
-          <details><summary>공유 폴더는 어떻게 추가하나요?</summary><p>로컬 파일은 기본으로 자동 검색합니다. 설정 → 검색 범위 → 외부 폴더 추가에서 <code>\\서버\공유폴더</code> 또는 연결된 외부 경로를 추가하세요.</p></details>
-          <details><summary>패치 업데이트는 어떻게 하나요?</summary><p>새 버전이 있으면 앱 상단에 업데이트 버튼이 나타납니다. Windows는 portable 패치를 내려받아 재실행하고, macOS는 universal DMG를 열어 설치를 완료합니다.</p></details>
-          <details><summary>파일이 외부로 전송되나요?</summary><p>검색과 자연어 보조는 로컬 규칙과 색인으로 처리합니다. 검색 대상 파일을 외부 AI 서버로 보내지 않습니다.</p></details>
-          <details><summary>처음 실행할 때 경고가 표시되나요?</summary><p>현재 배포본은 코드 서명 인증서 없이 빌드되어 macOS Gatekeeper 또는 Windows SmartScreen 경고가 표시될 수 있습니다. 공식 릴리스에서 받은 파일인지 확인한 뒤 운영체제 안내에 따라 실행하세요.</p></details>
-        </div>
-      </section>
-
-      <section class="donate-section shell" id="donate">
-        <div class="donate-panel">
-          <div>
-            <p class="eyebrow">06 / SUPPORT</p>
-            <h2>지역 기관의 시간을<br /><em>함께 줄여 주세요.</em></h2>
-            <p class="donate-lead">Dawith Search는 광고나 외부 AI 없이 운영되는 로컬 검색 도구입니다. 사회복지기관에서 계속 쓸 수 있도록 후원·기관 도입·테스트 의견을 받습니다.</p>
-          </div>
-          <div class="donate-actions">
-            <a class="button button-primary" href="https://github.com/dawith-ai/dawith-search/issues/new?title=%5B%ED%9B%84%EC%9B%90%5D%20Dawith%20Search%20후원%20및%20기관%20도입%20문의&body=후원%20또는%20기관%20도입%20문의입니다.%0A%0A기관명%3A%0A문의%20내용%3A" target="_blank" rel="noreferrer">후원·기관 도입 문의 ↗</a>
-            <a class="button button-quiet" href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">코드로 돕기 ↗</a>
-          </div>
-          <p class="donate-note">후원 방식과 영수증 안내는 문의 내용을 확인한 뒤 운영자가 직접 안내합니다.</p>
-        </div>
-      </section>
-
-      <section class="final-cta shell">
-        <div><p class="eyebrow">READY WHEN YOU ARE</p><h2>파일을 찾는 시간을<br /><em>오늘부터 줄이세요.</em></h2></div>
-        <a class="button button-primary" href="#install">설치 파일 선택하기 <span aria-hidden="true">↓</span></a>
-      </section>
-    </main>
-
-    <footer class="site-footer shell"><span class="footer-brand">Dawith Search</span><span>로컬 파일은 로컬에 남습니다.</span><span><a href="#help">도움말</a> · <a href="#donate">후원</a> · <a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything 공식 사이트</a></span></footer>
+    </div>
   </body>
 </html>

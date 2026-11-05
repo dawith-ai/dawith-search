@@ -136,6 +136,31 @@ sharedIndexer.search('share-report').then(result => {
   process.exit(1);
 });
 sharedIndexer.fileWatcher.close();
+const localFallbackIndexer = new Indexer({
+  storageDir: path.join(testDir, 'local-fallback-index'),
+  nativeSearch: { search: async () => ({ supported: true, backend: 'everything', records: [] }) }
+});
+localFallbackIndexer.config = { ...localFallbackIndexer.config, roots: [testDir], searchBackend: 'auto' };
+localFallbackIndexer.records = [{
+  name: 'local-fallback-report.txt',
+  path: testDir,
+  fullPath: path.join(testDir, 'local-fallback-report.txt'),
+  isDir: false,
+  ext: 'txt',
+  size: 12,
+  mtime: Date.now(),
+  ctime: Date.now()
+}];
+localFallbackIndexer.search('local-fallback-report').then(result => {
+  assert.strictEqual(result.results.length, 1);
+  assert.strictEqual(result.backend, 'local-fallback');
+  assert.match(result.warning, /local index fallback/i);
+  console.log('  ✓ Empty Everything results fall back to the local index passed');
+}).catch(error => {
+  console.error('Local fallback test error:', error);
+  process.exit(1);
+});
+localFallbackIndexer.fileWatcher.close();
 const scopeRoot = path.join(testDir, 'scope');
 scopeIndexer.records = [
   { name: 'report.pdf', path: scopeRoot, fullPath: path.join(scopeRoot, 'report.pdf'), isDir: false, size: 10 },

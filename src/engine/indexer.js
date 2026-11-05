@@ -516,8 +516,23 @@ class Indexer extends EventEmitter {
           })
           .filter(item => QueryParser.matches(item, parsed));
 
+        // If Everything returns zero, recover matches already present in the
+        // local index. This covers files on drives/shares that Everything has
+        // not indexed yet without slowing down normal native searches.
+        const localFallbackRecords = nativeRecords.length > 0 ? [] : this.records
+          .filter(item => this.isWithinConfiguredRoot(getFullPath(item)))
+          .map(item => {
+            const fullPath = getFullPath(item);
+            return {
+              ...item,
+              tags: this.tagManager.getTags(fullPath),
+              starred: this.tagManager.isStarred(fullPath)
+            };
+          })
+          .filter(item => QueryParser.matches(item, parsed));
+
         const byPath = new Map();
-        for (const item of [...scopedNativeRecords, ...localNetworkRecords]) {
+        for (const item of [...scopedNativeRecords, ...localNetworkRecords, ...localFallbackRecords]) {
           byPath.set(normalizePathKey(getFullPath(item)), item);
         }
         const sorted = this.sortResults([...byPath.values()], options);
@@ -527,8 +542,10 @@ class Indexer extends EventEmitter {
           totalIndexed: this.records.length,
           elapsedMs: Date.now() - start,
           parsedQuery: parsed,
-          backend: nativeResult.backend,
-          warning: nativeResult.warning || null
+          backend: localFallbackRecords.length > 0 ? 'local-fallback' : nativeResult.backend,
+          warning: localFallbackRecords.length > 0
+            ? 'Everything returned no matches; local index fallback used.'
+            : (nativeResult.warning || null)
         };
       }
     }

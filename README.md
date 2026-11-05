@@ -53,8 +53,8 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.1-universal.dmg)
-- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.1-portable.exe)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.2-universal.dmg)
+- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.2-portable.exe)
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 

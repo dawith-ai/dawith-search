@@ -32,6 +32,7 @@ const HistoryManager = require('../engine/history-manager');
 const EvidenceAnalyzer = require('../engine/evidence-analyzer');
 const RootManager = require('../engine/root-manager');
 const UpdateManager = require('./update-manager');
+const Converter = require('../engine/converter');
 
 let mainWindow = null;
 let guideWindow = null;
@@ -399,6 +400,32 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
     };
   } catch (e) {
     return null;
+  }
+});
+
+ipcMain.handle('get-conversion-options', async (event, filePaths) => {
+  try {
+    const paths = (Array.isArray(filePaths) ? filePaths : [filePaths]).map(filePath => getAllowedPath(filePath));
+    const stats = await Promise.all(paths.map(filePath => fs.promises.stat(filePath)));
+    if (stats.some(stat => stat.isDirectory())) return { success: false, error: '폴더 자체는 변환할 수 없습니다.' };
+    return { success: true, options: Converter.getConversionOptions(paths) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('convert-files', async (event, filePaths, operation, destinationDir) => {
+  try {
+    const paths = (Array.isArray(filePaths) ? filePaths : [filePaths]).map(filePath => getAllowedPath(filePath));
+    const destination = destinationDir ? getAllowedPath(destinationDir) : path.dirname(paths[0]);
+    const destinationStat = await fs.promises.stat(destination);
+    if (!destinationStat.isDirectory()) throw new Error('변환 대상 폴더가 아닙니다.');
+    const options = Converter.getConversionOptions(paths);
+    if (!options.some(option => option.id === operation)) throw new Error('선택한 파일에서 지원하지 않는 변환입니다.');
+    const outputs = await Converter.convertFiles(paths, operation, destination);
+    return { success: true, outputs };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });
 

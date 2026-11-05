@@ -61,6 +61,7 @@ function createFixture() {
   );
   fs.writeFileSync(path.join(fixtureRoot, 'budget-2026.csv'), '항목,금액\n인건비,1200000\n', 'utf8');
   fs.writeFileSync(path.join(fixtureRoot, 'photo-report.jpg'), Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  fs.writeFileSync(path.join(fixtureRoot, 'photo-report.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'));
   const duplicateContent = crypto.randomBytes(12 * 1024);
   fs.writeFileSync(path.join(fixtureRoot, 'duplicate-a.bin'), duplicateContent);
   fs.writeFileSync(path.join(fixtureRoot, 'nested', 'duplicate-b.bin'), duplicateContent);
@@ -196,6 +197,7 @@ async function pageState() {
     toolsHidden: document.querySelector('#toolsMenu')?.hidden,
     quickLookDisplay: document.querySelector('#quickLookModal')?.style.display,
     remoteDisplay: document.querySelector('#remoteModal')?.style.display,
+    conversionDisplay: document.querySelector('#conversionModal')?.style.display,
     storageDisplay: document.querySelector('#storageModal')?.style.display,
     evidenceDisplay: document.querySelector('#evidenceModal')?.style.display,
     settingsDisplay: document.querySelector('#settingsModal')?.style.display,
@@ -507,6 +509,23 @@ async function run() {
   assert.strictEqual(traversal.statusCode, 404);
   record('모바일 원격 공유·토큰 인증', `비인증 401 / 인증 검색 ${remoteData.results.length}건`);
   await click('#btnCloseRemote');
+
+  const conversionPath = path.join(fixtureRoot, 'photo-report.png');
+  const conversionOptions = await evaluate(`window.dawithAPI.getConversionOptions([${JSON.stringify(conversionPath)}])`, true);
+  assert.strictEqual(conversionOptions.success, true);
+  assert.ok(conversionOptions.options.some(option => option.id === 'images-to-pdf'));
+  const conversionResult = await evaluate(`window.dawithAPI.convertFiles([${JSON.stringify(conversionPath)}], 'images-to-pdf')`, true);
+  assert.strictEqual(conversionResult.success, true);
+  assert.ok(conversionResult.outputs.every(output => fs.existsSync(output)));
+  assert.ok(fs.existsSync(conversionPath), 'conversion must preserve the original file');
+  record('검색 결과 파일 변환', 'PNG→PDF 변환·원본 보존 확인');
+  await setSearch('photo-report.png');
+  await waitFor('conversion result rows', async () => (await evaluate("document.querySelectorAll('#tableBody .table-row').length")) > 0);
+  await click('#tableBody .row-btn-convert');
+  await waitForState('conversion modal', state => state.conversionDisplay === 'flex');
+  assert.ok(await evaluate("document.querySelector('#conversionOptions')?.textContent.includes('PDF')"));
+  await evaluate("document.querySelector('#btnCloseConversion').click()");
+  record('검색 결과 변환 UI', '결과 행 변환 버튼·변환 옵션 모달 확인');
 
   await click('#syntaxHintBtn');
   const guideTarget = await waitForDebugTarget(port, item => item.type === 'page' && item.url.includes('guide.html'));

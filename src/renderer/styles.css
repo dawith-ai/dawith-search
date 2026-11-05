@@ -1430,6 +1430,27 @@ kbd {
   min-width: 180px;
 }
 
+.conversion-dialog { max-width: 560px; }
+.conversion-options { display: grid; gap: 10px; margin-top: 16px; }
+.conversion-option {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 5px;
+  width: 100%; padding: 14px 16px; border: 1px solid var(--border-color);
+  border-radius: 12px; background: var(--surface); color: var(--text);
+  text-align: left; cursor: pointer; transition: border-color .16s, background .16s;
+}
+.conversion-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+.conversion-option:disabled { opacity: .55; cursor: wait; }
+.conversion-option strong { font-size: 13px; }
+.conversion-option small { color: var(--text-muted); font-size: 11px; }
+.conversion-drop-hint {
+  margin-top: 12px; padding: 10px 12px; border-radius: 9px;
+  background: var(--surface-muted); color: var(--text-muted); font-size: 11px;
+}
+.conversion-status { min-height: 18px; margin-top: 12px; color: var(--accent); font-size: 12px; }
+.table-row[draggable="true"] { cursor: grab; }
+.table-row.convert-dragging { opacity: .55; outline: 2px dashed var(--accent); outline-offset: -2px; }
+.table-row.convert-drop-target { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+
 .ctx-item {
   padding: 7px 14px;
   font-size: 12px;

@@ -57,6 +57,12 @@ const settingsModal = document.getElementById('settingsModal');
 const syntaxModal = document.getElementById('syntaxModal');
 const evidenceModal = document.getElementById('evidenceModal');
 const contextMenu = document.getElementById('contextMenu');
+const conversionModal = document.getElementById('conversionModal');
+const conversionOptions = document.getElementById('conversionOptions');
+const conversionSummary = document.getElementById('conversionSummary');
+const conversionStatus = document.getElementById('conversionStatus');
+let conversionItems = [];
+let conversionDestination = '';
 
 // Utilities
 function formatBytes(bytes) {
@@ -512,6 +518,7 @@ function renderResults(items, currentQuery) {
       <div class="td col-mtime">${formatDate(item.mtime)}</div>
       <div class="td col-ext">${item.isDir ? '폴더' : (item.ext ? item.ext.toUpperCase() : '파일')}</div>
       <div class="td col-actions">
+        <button class="btn btn-sm btn-ghost row-btn-convert" data-idx="${idx}" title="파일 변환">변환</button>
         <button class="btn btn-sm btn-ghost row-btn-open" data-idx="${idx}" title="열기">열기</button>
       </div>
     `;
@@ -526,6 +533,10 @@ function renderResults(items, currentQuery) {
         openItem(item);
         return;
       }
+      if (e.target.classList.contains('row-btn-convert')) {
+        openConversionDialog([item]);
+        return;
+      }
       if (e.metaKey || e.ctrlKey) {
         toggleRowSelection(idx);
       } else if (e.shiftKey && selectedIndex >= 0) {
@@ -537,6 +548,38 @@ function renderResults(items, currentQuery) {
 
     row.addEventListener('dblclick', () => {
       openItem(item);
+    });
+
+    row.draggable = !item.isDir;
+    row.addEventListener('dragstart', event => {
+      if (item.isDir) return;
+      const items = selectedIndexes.has(idx) ? getSelectedItems() : [item];
+      const paths = items.map(getFullPath);
+      event.dataTransfer.effectAllowed = 'copy';
+      event.dataTransfer.setData('text/uri-list', paths.map(filePath => `file://${encodeURI(filePath)}`).join('\n'));
+      event.dataTransfer.setData('application/x-dawith-search-files', JSON.stringify(paths));
+      row.classList.toggle('convert-dragging', event.shiftKey);
+      if (event.shiftKey) setRootStatus('변환 모드입니다. 검색 결과의 폴더에 놓거나 변환 메뉴를 선택하세요.');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('convert-dragging'));
+    row.addEventListener('dragover', event => {
+      if (!item.isDir || !event.shiftKey || !event.dataTransfer.types.includes('application/x-dawith-search-files')) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      row.classList.add('convert-drop-target');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('convert-drop-target'));
+    row.addEventListener('drop', event => {
+      row.classList.remove('convert-drop-target');
+      if (!item.isDir || !event.shiftKey) return;
+      event.preventDefault();
+      try {
+        const paths = JSON.parse(event.dataTransfer.getData('application/x-dawith-search-files') || '[]');
+        const droppedItems = searchResults.filter(result => paths.includes(getFullPath(result)));
+        openConversionDialog(droppedItems, getFullPath(item));
+      } catch (error) {
+        setRootStatus('변환할 파일을 읽지 못했습니다.', 'error');
+      }
     });
 
     row.addEventListener('contextmenu', (e) => {
@@ -622,6 +665,50 @@ async function openItemFolder(item) {
   if (!item) return;
   const full = getFullPath(item);
   await window.dawithAPI.openFolder(full);
+}
+
+async function openConversionDialog(items, destinationDir = '') {
+  const validItems = (items || []).filter(item => item && !item.isDir);
+  if (!validItems.length) {
+    alert('변환할 파일을 선택하세요.');
+    return;
+  }
+  const paths = validItems.map(getFullPath);
+  const result = await window.dawithAPI.getConversionOptions(paths);
+  if (!result.success) {
+    alert(`변환 메뉴를 준비하지 못했습니다.\n${result.error || '알 수 없는 오류'}`);
+    return;
+  }
+  if (!result.options.length) {
+    alert('이 파일 형식은 현재 변환을 지원하지 않습니다. PDF·PNG·JPG 또는 설치된 Office 변환기를 확인하세요.');
+    return;
+  }
+  conversionItems = validItems;
+  conversionDestination = destinationDir;
+  conversionSummary.textContent = `${validItems.length}개 파일 · 원본은 유지하고 ${destinationDir ? '놓은 폴더' : '원본 폴더'}에 결과를 저장합니다.`;
+  conversionStatus.textContent = '';
+  conversionOptions.innerHTML = result.options.map(option => `
+    <button class="conversion-option" type="button" data-conversion-operation="${escapeHtml(option.id)}">
+      <strong>${escapeHtml(option.label)}</strong><small>${escapeHtml(option.detail)}</small>
+    </button>
+  `).join('');
+  conversionModal.style.display = 'flex';
+}
+
+async function runConversion(operation) {
+  const paths = conversionItems.map(getFullPath);
+  conversionStatus.textContent = '변환 중… 원본 파일은 그대로 보존됩니다.';
+  conversionOptions.querySelectorAll('button').forEach(button => { button.disabled = true; });
+  const result = await window.dawithAPI.convertFiles(paths, operation, conversionDestination || undefined);
+  if (!result.success) {
+    conversionStatus.textContent = result.error || '변환에 실패했습니다.';
+    conversionOptions.querySelectorAll('button').forEach(button => { button.disabled = false; });
+    return;
+  }
+  conversionModal.style.display = 'none';
+  conversionStatus.textContent = '';
+  await executeSearch();
+  alert(`변환 완료\n${result.outputs.join('\n')}`);
 }
 
 async function toggleItemStar(item) {
@@ -935,6 +1022,9 @@ document.getElementById('ctxOpenFolder').addEventListener('click', () => {
 document.getElementById('ctxQuickLook').addEventListener('click', () => {
   if (currentContextItem) showQuickLook(currentContextItem);
 });
+document.getElementById('ctxConvert').addEventListener('click', () => {
+  if (currentContextItem) openConversionDialog([currentContextItem]);
+});
 document.getElementById('ctxCopyPath').addEventListener('click', () => {
   if (currentContextItem) window.dawithAPI.copyPath(getFullPath(currentContextItem));
 });
@@ -1080,6 +1170,7 @@ document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
   workspaceSidebar.classList.toggle('is-collapsed');
 });
 document.getElementById('btnCopySelectedPaths').addEventListener('click', copySelectedPaths);
+document.getElementById('btnConvertSelected').addEventListener('click', () => openConversionDialog(getSelectedItems()));
 document.getElementById('btnBatchRename').addEventListener('click', batchRenameSelected);
 document.getElementById('btnDeleteSelected').addEventListener('click', deleteSelectedItems);
 document.getElementById('btnClearSelection').addEventListener('click', () => {
@@ -1087,6 +1178,13 @@ document.getElementById('btnClearSelection').addEventListener('click', () => {
   selectedIndexes = new Set();
   updateSelectionUI();
   renderResults(searchResults, searchInput.value.trim());
+});
+document.getElementById('btnCloseConversion').addEventListener('click', () => {
+  conversionModal.style.display = 'none';
+});
+conversionOptions.addEventListener('click', event => {
+  const button = event.target.closest('[data-conversion-operation]');
+  if (button) runConversion(button.dataset.conversionOperation);
 });
 
 document.getElementById('emptyExamples').addEventListener('click', (e) => {

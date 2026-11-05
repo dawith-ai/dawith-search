@@ -202,6 +202,7 @@
       <span class="selection-hint">⌘/Ctrl을 누르고 여러 항목을 선택할 수 있습니다.</span>
       <div class="selection-actions">
         <button class="btn btn-sm btn-ghost" id="btnCopySelectedPaths" type="button">경로 복사</button>
+        <button class="btn btn-sm btn-ghost" id="btnConvertSelected" type="button">파일 변환</button>
         <button class="btn btn-sm btn-ghost" id="btnBatchRename" type="button">이름 일괄 변경</button>
         <button class="btn btn-sm btn-danger" id="btnDeleteSelected" type="button">휴지통으로 이동</button>
         <button class="selection-clear" id="btnClearSelection" type="button" title="선택 해제">×</button>
@@ -252,6 +253,25 @@
         <span class="key-hint"><kbd>Ctrl+K</kbd> 명령 팔레트</span>
       </div>
     </footer>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Conversion Modal -->
+  <div class="modal-overlay" id="conversionModal" style="display: none;">
+    <div class="modal-dialog conversion-dialog">
+      <div class="modal-header">
+        <div>
+          <span class="modal-kicker">LOCAL CONVERTER</span>
+          <h3>파일 변환</h3>
+        </div>
+        <button class="btn-close" id="btnCloseConversion" type="button">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" id="conversionSummary">원본은 유지하고 변환 결과를 저장합니다.</p>
+        <div class="conversion-drop-hint">검색 결과의 폴더에 파일을 <kbd>Shift</kbd>를 누른 채 끌어 놓아도 이 메뉴를 열 수 있습니다.</div>
+        <div class="conversion-options" id="conversionOptions"></div>
+        <div class="conversion-status" id="conversionStatus" aria-live="polite"></div>
       </div>
     </div>
   </div>
@@ -449,6 +469,7 @@
     <div class="ctx-item" id="ctxOpen">📂 열기 (Enter)</div>
     <div class="ctx-item" id="ctxOpenFolder">📁 상위 폴더 열기 (Ctrl+Enter)</div>
     <div class="ctx-item" id="ctxQuickLook">👁️ 빠른 미리보기 (Space)</div>
+    <div class="ctx-item" id="ctxConvert">⇄ 파일 변환 (Shift+끌기)</div>
     <div class="ctx-separator"></div>
     <div class="ctx-item" id="ctxCopyPath">📋 경로 복사 (Ctrl+C)</div>
     <div class="ctx-item" id="ctxTag">🏷️ 태그 추가/관리</div>

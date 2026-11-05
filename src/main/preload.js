@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   getFileContent: (filePath) => ipcRenderer.invoke('get-file-content', filePath),
   getFileStats: (filePath) => ipcRenderer.invoke('get-file-stats', filePath),
   getFileUrl: (filePath) => ipcRenderer.invoke('get-file-url', filePath),
+  getConversionOptions: (filePaths) => ipcRenderer.invoke('get-conversion-options', filePaths),
+  convertFiles: (filePaths, operation, destinationDir) => ipcRenderer.invoke('convert-files', filePaths, operation, destinationDir),
   
   exportResults: (format, items) => ipcRenderer.invoke('export-results', format, items),
   

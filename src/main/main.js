@@ -82,11 +82,22 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true
     },
-    show: false
+    // Show immediately so a frameless window cannot remain invisible when
+    // Electron skips ready-to-show on a local file URL.
+    show: true
   });
 
   mainWindow.once('ready-to-show', () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+  });
+  // Some macOS/Electron combinations load the local file successfully but do
+  // not emit ready-to-show for a hidden frameless window. Never leave the app
+  // running only in the tray when the main document has finished loading.
+  mainWindow.webContents.once('did-finish-load', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
   });
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     if (errorCode === -3) return;

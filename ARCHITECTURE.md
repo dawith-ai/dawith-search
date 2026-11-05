@@ -23,7 +23,7 @@ flowchart LR
 | 컨테이너 | 책임 | 기술 |
 | --- | --- | --- |
 | Electron main | 창 수명주기, IPC, 파일 작업, 트레이, 원격 서버 | Electron 45.x, Node.js |
-| Local indexer | 색인·캐시·감시·쿼리 실행 | fdir 6.x, chokidar 3.x |
+| Local indexer | 색인·캐시·감시·쿼리 실행 | Node.js filesystem APIs, chokidar 3.x |
 | Native adapter | 플랫폼별 빠른 검색 | macOS `mdfind`, Windows Voidtools `es.exe` |
 | Renderer | 검색 작업대·기관 업무 UX·안내 | HTML/CSS/브라우저 JS |
 | Remote server | 토큰으로 보호된 선택적 모바일 검색 | Express 4.x, Node HTTP |

@@ -3,7 +3,6 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 const EventEmitter = require('events');
-const { fdir } = require('fdir');
 const { QueryParser } = require('./query-parser');
 const FileWatcher = require('./file-watcher');
 const TagManager = require('./tag-manager');
@@ -66,7 +65,10 @@ class Indexer extends EventEmitter {
         'Cache'
       ],
       excludeHidden: true,
-      maxDepth: 12,
+      // Local search should not silently stop at a shallow folder depth.
+      // 64 is high enough for real Windows/macOS paths while still guarding
+      // against accidental recursive directory structures.
+      maxDepth: 64,
       autoStartWatcher: true,
       searchBackend: 'auto'
     };
@@ -138,7 +140,24 @@ class Indexer extends EventEmitter {
         .filter(value => /^[A-Za-z]:$/.test(value))
         .map(value => `${value}\\`);
     } catch (error) {
-      return [];
+      // PowerShell can be disabled by enterprise policy. Keep automatic
+      // whole-PC scope instead of silently falling back to the user profile.
+      try {
+        const output = execFileSync('wmic.exe', ['logicaldisk', 'get', 'deviceid,drivetype'], {
+          encoding: 'utf8',
+          windowsHide: true,
+          timeout: 5000
+        });
+        return String(output).split(/\r?\n/)
+          .map(line => line.trim().split(/\s+/))
+          .filter(parts => /^[A-Za-z]:$/.test(parts[0]) && (parts[1] === '2' || parts[1] === '3'))
+          .map(parts => `${parts[0]}\\`);
+      } catch (fallbackError) {
+        const fallbackDrive = process.env.SystemDrive || process.env.HOMEDRIVE;
+        return /^[A-Za-z]:$/.test(String(fallbackDrive || '').trim())
+          ? [`${String(fallbackDrive).trim()}\\`]
+          : [];
+      }
     }
   }
 
@@ -267,15 +286,12 @@ class Indexer extends EventEmitter {
   }
 
   async scanRoot(root, outputArray) {
-    const crawler = new fdir()
-      .withFullPaths()
-      .withDirs()
-      .withMaxDepth(this.config.maxDepth)
-      .exclude((dirName) => this.shouldExcludeName(dirName));
-
-    const paths = await crawler.crawl(root).withPromise();
-    const records = await Promise.all(paths.map(itemPath => this.createRecord(itemPath)));
-    outputArray.push(...records.filter(Boolean));
+    // Do not use a fail-fast crawler for a whole drive. One protected
+    // directory (AppData, System Volume Information, a disconnected share)
+    // must not abort the complete local index.
+    const startLength = outputArray.length;
+    await this.scanDirectory(root, outputArray, 0, this.config.maxDepth);
+    return outputArray.length - startLength;
   }
 
   shouldExcludeName(name) {

@@ -9,7 +9,7 @@ const WINDOWS_SORT_FIELDS = new Set(['name', 'path', 'size', 'mtime', 'ext']);
 const NATIVE_UNSUPPORTED_FILTERS = /(?:^|\s)(?:content|tag|tags|star|starred|dupe):/i;
 
 function parseJsonOutput(stdout) {
-  const text = String(stdout || '').trim();
+  const text = String(stdout || '').replace(/^\uFEFF/, '').trim();
   if (!text) return [];
 
   try {
@@ -19,7 +19,19 @@ function parseJsonOutput(stdout) {
     if (Array.isArray(parsed.items)) return parsed.items;
     return [];
   } catch (error) {
-    return text.split(/\r?\n/).filter(Boolean).map(line => ({ path: line }));
+    const jsonLines = [];
+    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    for (const line of lines) {
+      try {
+        const parsedLine = JSON.parse(line);
+        if (parsedLine && typeof parsedLine === 'object') jsonLines.push(parsedLine);
+      } catch (lineError) {
+        // Continue below with the legacy plain-path fallback.
+        jsonLines.length = 0;
+        break;
+      }
+    }
+    return jsonLines.length > 0 ? jsonLines : lines.map(line => ({ path: line.replace(/^"|"$/g, '') }));
   }
 }
 
@@ -157,7 +169,15 @@ class NativeSearchAdapter {
   }
 
   searchEverything(query, options) {
-    const args = ['-json', '-no-header', '-n', String(Math.max(1, options.limit || 1000))];
+    const timeoutMs = Math.max(1000, Math.min(30000, Number(options.timeoutMs) || 8000));
+    const args = [
+      '-json',
+      '-no-header',
+      '-timeout',
+      String(timeoutMs),
+      '-n',
+      String(Math.max(1, options.limit || 1000))
+    ];
     if (String(query || '').trim()) args.push(query);
     return new Promise(resolve => {
       this.spawn(this.esPath, args, {

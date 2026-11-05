@@ -12,7 +12,7 @@ const { isPathWithinRoot, normalizePathKey } = require('../src/engine/path-utils
 const TagManager = require('../src/engine/tag-manager');
 const BookmarkManager = require('../src/engine/bookmark-manager');
 const HistoryManager = require('../src/engine/history-manager');
-const { NativeSearchAdapter, normalizeEverythingRecord } = require('../src/engine/native-search');
+const { NativeSearchAdapter, normalizeEverythingRecord, parseJsonOutput } = require('../src/engine/native-search');
 
 console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
 
@@ -77,12 +77,15 @@ const fakeEs = new NativeSearchAdapter({
 assert.strictEqual(fakeEs.supports('report ext:txt'), true);
 assert.strictEqual(fakeEs.supports(''), true, 'Everything should own the blank whole-device query on Windows');
 assert.strictEqual(fakeEs.supports('tag:important'), false);
+assert.strictEqual(parseJsonOutput('{"name":"one.txt"}\n{"name":"two.txt"}').length, 2);
 fakeEs.search('report', { limit: 10 }).then(result => {
   assert.strictEqual(result.supported, true);
   assert.strictEqual(result.backend, 'everything');
   assert.strictEqual(result.records[0].size, 1024);
   assert.strictEqual(result.records[0].ext, 'txt');
   assert.ok(capturedEverythingArgs.includes('report'), 'text query must be passed to es.exe');
+  assert.ok(capturedEverythingArgs.includes('-timeout'), 'Everything must wait for its database to load');
+  assert.ok(capturedEverythingArgs.includes('8000'), 'Everything timeout must default to 8000ms');
   return fakeEs.search('', { limit: 10 });
 }).then(result => {
   assert.strictEqual(result.supported, true);

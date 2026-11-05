@@ -136,7 +136,7 @@ class NativeSearchAdapter {
   }
 
   supports(query, options = {}) {
-    if (!query || options.forceLocal || NATIVE_UNSUPPORTED_FILTERS.test(query)) return false;
+    if (options.forceLocal || NATIVE_UNSUPPORTED_FILTERS.test(query)) return false;
     if (this.platform === 'win32') return Boolean(this.esPath);
     if (this.platform !== 'darwin') return false;
 
@@ -158,8 +158,9 @@ class NativeSearchAdapter {
 
   searchEverything(query, options) {
     const args = ['-json', '-no-header', '-n', String(Math.max(1, options.limit || 1000))];
+    if (String(query || '').trim()) args.push(query);
     return new Promise(resolve => {
-      this.spawn(this.esPath, [...args, query], {
+      this.spawn(this.esPath, args, {
         windowsHide: true,
         timeout: options.timeoutMs || 8000,
         maxBuffer: 16 * 1024 * 1024

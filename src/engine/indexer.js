@@ -257,6 +257,11 @@ class Indexer extends EventEmitter {
     this.emit('indexing-started');
 
     const newRecords = [];
+    // Publish an empty-but-live array immediately. Searches during a large
+    // whole-drive scan should return partial results instead of staying blank.
+    this.records = newRecords;
+    this.rebuildMap();
+    this.updateStats();
     try {
       for (const root of this.config.roots) {
         if (!fs.existsSync(root)) continue;
@@ -290,7 +295,30 @@ class Indexer extends EventEmitter {
     // directory (AppData, System Volume Information, a disconnected share)
     // must not abort the complete local index.
     const startLength = outputArray.length;
-    await this.scanDirectory(root, outputArray, 0, this.config.maxDepth);
+    let publishedCount = outputArray.length;
+    const publishProgress = () => {
+      if (outputArray.length - publishedCount < 250) return;
+      this.records = outputArray;
+      this.rebuildMap();
+      this.updateStats();
+      publishedCount = outputArray.length;
+      this.emit('indexing-progress', {
+        totalFiles: this.stats.totalFiles,
+        totalFolders: this.stats.totalFolders,
+        totalBytes: this.stats.totalBytes
+      });
+    };
+    await this.scanDirectory(root, outputArray, 0, this.config.maxDepth, publishProgress);
+    if (outputArray.length !== publishedCount) {
+      this.records = outputArray;
+      this.rebuildMap();
+      this.updateStats();
+      this.emit('indexing-progress', {
+        totalFiles: this.stats.totalFiles,
+        totalFolders: this.stats.totalFolders,
+        totalBytes: this.stats.totalBytes
+      });
+    }
     return outputArray.length - startLength;
   }
 
@@ -325,7 +353,7 @@ class Indexer extends EventEmitter {
     };
   }
 
-  async scanDirectory(dir, outputArray, depth, maxDepth) {
+  async scanDirectory(dir, outputArray, depth, maxDepth, onProgress = null) {
     if (depth > maxDepth) return;
 
     let entries;
@@ -382,6 +410,7 @@ class Indexer extends EventEmitter {
         tags,
         starred
       });
+      if (onProgress) onProgress();
 
       if (isDir) {
         subdirs.push(fullPath);
@@ -390,7 +419,7 @@ class Indexer extends EventEmitter {
 
     // Recurse into subdirectories
     for (const sub of subdirs) {
-      await this.scanDirectory(sub, outputArray, depth + 1, maxDepth);
+      await this.scanDirectory(sub, outputArray, depth + 1, maxDepth, onProgress);
     }
   }
 

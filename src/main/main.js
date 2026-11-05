@@ -229,6 +229,12 @@ app.whenReady().then(() => {
     }
   });
 
+  indexer.on('indexing-progress', (stats) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('index-status', { status: 'indexing-progress', stats });
+    }
+  });
+
   indexer.on('file-updated', (data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('index-status', { status: 'updated', data });

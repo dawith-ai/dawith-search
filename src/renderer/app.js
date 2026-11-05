@@ -1564,6 +1564,10 @@ window.dawithAPI.onIndexStatus((data) => {
     executeSearch();
   } else if (data.status === 'updated') {
     executeSearch();
+  } else if (data.status === 'indexing-progress') {
+    titlebarStatus.textContent = `색인 중 · ${Number(data.stats?.totalFiles || 0).toLocaleString()}개 파일 발견`;
+    statTotalIndexed.textContent = `색인 항목: ${Number((data.stats?.totalFiles || 0) + (data.stats?.totalFolders || 0)).toLocaleString()}개`;
+    executeSearch();
   } else if (data.status === 'error') {
     statusDot.className = 'status-dot error';
     titlebarStatus.textContent = '색인 오류';

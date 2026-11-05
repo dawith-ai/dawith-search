@@ -13,6 +13,11 @@ async function main() {
 
   fs.mkdirSync(nestedDir, { recursive: true });
   fs.writeFileSync(visibleFile, 'local index regression fixture', 'utf8');
+  const progressDir = path.join(root, 'progress-fixture');
+  fs.mkdirSync(progressDir, { recursive: true });
+  for (let index = 0; index < 260; index += 1) {
+    fs.writeFileSync(path.join(progressDir, `indexed-${String(index).padStart(3, '0')}.txt`), `fixture ${index}`, 'utf8');
+  }
   fs.mkdirSync(protectedDir, { recursive: true });
   fs.writeFileSync(path.join(protectedDir, 'should-not-stop-the-scan.txt'), 'permission fixture', 'utf8');
 
@@ -29,13 +34,17 @@ async function main() {
   };
 
   const originalMode = fs.statSync(protectedDir).mode;
+  const progressEvents = [];
+  indexer.on('indexing-progress', stats => progressEvents.push(stats));
   try {
     if (process.platform !== 'win32') fs.chmodSync(protectedDir, 0o000);
     await indexer.startIndexing();
 
     assert.ok(indexer.records.some(record => record.fullPath === visibleFile), 'deep local file was not indexed');
     assert.ok(indexer.stats.totalFiles >= 1, 'local index contains no files');
-    console.log('Local indexing regression passed (deep file survives protected directory).');
+    assert.ok(progressEvents.length > 0, 'large local scans must publish partial indexing progress');
+    assert.ok(progressEvents.some(stats => stats.totalFiles >= 250), 'partial progress must expose indexed files before completion');
+    console.log(`Local indexing regression passed (deep file, protected directory, and ${progressEvents.length} partial progress event(s)).`);
   } finally {
     if (process.platform !== 'win32') fs.chmodSync(protectedDir, originalMode & 0o777);
     indexer.fileWatcher.close();

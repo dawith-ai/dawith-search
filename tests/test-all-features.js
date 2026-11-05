@@ -63,20 +63,30 @@ console.log('  ✓ Saved search persistence, recency, and history deduplication 
 
 // 1b. Cross-platform native adapter contracts
 console.log('\n1b. Testing native backend adapters:');
+let capturedEverythingArgs = null;
 const fakeEs = new NativeSearchAdapter({
   platform: 'win32',
   esPath: 'C:\\Tools\\es.exe',
-  spawn: (command, args, options, callback) => callback(null, JSON.stringify([
+  spawn: (command, args, options, callback) => {
+    capturedEverythingArgs = args;
+    callback(null, JSON.stringify([
     { name: 'Report.txt', path: 'C:\\Users\\Dawith\\Documents', size: '1,024', date_modified: '2026-10-26T10:00:00Z' }
-  ]), '')
+    ]), '');
+  }
 });
 assert.strictEqual(fakeEs.supports('report ext:txt'), true);
+assert.strictEqual(fakeEs.supports(''), true, 'Everything should own the blank whole-device query on Windows');
 assert.strictEqual(fakeEs.supports('tag:important'), false);
 fakeEs.search('report', { limit: 10 }).then(result => {
   assert.strictEqual(result.supported, true);
   assert.strictEqual(result.backend, 'everything');
   assert.strictEqual(result.records[0].size, 1024);
   assert.strictEqual(result.records[0].ext, 'txt');
+  assert.ok(capturedEverythingArgs.includes('report'), 'text query must be passed to es.exe');
+  return fakeEs.search('', { limit: 10 });
+}).then(result => {
+  assert.strictEqual(result.supported, true);
+  assert.ok(!capturedEverythingArgs.includes(''), 'blank query must not be passed as an empty es.exe argument');
   console.log('  ✓ Everything JSON adapter normalization and local-only filter routing passed');
 }).catch(error => {
   console.error('Native adapter test error:', error);

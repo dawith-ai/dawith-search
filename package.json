@@ -61,17 +61,9 @@
     "win": {
       "icon": "src/assets/icon.ico",
       "target": [
-        "nsis"
+        "portable"
       ],
       "signAndEditExecutable": false
-    },
-    "nsis": {
-      "artifactName": "DawithSearch-${version}-setup.exe",
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
     },
     "mac": {
       "icon": "src/assets/icon.png",

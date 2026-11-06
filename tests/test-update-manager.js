@@ -11,7 +11,7 @@ assert.deepStrictEqual(normalizeVersion('v1.0.7'), [1, 0, 7]);
 assert.strictEqual(compareVersions('1.0.7', '1.0.6'), 1);
 assert.strictEqual(compareVersions('v1.0.7', '1.0.7'), 0);
 assert.strictEqual(compareVersions('1.0.6', '1.0.7'), -1);
-assert.strictEqual(getAssetName('1.0.7', 'win32'), 'DawithSearch-1.0.7-setup.exe');
+assert.strictEqual(getAssetName('1.0.7', 'win32'), 'DawithSearch-1.0.7-portable.exe');
 assert.strictEqual(getAssetName('1.0.7', 'darwin'), 'Dawith.Search-1.0.7-universal.dmg');
 assert.strictEqual(getAssetName('1.0.7', 'linux'), null);
 
@@ -37,8 +37,8 @@ function mockGithubRequest(payload) {
     tag_name: 'v1.0.7',
     html_url: 'https://github.com/dawith-ai/dawith-search/releases/tag/v1.0.7',
     assets: [{
-      name: 'DawithSearch-1.0.7-setup.exe',
-      browser_download_url: 'https://example.test/DawithSearch-1.0.7-setup.exe',
+      name: 'DawithSearch-1.0.7-portable.exe',
+      browser_download_url: 'https://example.test/DawithSearch-1.0.7-portable.exe',
       digest: 'sha256:abc123',
       size: 123
     }]

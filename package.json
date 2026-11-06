@@ -1,6 +1,6 @@
 {
   "name": "dawith-search",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {
@@ -69,7 +69,8 @@
     "win": {
       "icon": "src/assets/icon.ico",
       "target": [
-        "portable"
+        "portable",
+        "nsis-web"
       ],
       "signAndEditExecutable": false
     },
@@ -83,6 +84,9 @@
     },
     "portable": {
       "artifactName": "DawithSearch-${version}-portable.exe"
+    },
+    "nsisWeb": {
+      "artifactName": "DawithSearch-${version}-web-setup.exe"
     }
   }
 }

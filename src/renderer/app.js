@@ -532,7 +532,9 @@ async function executeSearch() {
     renderResults(searchResults, rawInput);
 
     if (backendStatus) {
-      backendStatus.textContent = res.backend === 'everything'
+      backendStatus.textContent = res.backend === 'goz'
+        ? 'goz NTFS'
+        : res.backend === 'everything'
         ? 'Everything'
         : res.backend === 'spotlight' ? 'Spotlight' : '로컬 색인';
     }

@@ -10,7 +10,7 @@
 - 저장된 위치를 로컬/Windows 공유/네트워크 드라이브/macOS 공유폴더로 구분하고 개별 제거할 수 있다.
 - 루트 추가 후 즉시 재색인하고, UNC 경계·경로 정규화·권한 오류를 테스트한다.
 - Windows 패키지는 `native/goz`의 전체 소스에서 `goz.exe`/`gozd.exe`를 빌드한다.
-- Windows 검색은 `goz`(MFT/USN Journal) → 설치된 Everything `es.exe` → Dawith 로컬 색인 순서로 안전하게 fallback한다.
+- Windows 검색은 실행 중인 Everything 공식 SDK IPC → `goz`(MFT/USN Journal) → 설치된 Everything `es.exe` → Dawith 로컬 색인 순서로 안전하게 fallback한다.
 
 ## 조사한 후보와 판단
 
@@ -21,6 +21,7 @@
 | [SysAdminDoc/QuickFind](https://github.com/SysAdminDoc/QuickFind) (MIT) | SMB/UNC 색인, 네트워크 자격 증명 경계, junction loop guard, SQLite FTS5, USN Journal, 진단 | Windows 전용 MFT/USN 구현은 macOS와 공통 패키지로 묶지 않는다. 대신 이번 작업에서 안전한 UNC 입력·권한 확인·재색인 흐름을 먼저 반영했다. 자격 증명은 앱에 저장하지 않는다. |
 | [Pixel-Master/File-Find](https://github.com/Pixel-Master/File-Find) | 비교 검색, 중복 검색, 필터 저장, 캐시 재사용, Full Disk Access 안내 | 기존 중복 분석·저장 검색·Quick Look과 기능이 겹친다. macOS 권한 안내만 설치 문서에 유지한다. |
 | [mustafaahci/goz](https://github.com/mustafaahci/goz) (MIT) | Rust NTFS MFT 초기 색인, USN Journal 실시간 반영, named pipe, `es.exe` 호환 JSON CLI | `native/goz`로 전체 소스와 MIT 고지를 포함하고 Windows CI에서 바이너리를 빌드한다. 현재 Windows 기본 네이티브 후보로 통합했다. |
+| [Voidtools Everything SDK](https://www.voidtools.com/en-us/support/everything/sdk/) (공식 SDK) | Everything 본체와 로컬 IPC로 검색하고 경로·크기·수정일·속성 결과를 받는 C API | SDK의 공개 고지 소스 래퍼를 `native/everything-sdk`에 보존하고 `everything-ipc.exe` JSON 브리지로 연결한다. Everything 본체가 실행 중일 때 1순위로 사용하며, 공식 DLL 바이너리는 별도 재배포 허가가 명시되지 않아 번들하지 않는다. |
 | [Swatto86/AllTheThings](https://github.com/Swatto86/AllTheThings) (MIT) | Tauri 기반 Everything 독립 구현, MFT/USN 색인 | 기능과 런타임을 비교 검토했지만 기존 Electron UI·macOS Spotlight 계약을 깨지 않도록 현재 백엔드에 직접 중복 탑재하지 않는다. |
 
 ## 다음 구현 후보

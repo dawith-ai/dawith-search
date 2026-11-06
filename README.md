@@ -6,7 +6,7 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 
 ## 검색 백엔드
 
-- Windows: 패키지에 포함된 MIT 오픈소스 `goz` 클라이언트가 실행 중인 `gozd` NTFS MFT/USN Journal 엔진을 먼저 사용합니다. `gozd`가 설치되지 않았거나 실행되지 않으면 설치된 Voidtools `es.exe`, 마지막으로 Dawith 자체 색인으로 자동 fallback합니다. `DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
+- Windows: 실행 중인 Voidtools Everything에 공식 SDK IPC로 연결하는 `everything-ipc.exe`를 먼저 사용합니다. Everything이 실행되지 않거나 DB가 준비되지 않으면 패키지에 포함된 MIT 오픈소스 `goz` 클라이언트와 `gozd` NTFS MFT/USN Journal 엔진, 설치된 `es.exe`, Dawith 자체 색인 순으로 자동 fallback합니다. `DAWITH_EVERYTHING_IPC_PATH`/`DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
 - macOS: 단순 파일명 검색은 Spotlight `mdfind`를 사용하고, `ext:`, `size:`, `dm:`, `content:`, 태그 같은 복합 검색은 앱의 로컬 인덱서로 처리합니다.
 - 기타 플랫폼: Node.js 파일시스템 기반 초기 색인과 `chokidar` 기반 변경 감시를 사용합니다. 접근할 수 없는 폴더는 건너뛰고 검색 가능한 파일은 계속 색인합니다.
 
@@ -71,13 +71,15 @@ npm start
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 
-릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서는 Everything이 설치되어 있으면 `es.exe` 네이티브 검색을 사용하고, 없으면 Dawith Search 로컬 색인으로 동작합니다.
+릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서 Everything이 설치되어 실행 중이면 공식 SDK IPC 백엔드를 사용하고, 준비되지 않았으면 `goz`/`es.exe`/Dawith Search 로컬 색인 순으로 동작합니다. SDK IPC는 Everything 본체가 백그라운드에서 실행 중이어야 하며, IPC를 제공하지 않는 설치 형태에서는 사용할 수 없습니다.
 
 ## 공식 참고 주소
 
 - [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
 - [goz 소스와 라이선스](https://github.com/mustafaahci/goz)
 - [Everything 다운로드](https://www.voidtools.com/ko-kr/downloads/)
+- [Everything 공식 SDK](https://www.voidtools.com/en-us/support/everything/sdk/)
+- [Everything SDK IPC API](https://www.voidtools.com/support/everything/sdk/ipc/)
 - [Everything 공식 도움말](https://www.voidtools.com/support/everything/)
 
 공유 폴더 경계와 Everything 미색인 UNC 폴더 보완 경로는 `npm test`의 Windows UNC 회귀 케이스로 검증합니다. 실제 사내 공유 서버 접근 여부는 해당 Windows 계정의 네트워크 권한과 연결 상태에 따라 달라집니다.

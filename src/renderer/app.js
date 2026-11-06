@@ -532,7 +532,9 @@ async function executeSearch() {
     renderResults(searchResults, rawInput);
 
     if (backendStatus) {
-      backendStatus.textContent = res.backend === 'goz'
+      backendStatus.textContent = res.backend === 'everything-ipc'
+        ? 'Everything SDK IPC'
+        : res.backend === 'goz'
         ? 'goz NTFS'
         : res.backend === 'everything'
         ? 'Everything'

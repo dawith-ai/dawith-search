@@ -91,6 +91,35 @@ fakeGoz.search('report', { limit: 10 }).then(result => {
   process.exit(1);
 });
 
+let capturedEverythingIpcArgs = null;
+const fakeEverythingIpc = new NativeSearchAdapter({
+  platform: 'win32',
+  everythingIpcPath: 'C:\\Tools\\everything-ipc.exe',
+  gozPath: '',
+  esPath: '',
+  execFileSync: () => { throw new Error('Everything IPC helper status is mocked by the query contract'); },
+  spawn: (command, args, options, callback) => {
+    capturedEverythingIpcArgs = args;
+    callback(null, JSON.stringify({
+      total: 1,
+      items: [{ path: 'C:\\Users\\Dawith\\Documents\\ipc-report.pdf', size: 8192, date_modified: '1761472800000', is_dir: false }]
+    }), '');
+  }
+});
+fakeEverythingIpc.search('report', { limit: 10 }).then(result => {
+  assert.strictEqual(result.supported, true);
+  assert.strictEqual(result.backend, 'everything-ipc');
+  assert.strictEqual(result.records[0].name, 'ipc-report.pdf');
+  assert.strictEqual(result.records[0].size, 8192);
+  assert.ok(capturedEverythingIpcArgs.includes('--json'), 'Everything SDK bridge must use JSON output');
+  assert.ok(capturedEverythingIpcArgs.includes('-n'), 'Everything SDK bridge must receive a result limit');
+  assert.ok(capturedEverythingIpcArgs.includes('report'), 'Everything SDK bridge must receive the user query');
+  console.log('  ✓ Official Everything SDK IPC adapter contract passed');
+}).catch(error => {
+  console.error('Everything IPC adapter test error:', error);
+  process.exit(1);
+});
+
 let capturedEverythingArgs = null;
 const fakeEs = new NativeSearchAdapter({
   platform: 'win32',

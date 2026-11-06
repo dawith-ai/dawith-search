@@ -22,6 +22,7 @@ class Indexer extends EventEmitter {
     this.fileWatcher = new FileWatcher({ ignored: this.getIgnoredPaths() });
     this.nativeSearch = options.nativeSearch || new NativeSearchAdapter({
       platform: options.platform,
+      everythingIpcPath: options.everythingIpcPath,
       gozPath: options.gozPath,
       esPath: options.esPath
     });

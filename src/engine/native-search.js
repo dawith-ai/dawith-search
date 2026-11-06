@@ -114,10 +114,28 @@ class NativeSearchAdapter {
     this.platform = options.platform || process.platform;
     this.spawn = options.spawn || execFile;
     this.execFileSync = options.execFileSync || execFileSync;
+    this.everythingIpcPath = options.everythingIpcPath || this.findEverythingIpcCli();
     this.gozPath = options.gozPath || this.findGozCli();
     this.esPath = options.esPath || this.findEverythingCli();
+    this.everythingIpcStatus = null;
+    this.everythingIpcStatusCheckedAt = 0;
     this.gozStatus = null;
     this.gozStatusCheckedAt = 0;
+  }
+
+  findEverythingIpcCli() {
+    if (this.platform !== 'win32') return null;
+
+    const resourcesPath = typeof process.resourcesPath === 'string' ? process.resourcesPath : '';
+    const nativeArch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const candidates = [
+      process.env.DAWITH_EVERYTHING_IPC_PATH,
+      resourcesPath ? path.join(resourcesPath, 'app.asar.unpacked', 'bin', 'native', 'windows', nativeArch, 'everything-ipc.exe') : null,
+      resourcesPath ? path.join(resourcesPath, 'bin', 'native', 'windows', nativeArch, 'everything-ipc.exe') : null,
+      path.join(__dirname, '..', '..', 'bin', 'native', 'windows', nativeArch, 'everything-ipc.exe')
+    ].filter(Boolean);
+
+    return candidates.find(candidate => fs.existsSync(candidate)) || null;
   }
 
   findGozCli() {
@@ -210,6 +228,14 @@ class NativeSearchAdapter {
 
   getStatus() {
     if (this.platform === 'win32') {
+      if (this.everythingIpcPath && this.isEverythingIpcReady()) {
+        return {
+          backend: 'everything-ipc',
+          label: 'Everything IPC 연결됨',
+          available: true,
+          detail: `${this.everythingIpcPath} · 공식 SDK IPC 백엔드`
+        };
+      }
       if (this.gozPath && this.isGozReady()) {
         return {
           backend: 'goz',
@@ -245,7 +271,7 @@ class NativeSearchAdapter {
 
   supports(query, options = {}) {
     if (options.forceLocal || NATIVE_UNSUPPORTED_FILTERS.test(query)) return false;
-    if (this.platform === 'win32') return Boolean(this.gozPath || this.esPath);
+    if (this.platform === 'win32') return Boolean(this.everythingIpcPath || this.gozPath || this.esPath);
     if (this.platform !== 'darwin') return false;
 
     // Spotlight is used as a candidate finder; QueryParser still applies the
@@ -260,6 +286,10 @@ class NativeSearchAdapter {
 
     if (this.platform === 'win32') {
       const nativeQuery = translateNativeQuery(query);
+      if (this.everythingIpcPath) {
+        const ipcResult = await this.searchEverythingIpc(nativeQuery, options);
+        if (ipcResult.supported) return ipcResult;
+      }
       if (this.gozPath) {
         const gozResult = await this.searchGoz(nativeQuery, options);
         if (gozResult.supported) return gozResult;
@@ -278,7 +308,9 @@ class NativeSearchAdapter {
       this.execFileSync(this.gozPath, ['--server-version'], {
         encoding: 'utf8',
         windowsHide: true,
-        timeout: 1500,
+        // A missing service should fall through to Everything/local quickly;
+        // never hold the Electron main process for the full query timeout.
+        timeout: 350,
         stdio: ['ignore', 'pipe', 'ignore']
       });
       this.gozStatus = true;
@@ -287,6 +319,56 @@ class NativeSearchAdapter {
     }
     this.gozStatusCheckedAt = now;
     return this.gozStatus;
+  }
+
+  isEverythingIpcReady() {
+    const now = Date.now();
+    if (this.everythingIpcStatus !== null && now - this.everythingIpcStatusCheckedAt < 3000) {
+      return this.everythingIpcStatus;
+    }
+    if (!this.everythingIpcPath) return false;
+    try {
+      this.execFileSync(this.everythingIpcPath, ['--status'], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 350,
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
+      this.everythingIpcStatus = true;
+    } catch (error) {
+      this.everythingIpcStatus = false;
+    }
+    this.everythingIpcStatusCheckedAt = now;
+    return this.everythingIpcStatus;
+  }
+
+  searchEverythingIpc(query, options) {
+    const limit = Math.max(1, Math.min(5000, Number(options.limit) || 1000));
+    const args = ['--json', '-n', String(limit)];
+    if (String(query || '').trim()) args.push(query);
+    return new Promise(resolve => {
+      this.spawn(this.everythingIpcPath, args, {
+        windowsHide: true,
+        timeout: Math.max(1000, Math.min(30000, Number(options.timeoutMs) || 8000)),
+        maxBuffer: 16 * 1024 * 1024
+      }, (error, stdout, stderr) => {
+        if (error && !stdout) {
+          this.everythingIpcStatus = false;
+          this.everythingIpcStatusCheckedAt = Date.now();
+          resolve({ supported: false, error: error.message, stderr });
+          return;
+        }
+        const records = parseJsonOutput(stdout).map(normalizeEverythingRecord).filter(record => record.fullPath);
+        this.everythingIpcStatus = true;
+        this.everythingIpcStatusCheckedAt = Date.now();
+        resolve({
+          supported: true,
+          backend: 'everything-ipc',
+          records,
+          warning: error ? String(stderr || error.message || '').trim() : null
+        });
+      });
+    });
   }
 
   searchGoz(query, options) {

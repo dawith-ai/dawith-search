@@ -91,7 +91,7 @@
     <section class="section" id="platforms">
       <div class="section-heading"><span class="section-kicker">UNDER THE HOOD</span><h2>플랫폼에 맞는 검색 엔진</h2><p>백엔드는 자동 선택됩니다. 특정 기능이 필요한 쿼리는 정확도를 위해 로컬 인덱서로 전환됩니다.</p></div>
       <div class="platform-grid">
-        <article class="platform-card windows"><div class="platform-icon">⊞</div><div><span class="platform-label">WINDOWS</span><h3>goz NTFS 엔진 + 공유 폴더</h3><p>패키지에 포함된 MIT 오픈소스 `goz`가 `gozd` 서비스와 연결되면 MFT/USN Journal로 로컬 NTFS를 빠르게 검색합니다. 서비스가 없으면 Everything `es.exe`, 그 다음 자체 색인으로 자동 전환합니다. `\\\\서버\\공유폴더`는 권한이 있는 경우 검색 경로로 추가할 수 있습니다.</p><code>gozd.exe install · goz.exe --status</code></div></article>
+        <article class="platform-card windows"><div class="platform-icon">⊞</div><div><span class="platform-label">WINDOWS</span><h3>Everything SDK IPC + 공유 폴더</h3><p>Everything이 실행 중이면 공식 SDK IPC로 빠른 기본 검색을 사용합니다. Everything DB가 준비되지 않으면 `goz` NTFS 엔진, `es.exe`, 자체 색인 순으로 자동 전환합니다. `\\\\서버\\공유폴더`는 권한이 있는 경우 검색 경로로 추가할 수 있습니다.</p><code>Everything 실행 · gozd.exe install</code></div></article>
         <article class="platform-card mac"><div class="platform-icon">⌘</div><div><span class="platform-label">MACOS</span><h3>Spotlight + 로컬 색인</h3><p>단순 파일명 검색은 Spotlight로 빠르게 시작하고, 크기·날짜·본문·태그 조건은 로컬 색인에서 일관되게 처리합니다.</p><code>simple → Spotlight / advanced → local</code></div></article>
       </div>
       <div class="download-panel">
@@ -106,6 +106,8 @@
         <span class="section-kicker">OFFICIAL REFERENCE</span>
         <a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Voidtools 공식 홈페이지 ↗</a>
         <a href="https://www.voidtools.com/ko-kr/downloads/" target="_blank" rel="noreferrer">Everything 다운로드 ↗</a>
+        <a href="https://www.voidtools.com/en-us/support/everything/sdk/" target="_blank" rel="noreferrer">Everything SDK ↗</a>
+        <a href="https://www.voidtools.com/support/everything/sdk/ipc/" target="_blank" rel="noreferrer">SDK IPC API ↗</a>
         <a href="https://www.voidtools.com/support/everything/" target="_blank" rel="noreferrer">Everything 공식 도움말 ↗</a>
       </div>
     </section>

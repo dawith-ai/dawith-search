@@ -6,7 +6,7 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 
 ## 검색 백엔드
 
-- Windows: `es.exe`를 찾으면 실행 중인 Voidtools Everything의 네이티브 인덱스를 사용합니다. `DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다. Everything과 `es.exe`는 앱에 포함하지 않습니다.
+- Windows: 패키지에 포함된 MIT 오픈소스 `goz` 클라이언트가 실행 중인 `gozd` NTFS MFT/USN Journal 엔진을 먼저 사용합니다. `gozd`가 설치되지 않았거나 실행되지 않으면 설치된 Voidtools `es.exe`, 마지막으로 Dawith 자체 색인으로 자동 fallback합니다. `DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
 - macOS: 단순 파일명 검색은 Spotlight `mdfind`를 사용하고, `ext:`, `size:`, `dm:`, `content:`, 태그 같은 복합 검색은 앱의 로컬 인덱서로 처리합니다.
 - 기타 플랫폼: Node.js 파일시스템 기반 초기 색인과 `chokidar` 기반 변경 감시를 사용합니다. 접근할 수 없는 폴더는 건너뛰고 검색 가능한 파일은 계속 색인합니다.
 
@@ -66,6 +66,7 @@ npm start
 ## 공식 참고 주소
 
 - [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
+- [goz 소스와 라이선스](https://github.com/mustafaahci/goz)
 - [Everything 다운로드](https://www.voidtools.com/ko-kr/downloads/)
 - [Everything 공식 도움말](https://www.voidtools.com/support/everything/)
 
@@ -110,7 +111,7 @@ dawith-cli "*.png|*.jpg" -s size -r
 
 각 프로젝트의 라이선스와 원문은 링크에서 확인할 수 있습니다. 앱에 실제로 포함한 라이브러리는 위의 `chokidar`, Electron 계열이며, Sift/File-Find/FilesMate는 설계 비교 자료입니다.
 
-Everything/ES는 Voidtools의 별도 소프트웨어이며, 공식 CLI 사용 조건은 [Voidtools 문서](https://www.voidtools.com/en-us/support/everything/command_line_interface/)를 따릅니다.
+Everything/ES는 Voidtools의 별도 소프트웨어이며, 공식 CLI 사용 조건은 [Voidtools 문서](https://www.voidtools.com/en-us/support/everything/command_line_interface/)를 따릅니다. Dawith Search의 독립 Windows 엔진 소스는 `native/goz`에 MIT 고지와 함께 포함되어 있습니다. `gozd.exe install`은 관리자 권한이 필요한 명시적 작업이라 앱이 몰래 실행하지 않습니다.
 
 ## 라이선스
 

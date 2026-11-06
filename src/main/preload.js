@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   chooseRoot: () => ipcRenderer.invoke('choose-root'),
   inspectRoot: (rootPath) => ipcRenderer.invoke('inspect-root', rootPath),
   getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
+  installGozBackend: () => ipcRenderer.invoke('install-goz-backend'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   openGuide: () => ipcRenderer.invoke('open-guide'),

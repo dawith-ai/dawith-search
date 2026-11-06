@@ -63,6 +63,34 @@ console.log('  ✓ Saved search persistence, recency, and history deduplication 
 
 // 1b. Cross-platform native adapter contracts
 console.log('\n1b. Testing native backend adapters:');
+let capturedGozArgs = null;
+const fakeGoz = new NativeSearchAdapter({
+  platform: 'win32',
+  gozPath: 'C:\\Tools\\goz.exe',
+  esPath: '',
+  execFileSync: () => { throw new Error('gozd is not running in the contract test'); },
+  spawn: (command, args, options, callback) => {
+    capturedGozArgs = args;
+    callback(null, JSON.stringify({
+      total: 1,
+      items: [{ path: 'C:\\Users\\Dawith\\Documents\\goz-report.pdf', size: 4096, is_dir: false }],
+      volumes_incomplete: false,
+      metadata_pending: false
+    }), '');
+  }
+});
+fakeGoz.search('report', { limit: 10 }).then(result => {
+  assert.strictEqual(result.supported, true);
+  assert.strictEqual(result.backend, 'goz');
+  assert.strictEqual(result.records[0].name, 'goz-report.pdf');
+  assert.ok(capturedGozArgs.includes('-argv'), 'goz must receive argv mode for one-query-per-argument semantics');
+  assert.ok(capturedGozArgs.includes('--json'), 'goz must use machine-readable JSON output');
+  console.log('  ✓ Open-source goz JSON adapter normalization and fallback contract passed');
+}).catch(error => {
+  console.error('goz adapter test error:', error);
+  process.exit(1);
+});
+
 let capturedEverythingArgs = null;
 const fakeEs = new NativeSearchAdapter({
   platform: 'win32',

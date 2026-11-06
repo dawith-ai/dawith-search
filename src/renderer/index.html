@@ -450,6 +450,15 @@
           </div>
           <p class="setting-help" id="uiModeStatus"></p>
         </div>
+        <div class="setting-group native-engine-setting">
+          <label>Windows 빠른 검색 엔진</label>
+          <p class="setting-help">Windows NTFS에서는 포함된 오픈소스 `goz` 엔진을 우선 사용합니다. 최초 한 번만 관리자 권한으로 서비스를 설치하면 로컬 드라이브 파일명을 빠르게 색인하고 변경사항을 추적합니다.</p>
+          <div class="native-engine-actions">
+            <span class="setting-inline-status" id="nativeEngineStatus">백엔드 확인 중</span>
+            <button class="btn btn-sm btn-ghost" id="btnInstallGoz" type="button">Windows 엔진 설치·시작</button>
+          </div>
+          <p class="setting-help">공유폴더는 Windows 계정 권한으로 별도 검색 경로에 추가합니다. macOS에서는 Spotlight/로컬 색인을 사용합니다.</p>
+        </div>
         <div class="setting-group">
           <label>검색 범위</label>
           <p class="setting-help">내 PC의 로컬 파일은 폴더를 고르지 않아도 자동 검색합니다. 공유폴더·외부 경로만 아래에서 서치 경로로 추가하세요.</p>

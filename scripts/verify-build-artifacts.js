@@ -7,6 +7,8 @@ const root = path.join(__dirname, '..');
 const version = require(path.join(root, 'package.json')).version;
 const expectedEntry = 'src/engine/root-manager.js';
 const expectedAnalyzer = 'src/engine/evidence-analyzer.js';
+const expectedGozClient = 'bin/native/windows/x64/goz.exe';
+const expectedGozDaemon = 'bin/native/windows/x64/gozd.exe';
 
 function requireFile(filePath) {
   assert.ok(fs.existsSync(filePath), `Missing build artifact: ${path.relative(root, filePath)}`);
@@ -35,4 +37,8 @@ const listing = execFileSync(npx, ['--no-install', 'asar', 'list', asarPath], {
 }).replace(/\\/g, '/');
 assert.ok(listing.includes(expectedEntry), `Packaged app is missing ${expectedEntry}`);
 assert.ok(listing.includes(expectedAnalyzer), `Packaged app is missing ${expectedAnalyzer}`);
+if (process.platform === 'win32') {
+  assert.ok(listing.includes(expectedGozClient), `Packaged app is missing ${expectedGozClient}`);
+  assert.ok(listing.includes(expectedGozDaemon), `Packaged app is missing ${expectedGozDaemon}`);
+}
 console.log(`Build artifact verification passed on ${process.platform}: ${path.relative(root, asarPath)}`);

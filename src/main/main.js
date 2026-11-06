@@ -558,6 +558,39 @@ ipcMain.handle('get-backend-status', () => {
   return indexer ? indexer.nativeSearch.getStatus() : { backend: 'local', label: '로컬 색인 모드', available: false };
 });
 
+ipcMain.handle('install-goz-backend', async () => {
+  if (process.platform !== 'win32' || !indexer || typeof indexer.nativeSearch.getGozDaemonPath !== 'function') {
+    return { success: false, supported: false, message: 'Windows에서만 사용할 수 있는 기능입니다.' };
+  }
+  const daemonPath = indexer.nativeSearch.getGozDaemonPath();
+  if (!daemonPath) {
+    return { success: false, supported: true, message: 'gozd.exe가 패키지에 없습니다. Windows 설치 파일을 다시 확인하세요.' };
+  }
+
+  const escapedPath = daemonPath.replace(/'/g, "''");
+  const command = `Start-Process -FilePath '${escapedPath}' -ArgumentList 'install' -Verb RunAs -Wait`;
+  return await new Promise(resolve => {
+    const child = spawn('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-Command',
+      command
+    ], { windowsHide: true });
+    let stderr = '';
+    child.stderr?.on('data', chunk => { stderr += chunk.toString(); });
+    child.on('error', error => resolve({ success: false, supported: true, message: error.message }));
+    child.on('close', code => {
+      if (code === 0) {
+        indexer.nativeSearch.gozStatus = null;
+        return resolve({ success: true, supported: true, message: 'Windows NTFS 검색 엔진 설치 요청을 완료했습니다. 잠시 후 상태를 다시 확인하세요.' });
+      }
+      resolve({ success: false, supported: true, message: stderr.trim() || `gozd 설치가 종료 코드 ${code}로 끝났습니다.` });
+    });
+  });
+});
+
 ipcMain.handle('check-for-updates', async () => {
   if (process.env.DAWITH_DISABLE_UPDATE_CHECK === '1') {
     return { supported: false, available: false, reason: 'disabled-for-test' };

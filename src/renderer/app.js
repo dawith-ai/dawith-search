@@ -1641,6 +1641,23 @@ document.getElementById('btnReindexNow').addEventListener('click', async () => {
   await window.dawithAPI.reindex();
   settingsModal.style.display = 'none';
 });
+document.getElementById('btnInstallGoz')?.addEventListener('click', async () => {
+  const status = document.getElementById('nativeEngineStatus');
+  const button = document.getElementById('btnInstallGoz');
+  if (status) status.textContent = '관리자 권한 요청 중…';
+  if (button) button.disabled = true;
+  try {
+    const result = await window.dawithAPI.installGozBackend();
+    if (status) status.textContent = result.message || (result.success ? '설치 완료' : '설치하지 못했습니다.');
+    if (result.success) {
+      setTimeout(initBackendStatus, 800);
+    }
+  } catch (error) {
+    if (status) status.textContent = error.message || '설치하지 못했습니다.';
+  } finally {
+    if (button) button.disabled = false;
+  }
+});
 
 // Syntax Guide
 document.getElementById('syntaxHintBtn').addEventListener('click', () => {
@@ -1681,8 +1698,18 @@ async function initBackendStatus() {
   try {
     const status = await window.dawithAPI.getBackendStatus();
     if (backendStatus) backendStatus.textContent = status.label || '로컬 색인';
+    const nativeEngineStatus = document.getElementById('nativeEngineStatus');
+    const installGozButton = document.getElementById('btnInstallGoz');
+    if (nativeEngineStatus) nativeEngineStatus.textContent = status.detail || status.label || '로컬 색인 모드';
+    if (installGozButton && status.backend !== 'goz') installGozButton.textContent = 'Windows 엔진 설치·시작';
+    if (installGozButton && status.backend === 'goz') {
+      installGozButton.textContent = 'goz 연결됨';
+      installGozButton.disabled = true;
+    }
   } catch (error) {
     if (backendStatus) backendStatus.textContent = '로컬 색인';
+    const nativeEngineStatus = document.getElementById('nativeEngineStatus');
+    if (nativeEngineStatus) nativeEngineStatus.textContent = '로컬 색인 모드';
   }
 }
 

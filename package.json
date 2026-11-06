@@ -15,8 +15,9 @@
     "lint": "node scripts/check-syntax.js && node scripts/check-renderer-contract.js",
     "check": "npm run lint && npm test",
     "build": "electron-builder",
-    "build:win": "node scripts/create-windows-icon.js && electron-builder --win --x64 --publish never",
-    "build:win:arm64": "node scripts/create-windows-icon.js && electron-builder --win --arm64 --publish never",
+    "build:goz:win": "node scripts/build-goz.js",
+    "build:win": "npm run build:goz:win && node scripts/create-windows-icon.js && electron-builder --win --x64 --publish never",
+    "build:win:arm64": "node scripts/build-goz.js --arch arm64 && node scripts/create-windows-icon.js && electron-builder --win --arm64 --publish never",
     "build:mac": "electron-builder --mac --universal --publish never"
   },
   "keywords": [
@@ -66,6 +67,9 @@
       "!*.md"
     ],
     "forceCodeSigning": false,
+    "asarUnpack": [
+      "bin/native/**/*.exe"
+    ],
     "win": {
       "icon": "src/assets/icon.ico",
       "target": [

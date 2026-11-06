@@ -2067,3 +2067,17 @@ body.ui-simple .table-row .col-ext { display: none; }
   .mode-choice-grid { grid-template-columns: 1fr; }
   .shortcuts-list { grid-template-columns: 1fr; }
 }
+/* Native backend status stays compact so the settings panel remains easy to scan. */
+.native-engine-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.setting-inline-status {
+  color: var(--text-muted, #6b7b76);
+  font-size: 12px;
+  line-height: 1.45;
+  flex: 1 1 240px;
+}

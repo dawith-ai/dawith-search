@@ -114,7 +114,72 @@ class NativeSearchAdapter {
     this.platform = options.platform || process.platform;
     this.spawn = options.spawn || execFile;
     this.execFileSync = options.execFileSync || execFileSync;
+    this.gozPath = options.gozPath || this.findGozCli();
     this.esPath = options.esPath || this.findEverythingCli();
+    this.gozStatus = null;
+    this.gozStatusCheckedAt = 0;
+  }
+
+  findGozCli() {
+    if (this.platform !== 'win32') return null;
+
+    const resourcesPath = typeof process.resourcesPath === 'string' ? process.resourcesPath : '';
+    const nativeArch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const candidates = [
+      process.env.DAWITH_GOZ_PATH,
+      resourcesPath ? path.join(resourcesPath, 'app.asar.unpacked', 'bin', 'native', 'windows', nativeArch, 'goz.exe') : null,
+      resourcesPath ? path.join(resourcesPath, 'bin', 'native', 'windows', nativeArch, 'goz.exe') : null,
+      path.join(__dirname, '..', '..', 'bin', 'native', 'windows', nativeArch, 'goz.exe'),
+      process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'Dawith Search', 'goz.exe') : null,
+      'goz.exe'
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      if (candidate === 'goz.exe') {
+        try {
+          const resolved = this.execFileSync('where', ['goz.exe'], { encoding: 'utf8', windowsHide: true }).trim();
+          if (resolved) return resolved.split(/\r?\n/)[0];
+        } catch (error) {
+          continue;
+        }
+      } else if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  findGozDaemon() {
+    if (this.platform !== 'win32') return null;
+    const resourcesPath = typeof process.resourcesPath === 'string' ? process.resourcesPath : '';
+    const nativeArch = process.arch === 'arm64' ? 'arm64' : 'x64';
+    const candidates = [
+      process.env.DAWITH_GOZD_PATH,
+      resourcesPath ? path.join(resourcesPath, 'app.asar.unpacked', 'bin', 'native', 'windows', nativeArch, 'gozd.exe') : null,
+      resourcesPath ? path.join(resourcesPath, 'bin', 'native', 'windows', nativeArch, 'gozd.exe') : null,
+      path.join(__dirname, '..', '..', 'bin', 'native', 'windows', nativeArch, 'gozd.exe'),
+      process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'Dawith Search', 'gozd.exe') : null,
+      'gozd.exe'
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      if (candidate === 'gozd.exe') {
+        try {
+          const resolved = this.execFileSync('where', ['gozd.exe'], { encoding: 'utf8', windowsHide: true }).trim();
+          if (resolved) return resolved.split(/\r?\n/)[0];
+        } catch (error) {
+          continue;
+        }
+      } else if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  getGozDaemonPath() {
+    return this.findGozDaemon();
   }
 
   findEverythingCli() {
@@ -145,11 +210,21 @@ class NativeSearchAdapter {
 
   getStatus() {
     if (this.platform === 'win32') {
+      if (this.gozPath && this.isGozReady()) {
+        return {
+          backend: 'goz',
+          label: 'goz NTFS 엔진 연결됨',
+          available: true,
+          detail: `${this.gozPath} · MFT/USN Journal 오픈소스 엔진`
+        };
+      }
       return {
         backend: this.esPath ? 'everything' : 'local',
         label: this.esPath ? 'Everything 연결됨' : '로컬 색인 모드',
         available: Boolean(this.esPath),
-        detail: this.esPath || 'es.exe를 찾지 못해 자체 색인을 사용합니다.'
+        detail: this.esPath || (this.gozPath
+          ? 'goz 클라이언트는 있지만 gozd 서비스가 실행되지 않아 자체 색인을 사용합니다.'
+          : 'goz/Everything을 찾지 못해 자체 색인을 사용합니다.')
       };
     }
     if (this.platform === 'darwin') {
@@ -170,7 +245,7 @@ class NativeSearchAdapter {
 
   supports(query, options = {}) {
     if (options.forceLocal || NATIVE_UNSUPPORTED_FILTERS.test(query)) return false;
-    if (this.platform === 'win32') return Boolean(this.esPath);
+    if (this.platform === 'win32') return Boolean(this.gozPath || this.esPath);
     if (this.platform !== 'darwin') return false;
 
     // Spotlight is used as a candidate finder; QueryParser still applies the
@@ -184,9 +259,65 @@ class NativeSearchAdapter {
     }
 
     if (this.platform === 'win32') {
-      return this.searchEverything(translateNativeQuery(query), options);
+      const nativeQuery = translateNativeQuery(query);
+      if (this.gozPath) {
+        const gozResult = await this.searchGoz(nativeQuery, options);
+        if (gozResult.supported) return gozResult;
+      }
+      if (this.esPath) return this.searchEverything(nativeQuery, options);
+      return { supported: false };
     }
     return this.searchSpotlight(query, options, roots);
+  }
+
+  isGozReady() {
+    const now = Date.now();
+    if (this.gozStatus !== null && now - this.gozStatusCheckedAt < 3000) return this.gozStatus;
+    if (!this.gozPath) return false;
+    try {
+      this.execFileSync(this.gozPath, ['--server-version'], {
+        encoding: 'utf8',
+        windowsHide: true,
+        timeout: 1500,
+        stdio: ['ignore', 'pipe', 'ignore']
+      });
+      this.gozStatus = true;
+    } catch (error) {
+      this.gozStatus = false;
+    }
+    this.gozStatusCheckedAt = now;
+    return this.gozStatus;
+  }
+
+  searchGoz(query, options) {
+    const limit = Math.max(1, Math.min(5000, Number(options.limit) || 1000));
+    const args = ['-argv', '--json', '-n', String(limit)];
+    if (String(query || '').trim()) args.push(query);
+    return new Promise(resolve => {
+      this.spawn(this.gozPath, args, {
+        windowsHide: true,
+        timeout: Math.max(1000, Math.min(30000, Number(options.timeoutMs) || 8000)),
+        maxBuffer: 16 * 1024 * 1024
+      }, (error, stdout, stderr) => {
+        if (error && !stdout) {
+          this.gozStatus = false;
+          this.gozStatusCheckedAt = Date.now();
+          resolve({ supported: false, error: error.message, stderr });
+          return;
+        }
+
+        const payload = parseJsonOutput(stdout);
+        const records = payload.map(normalizeEverythingRecord).filter(record => record.fullPath);
+        this.gozStatus = true;
+        this.gozStatusCheckedAt = Date.now();
+        resolve({
+          supported: true,
+          backend: 'goz',
+          records,
+          warning: error ? String(stderr || error.message || '').trim() : null
+        });
+      });
+    });
   }
 
   searchEverything(query, options) {

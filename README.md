@@ -18,7 +18,7 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 
 ### 패치 업데이트
 
-앱은 실행 후 GitHub 최신 릴리스를 확인하고 새 패치가 있으면 상단에 `vX.Y.Z 업데이트` 버튼을 표시합니다. Windows는 최신 portable EXE를 내려받아 앱을 재실행하고, macOS는 universal DMG를 열어 설치를 이어갑니다. 설치 파일에 GitHub SHA-256 digest가 제공되면 다운로드 후 무결성을 확인합니다.
+앱은 실행 후 GitHub 최신 릴리스를 확인하고 새 패치가 있으면 상단에 `vX.Y.Z 업데이트` 버튼을 표시합니다. Windows는 최신 설치 EXE를 내려받아 앱을 재실행하고, macOS는 universal DMG를 열어 설치를 이어갑니다. 설치 파일에 GitHub SHA-256 digest가 제공되면 다운로드 후 무결성을 확인합니다.
 
 ### Windows 공유 폴더
 
@@ -55,8 +55,8 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.6-universal.dmg)
-- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.6-portable.exe)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.7-universal.dmg)
+- [Windows x64 설치 EXE](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.7-setup.exe)
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 
@@ -80,8 +80,8 @@ npm audit --audit-level=high
 패키징:
 
 ```bash
-npm run build:win   # Windows portable EXE
-npm run build:win:arm64 # Windows ARM64 portable EXE
+npm run build:win   # Windows 설치 EXE
+npm run build:win:arm64 # Windows ARM64 설치 EXE
 npm run build:mac   # macOS universal DMG + ZIP (Apple Silicon + Intel)
 ```
 

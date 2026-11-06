@@ -1,6 +1,6 @@
 {
   "name": "dawith-search",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {
@@ -61,9 +61,17 @@
     "win": {
       "icon": "src/assets/icon.ico",
       "target": [
-        "portable"
+        "nsis"
       ],
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "artifactName": "DawithSearch-${version}-setup.exe",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "mac": {
       "icon": "src/assets/icon.png",

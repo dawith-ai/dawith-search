@@ -293,6 +293,13 @@ async function run() {
   assert.strictEqual(initialState.title, 'Dawith Search');
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
 
+  assert.strictEqual(await evaluate("document.querySelectorAll('.mode-choice-preview').length"), 2);
+  await click('#btnViewSimple');
+  await waitFor('simple view switch', async () => (await evaluate("document.body.classList.contains('ui-simple')")) === true);
+  await click('#btnViewAdvanced');
+  await waitFor('advanced view switch', async () => (await evaluate("document.body.classList.contains('ui-advanced')")) === true);
+  record('간편·기능 보기 예시와 상시 전환', '첫 실행 미리보기 2종과 상단 전환 버튼 확인');
+
   await evaluate("updateIndexingBanner({ status: 'indexing' })");
   assert.strictEqual(await evaluate("document.querySelector('#indexingBanner')?.hidden"), false);
   await evaluate("updateIndexingBanner({ status: 'indexing-progress', stats: { totalFiles: 12, totalFolders: 4, root: 'C:\\\\', rootIndex: 0, totalRoots: 1, elapsedMs: 2300 } })");
@@ -410,6 +417,7 @@ async function run() {
   assert.ok(settingsRoot.includes(path.basename(fixtureRoot)));
   const rootCount = await evaluate("document.querySelector('#rootCount')?.textContent || ''");
   assert.ok(rootCount.includes('로컬 자동'));
+  assert.ok((await evaluate("document.querySelectorAll('.shortcut-card').length")) >= 7);
   record('설정·검색 루트 표시', '격리 fixture root 확인');
   await click('#btnSetSimpleMode');
   assert.strictEqual(await evaluate("document.body.classList.contains('ui-simple')"), true);

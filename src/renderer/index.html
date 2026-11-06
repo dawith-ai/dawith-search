@@ -74,6 +74,11 @@
         <button class="btn btn-toggle advanced-only" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
           <span class="icon">✦</span> 자연어 검색
         </button>
+        <div class="view-switcher" role="group" aria-label="화면 보기 전환">
+          <span class="view-switcher-label">보기</span>
+          <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
+          <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
+        </div>
         <div class="tools-menu-wrap">
           <button class="btn btn-ghost" id="btnTools" type="button" aria-expanded="false" aria-controls="toolsMenu">
             도구 <span class="menu-chevron">⌄</span>
@@ -281,6 +286,10 @@
         <p class="modal-desc" id="conversionSummary">원본은 유지하고 변환 결과를 저장합니다.</p>
         <div class="conversion-drop-hint">검색 결과의 폴더에 파일을 <kbd>Shift</kbd>를 누른 채 끌어 놓아도 이 메뉴를 열 수 있습니다.</div>
         <div class="conversion-options" id="conversionOptions"></div>
+        <div class="conversion-loading" id="conversionLoading" hidden>
+          <span class="loading-spinner" aria-hidden="true"></span>
+          <span>변환 가능한 작업을 확인하는 중입니다…</span>
+        </div>
         <div class="conversion-status" id="conversionStatus" aria-live="polite"></div>
       </div>
     </div>
@@ -291,13 +300,23 @@
       <div class="mode-choice-mark"><img src="../assets/icon.png" alt="Dawith CI"></div>
       <span class="modal-kicker">DAWITH SEARCH</span>
       <h3>어떤 화면으로 시작할까요?</h3>
-      <p class="modal-desc">나중에 설정에서 언제든 바꿀 수 있습니다.</p>
+      <p class="modal-desc">아래 예시를 보고 선택하세요. 사용 중에도 상단의 보기 버튼으로 바로 바꿀 수 있습니다.</p>
       <div class="mode-choice-grid">
         <button class="mode-choice-card" id="btnChooseSimpleMode" type="button">
-          <span class="mode-choice-icon">⌕</span><strong>간편 모드</strong><small>검색창과 결과 중심으로 깔끔하게 사용합니다.</small>
+          <div class="mode-choice-preview simple-preview" aria-hidden="true">
+            <div class="preview-topline"><span class="preview-dot"></span><span class="preview-search-line"></span></div>
+            <div class="preview-result-line"><i></i><b></b><em></em></div>
+            <div class="preview-result-line"><i></i><b></b><em></em></div>
+            <div class="preview-result-line"><i></i><b></b><em></em></div>
+          </div>
+          <span class="mode-choice-icon">⌕</span><strong>간편 보기</strong><small>검색창과 결과만 남겨 처음 쓰는 사람도 바로 찾습니다.</small>
         </button>
         <button class="mode-choice-card" id="btnChooseAdvancedMode" type="button">
-          <span class="mode-choice-icon">✦</span><strong>다양한 기능 모드</strong><small>저장 검색, 분석, 변환, 필터를 모두 표시합니다.</small>
+          <div class="mode-choice-preview advanced-preview" aria-hidden="true">
+            <div class="preview-sidebar"><span></span><span></span><span></span><span></span></div>
+            <div class="preview-advanced-main"><div class="preview-filter-line"><span></span><span></span><span></span></div><div class="preview-result-line"><i></i><b></b><em></em></div><div class="preview-result-line"><i></i><b></b><em></em></div></div>
+          </div>
+          <span class="mode-choice-icon">✦</span><strong>다양한 기능 보기</strong><small>저장 검색, 필터, 변환, 분석 도구를 한 화면에서 씁니다.</small>
         </button>
       </div>
     </div>
@@ -456,15 +475,15 @@
         </div>
         <div class="setting-group mt-4">
           <label>단축키 안내:</label>
-          <ul class="shortcuts-list">
-            <li><kbd>Alt + Space</kbd> : 어디서든 Dawith Search 즉시 호출/숨기기</li>
-            <li><kbd>Space</kbd> : 선택한 파일 즉시 Quick Look 미리보기</li>
-            <li><kbd>Enter</kbd> : 파일 기본 프로그램으로 실행</li>
-            <li><kbd>Ctrl + Enter</kbd> : 파일이 있는 폴더 열기 (Explorer)</li>
-            <li><kbd>F2</kbd> : 이름 변경</li>
-            <li><kbd>Delete</kbd> : 휴지통으로 파일 삭제</li>
-            <li><kbd>Ctrl + C</kbd> : 파일 전체 경로 복사</li>
-          </ul>
+          <div class="shortcuts-list">
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Alt</kbd><span>+</span><kbd>Space</kbd></div><div><strong>앱 호출 / 숨기기</strong><small>어느 앱에서든 Dawith Search를 엽니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Space</kbd></div><div><strong>빠른 미리보기</strong><small>선택한 파일을 Quick Look으로 봅니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Enter</kbd></div><div><strong>파일 열기</strong><small>기본 프로그램으로 실행합니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Ctrl</kbd><span>+</span><kbd>Enter</kbd></div><div><strong>폴더 열기</strong><small>파일이 있는 폴더를 Explorer/Finder로 엽니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>F2</kbd></div><div><strong>이름 변경</strong><small>선택한 파일의 이름을 바로 바꿉니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Delete</kbd></div><div><strong>휴지통으로 이동</strong><small>선택한 파일을 안전하게 휴지통으로 보냅니다.</small></div></div>
+            <div class="shortcut-card"><div class="shortcut-keys"><kbd>Ctrl</kbd><span>+</span><kbd>C</kbd></div><div><strong>경로 복사</strong><small>선택한 파일의 전체 경로를 복사합니다.</small></div></div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 {
   "name": "dawith-search",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Dawith Search - cross-platform local Everything-style file search with saved workspaces and Quick Look",
   "main": "src/main/main.js",
   "bin": {
@@ -31,7 +31,6 @@
   "dependencies": {
     "chokidar": "^3.6.0",
     "express": "^4.21.2",
-    "lucide-react": "^1.16.0",
     "pdf-lib": "^1.17.1",
     "qrcode": "^1.5.4",
     "ws": "^8.18.0"
@@ -47,6 +46,17 @@
     "directories": {
       "output": "dist"
     },
+    "compression": "maximum",
+    "files": [
+      "src/**/*",
+      "bin/**/*",
+      "package.json",
+      "!src/**/*.map",
+      "!tests{,/**/*}",
+      "!scripts{,/**/*}",
+      "!site{,/**/*}",
+      "!*.md"
+    ],
     "forceCodeSigning": false,
     "win": {
       "icon": "src/assets/icon.ico",

@@ -55,6 +55,8 @@ const indexingBannerCount = document.getElementById('indexingBannerCount');
 const indexingProgressBar = document.getElementById('indexingProgressBar');
 const modeChoiceModal = document.getElementById('modeChoiceModal');
 const uiModeStatus = document.getElementById('uiModeStatus');
+const viewSimpleButton = document.getElementById('btnViewSimple');
+const viewAdvancedButton = document.getElementById('btnViewAdvanced');
 let currentUiMode = 'advanced';
 
 // Modals
@@ -69,6 +71,7 @@ const conversionModal = document.getElementById('conversionModal');
 const conversionOptions = document.getElementById('conversionOptions');
 const conversionSummary = document.getElementById('conversionSummary');
 const conversionStatus = document.getElementById('conversionStatus');
+const conversionLoading = document.getElementById('conversionLoading');
 let conversionItems = [];
 let conversionDestination = '';
 
@@ -134,10 +137,13 @@ function applyUiMode(mode) {
       ? '현재: 간편 모드 · 검색과 외부 폴더 추가만 바로 보입니다.'
       : '현재: 다양한 기능 모드 · 분석·저장·변환·필터를 모두 표시합니다.';
   }
-  document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode').forEach(button => {
+  document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode, #btnViewSimple, #btnViewAdvanced').forEach(button => {
     const selected = (button.id === 'btnSetSimpleMode' && currentUiMode === 'simple')
-      || (button.id === 'btnSetAdvancedMode' && currentUiMode === 'advanced');
+      || (button.id === 'btnSetAdvancedMode' && currentUiMode === 'advanced')
+      || (button.id === 'btnViewSimple' && currentUiMode === 'simple')
+      || (button.id === 'btnViewAdvanced' && currentUiMode === 'advanced');
     button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
   });
 }
 
@@ -747,19 +753,27 @@ async function openConversionDialog(items, destinationDir = '') {
     return;
   }
   const paths = validItems.map(getFullPath);
-  const result = await window.dawithAPI.getConversionOptions(paths);
-  if (!result.success) {
-    alert(`변환 메뉴를 준비하지 못했습니다.\n${result.error || '알 수 없는 오류'}`);
-    return;
-  }
-  if (!result.options.length) {
-    alert(result.notice || '이 파일 형식은 현재 변환을 지원하지 않습니다.');
-    return;
-  }
   conversionItems = validItems;
   conversionDestination = destinationDir;
   conversionSummary.textContent = `${validItems.length}개 파일 · 원본은 유지하고 ${destinationDir ? '놓은 폴더' : '원본 폴더'}에 결과를 저장합니다.`;
   conversionStatus.textContent = '';
+  conversionStatus.classList.remove('error');
+  conversionOptions.innerHTML = '';
+  conversionLoading.hidden = false;
+  conversionModal.style.display = 'flex';
+
+  const result = await window.dawithAPI.getConversionOptions(paths);
+  conversionLoading.hidden = true;
+  if (!result.success) {
+    conversionStatus.textContent = result.error || '변환 메뉴를 준비하지 못했습니다.';
+    conversionStatus.classList.add('error');
+    return;
+  }
+  if (!result.options.length) {
+    conversionStatus.textContent = result.notice || '이 파일 형식은 현재 변환을 지원하지 않습니다.';
+    conversionStatus.classList.add('error');
+    return;
+  }
   conversionOptions.innerHTML = result.options.map(option => `
     <button class="conversion-option" type="button" data-conversion-operation="${escapeHtml(option.id)}">
       <strong>${escapeHtml(option.label)}</strong><small>${escapeHtml(option.detail)}</small>
@@ -771,6 +785,7 @@ async function openConversionDialog(items, destinationDir = '') {
 async function runConversion(operation) {
   const paths = conversionItems.map(getFullPath);
   conversionStatus.textContent = '변환 중… 원본 파일은 그대로 보존됩니다.';
+  conversionStatus.classList.remove('error');
   conversionOptions.querySelectorAll('button').forEach(button => { button.disabled = true; });
   const result = await window.dawithAPI.convertFiles(paths, operation, conversionDestination || undefined);
   if (!result.success) {
@@ -1542,6 +1557,8 @@ document.getElementById('btnChooseSimpleMode')?.addEventListener('click', () => 
 document.getElementById('btnChooseAdvancedMode')?.addEventListener('click', () => saveUiMode('advanced', true));
 document.getElementById('btnSetSimpleMode')?.addEventListener('click', () => saveUiMode('simple'));
 document.getElementById('btnSetAdvancedMode')?.addEventListener('click', () => saveUiMode('advanced'));
+viewSimpleButton?.addEventListener('click', () => saveUiMode('simple'));
+viewAdvancedButton?.addEventListener('click', () => saveUiMode('advanced'));
 
 document.getElementById('btnSettings').addEventListener('click', async () => {
   settingsModal.style.display = 'flex';

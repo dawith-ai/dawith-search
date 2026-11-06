@@ -43,6 +43,8 @@ async function main() {
       commandFinder: () => 'powershell.exe'
     });
     assert.ok(windowsOfficeOptions.some(option => option.id === 'office-to-pdf'));
+    const asyncWindowsOfficeOptions = await Converter.getConversionOptionsAsync([path.join(root, '보고서.docx')], { platform: 'win32' });
+    assert.ok(asyncWindowsOfficeOptions.some(option => option.id === 'office-to-pdf'));
     assert.match(Converter.getConversionNotice([path.join(root, '보고서.docx')], { platform: 'win32' }), /암호|Office/);
     assert.strictEqual(Converter.isEncryptedConversionError(new Error('DAWITH_ENCRYPTED_FILE|password required')), true);
     assert.strictEqual(Converter.isEncryptedConversionError(new Error('ordinary conversion error')), false);

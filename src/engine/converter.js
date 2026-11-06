@@ -7,6 +7,8 @@ const { PDFDocument } = require('pdf-lib');
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg']);
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'hwp', 'hwpx']);
 const WINDOWS_OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'rtf', 'odt', 'xls', 'xlsx', 'ods', 'ppt', 'pptx', 'odp', 'hwp', 'hwpx']);
+const commandCache = new Map();
+const commandPromiseCache = new Map();
 
 function extension(filePath) {
   return path.extname(filePath).replace(/^\./, '').toLowerCase();
@@ -42,6 +44,42 @@ function findCommand(names, platform = os.platform()) {
   return null;
 }
 
+function commandCacheKey(names, platform) {
+  const candidates = Array.isArray(names) ? names : [names];
+  return `${platform}:${candidates.join('|')}`;
+}
+
+function findCommandAsync(names, platform = os.platform()) {
+  const key = commandCacheKey(names, platform);
+  if (commandCache.has(key)) return Promise.resolve(commandCache.get(key));
+  if (commandPromiseCache.has(key)) return commandPromiseCache.get(key);
+  const candidates = Array.isArray(names) ? names : [names];
+  const command = platform === 'win32' ? 'where.exe' : 'which';
+  const promise = (async () => {
+    for (const name of candidates) {
+      try {
+        const output = await new Promise((resolve, reject) => {
+          execFile(command, [name], { encoding: 'utf8', windowsHide: true, timeout: 1200 }, (error, stdout) => {
+            if (error) reject(error);
+            else resolve(String(stdout || '').trim());
+          });
+        });
+        if (output) {
+          const resolved = output.split(/\r?\n/)[0];
+          commandCache.set(key, resolved);
+          return resolved;
+        }
+      } catch (error) {
+        // Try the next supported converter without blocking the renderer.
+      }
+    }
+    commandCache.set(key, null);
+    return null;
+  })().finally(() => commandPromiseCache.delete(key));
+  commandPromiseCache.set(key, promise);
+  return promise;
+}
+
 function getAvailableImageTool(platform = os.platform(), commandFinder = findCommand) {
   if (platform === 'darwin') return commandFinder('sips', platform);
   if (platform === 'win32') return commandFinder(['magick.exe', 'convert.exe'], platform);
@@ -53,6 +91,19 @@ function getAvailableOfficeTool(platform = os.platform(), commandFinder = findCo
   return commandFinder(platform === 'win32'
     ? ['soffice.exe', 'libreoffice.exe']
     : ['soffice', 'libreoffice'], platform);
+}
+
+async function getAvailableImageToolAsync(platform = os.platform()) {
+  if (platform === 'darwin') return '/usr/bin/sips';
+  if (platform === 'win32') return findCommandAsync(['magick.exe', 'convert.exe'], platform);
+  return findCommandAsync(['magick', 'convert'], platform);
+}
+
+async function getAvailableOfficeToolAsync(platform = os.platform()) {
+  // PowerShell ships with supported Windows editions. The COM application is
+  // checked only when conversion starts, so opening the menu stays instant.
+  if (platform === 'win32') return 'powershell.exe';
+  return findCommandAsync(['soffice', 'libreoffice'], platform);
 }
 
 function getConversionNotice(filePaths, runtime = {}) {
@@ -107,6 +158,36 @@ function getConversionOptions(filePaths, runtime = {}) {
   return options;
 }
 
+async function getConversionOptionsAsync(filePaths, runtime = {}) {
+  const files = (Array.isArray(filePaths) ? filePaths : [filePaths]).filter(Boolean);
+  const extensions = files.map(extension);
+  const platform = runtime.platform || os.platform();
+  const options = [];
+  const allImages = files.length > 0 && extensions.every(item => IMAGE_EXTENSIONS.has(item));
+  const allPdfs = files.length > 0 && extensions.every(item => item === 'pdf');
+  const imageTool = await getAvailableImageToolAsync(platform);
+  const officeTool = await getAvailableOfficeToolAsync(platform);
+
+  if (allImages) {
+    options.push({ id: 'images-to-pdf', label: files.length > 1 ? '이미지를 PDF 하나로 묶기' : 'PDF로 변환', detail: '원본은 유지하고 같은 폴더에 새 파일을 만듭니다.' });
+    if (files.length === 1 && imageTool) {
+      options.push({ id: 'image-to-png', label: 'PNG로 변환', detail: '설치된 OS 이미지 변환 도구를 사용합니다.' });
+      options.push({ id: 'image-to-jpg', label: 'JPG로 변환', detail: '설치된 OS 이미지 변환 도구를 사용합니다.' });
+    }
+  }
+  if (allPdfs) {
+    if (files.length > 1) options.push({ id: 'merge-pdf', label: 'PDF 하나로 합치기', detail: `${files.length}개 PDF를 선택 순서대로 합칩니다.` });
+    if (files.length === 1) options.push({ id: 'split-pdf', label: 'PDF 페이지별로 나누기', detail: '페이지마다 별도 PDF를 만듭니다.' });
+  }
+  const windowsOfficeFile = files.length === 1 && WINDOWS_OFFICE_EXTENSIONS.has(extensions[0]);
+  if (windowsOfficeFile && platform === 'win32' && officeTool) {
+    options.push({ id: 'office-to-pdf', label: 'PDF로 변환', detail: '설치된 Word·Excel·PowerPoint·한글을 사용합니다. 암호 파일은 제외됩니다.' });
+  } else if (files.length === 1 && OFFICE_EXTENSIONS.has(extensions[0]) && officeTool) {
+    options.push({ id: 'office-to-pdf', label: 'PDF로 변환', detail: '설치된 LibreOffice/지원 변환기를 사용합니다.' });
+  }
+  return options;
+}
+
 async function imageToPdf(filePaths, destinationDir) {
   const document = await PDFDocument.create();
   for (const filePath of filePaths) {
@@ -148,8 +229,8 @@ async function splitPdf(filePath, destinationDir) {
   return outputs;
 }
 
-function convertImage(filePath, targetExtension, destinationDir) {
-  const tool = getAvailableImageTool();
+async function convertImage(filePath, targetExtension, destinationDir) {
+  const tool = await getAvailableImageToolAsync();
   if (!tool) throw new Error('이미지 변환 도구를 찾지 못했습니다.');
   const outputPath = uniqueOutput(path.join(destinationDir, `${stem(filePath)}.${targetExtension}`));
   const args = os.platform() === 'darwin'
@@ -249,8 +330,8 @@ if (-not (Test-Path -LiteralPath $outputPath)) { [Console]::Error.WriteLine('PDF
   });
 }
 
-function convertOfficeToPdf(filePath, destinationDir) {
-  const tool = getAvailableOfficeTool();
+async function convertOfficeToPdf(filePath, destinationDir) {
+  const tool = await getAvailableOfficeToolAsync();
   if (!tool) throw new Error('LibreOffice 또는 호환 Office 변환기를 찾지 못했습니다.');
   if (os.platform() === 'win32' && /powershell|pwsh/i.test(path.basename(tool))) {
     return convertWindowsOfficeToPdf(filePath, destinationDir, tool);
@@ -297,6 +378,7 @@ module.exports = {
   IMAGE_EXTENSIONS,
   getConversionNotice,
   getConversionOptions,
+  getConversionOptionsAsync,
   convertFiles,
   isEncryptedConversionError
 };

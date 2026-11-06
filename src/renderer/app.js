@@ -517,7 +517,9 @@ async function executeSearch() {
       useAI: isAiMode,
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
-      limit: 1000,
+      // Keep the result table responsive. The backend still reports the
+      // total match count while returning a compact first page for rendering.
+      limit: 200,
       scopeRoot: scopeRoot || undefined
     });
 

@@ -97,6 +97,15 @@ function parseDateCondition(str) {
   return null;
 }
 
+// macOS commonly returns filenames in decomposed Unicode (NFD), while users
+// type Korean and accented characters in composed form (NFC). Normalize both
+// sides once at the matcher boundary so Spotlight candidates are not lost
+// after they are returned to the cross-platform matcher.
+function normalizeSearchText(value) {
+  const text = String(value ?? '');
+  return typeof text.normalize === 'function' ? text.normalize('NFC') : text;
+}
+
 /**
  * Natural Language Parser for AI Smart Search
  * Translates Korean/English intuitive queries to Everything syntax
@@ -150,7 +159,7 @@ function translateNaturalLanguage(raw) {
  * Compile a wildcard glob (* and ?) into regex
  */
 function wildcardToRegex(pattern, caseSensitive = false) {
-  let escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  let escaped = normalizeSearchText(pattern).replace(/[.+^${}()|[\]\\]/g, '\\$&');
   escaped = escaped.replace(/\*/g, '.*').replace(/\?/g, '.');
   return new RegExp(escaped, caseSensitive ? '' : 'i');
 }
@@ -441,17 +450,17 @@ class QueryParser {
     // Regex filter
     if (parsedFilters.regex) {
       const separator = item.path && item.path.includes('\\') ? '\\' : '/';
-      const targetStr = parsedFilters.matchPath
+      const targetStr = normalizeSearchText(parsedFilters.matchPath
         ? (item.path + (item.path.endsWith('\\') || item.path.endsWith('/') ? '' : separator) + item.name)
-        : item.name;
+        : item.name);
       if (!parsedFilters.regex.test(targetStr)) return false;
     }
 
     // Terms (AND groups of OR clauses)
     const separator = item.path && item.path.includes('\\') ? '\\' : '/';
-    const targetText = parsedFilters.matchPath
+    const targetText = normalizeSearchText(parsedFilters.matchPath
       ? (item.path + (item.path.endsWith('\\') || item.path.endsWith('/') ? '' : separator) + item.name)
-      : item.name;
+      : item.name);
     const cmpTarget = parsedFilters.caseSensitive ? targetText : targetText.toLowerCase();
 
     for (const orClauses of parsedFilters.terms) {
@@ -461,7 +470,8 @@ class QueryParser {
         if (clause.hasWildcard && clause.regex) {
           isMatch = clause.regex.test(targetText);
         } else {
-          const needle = parsedFilters.caseSensitive ? clause.text : clause.text.toLowerCase();
+          const normalizedClause = normalizeSearchText(clause.text);
+          const needle = parsedFilters.caseSensitive ? normalizedClause : normalizedClause.toLowerCase();
           if (parsedFilters.wholeWord) {
             const re = new RegExp(`\\b${needle.replace(/[.+^${}()|[\]\\]/g, '\\$&')}\\b`, parsedFilters.caseSensitive ? '' : 'i');
             isMatch = re.test(targetText);

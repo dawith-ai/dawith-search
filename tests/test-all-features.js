@@ -12,7 +12,7 @@ const { isPathWithinRoot, normalizePathKey } = require('../src/engine/path-utils
 const TagManager = require('../src/engine/tag-manager');
 const BookmarkManager = require('../src/engine/bookmark-manager');
 const HistoryManager = require('../src/engine/history-manager');
-const { NativeSearchAdapter, normalizeEverythingRecord, parseJsonOutput, translateNativeQuery, buildSpotlightExpression } = require('../src/engine/native-search');
+const { NativeSearchAdapter, normalizeEverythingRecord, parseJsonOutput, translateNativeQuery, buildSpotlightExpression, canUseSpotlightNameFastPath } = require('../src/engine/native-search');
 
 console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
 
@@ -161,6 +161,19 @@ assert.strictEqual(normalizedRecord.ext, 'md');
 const normalizedWindowsPath = normalizeEverythingRecord({ path: 'C:\\Users\\Dawith\\Documents\\Report.md', size: 10 });
 assert.strictEqual(normalizedWindowsPath.name, 'Report.md');
 assert.strictEqual(normalizedWindowsPath.fullPath, 'C:\\Users\\Dawith\\Documents\\Report.md');
+
+const spotlightExpression = buildSpotlightExpression(QueryParser.parse('AI목소리'));
+assert.match(spotlightExpression, /kMDItemFSName == \"\*AI목소리\*\"cd/);
+assert.doesNotMatch(spotlightExpression, /-name/);
+assert.strictEqual(canUseSpotlightNameFastPath(QueryParser.parse('report')), true);
+assert.strictEqual(canUseSpotlightNameFastPath(QueryParser.parse('보고서')), false);
+assert.strictEqual(QueryParser.matches({
+  name: 'AI목소리_edge_비교.mp3',
+  path: '/Users/dawith/Desktop',
+  isDir: false,
+  ext: 'mp3',
+  size: 1
+}, QueryParser.parse('AI목소리')), true, 'NFC queries must match macOS NFD filenames');
 
 const scopeIndexer = new Indexer({
   storageDir: path.join(testDir, 'scope-index'),

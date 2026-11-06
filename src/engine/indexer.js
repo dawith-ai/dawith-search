@@ -197,12 +197,16 @@ class Indexer extends EventEmitter {
 
   loadCache() {
     if (!fs.existsSync(this.cacheFile)) return false;
-    // A native index is already optimized for whole-device lookup. Loading a
-    // huge JSON mirror only to search it again makes startup and every local
-    // fallback query noticeably heavy. External roots are re-indexed below.
+    // A native index is already optimized for whole-device lookup. The old
+    // JSON mirror is not needed when every configured root is local/native;
+    // retaining hundreds of megabytes here only makes the app look heavy and
+    // can cause stale local results after a reinstall. External roots still
+    // keep their own lightweight cache.
     try {
-      const cacheSize = fs.statSync(this.cacheFile).size;
-      if (this.canUseNativeLocalIndex() && cacheSize > 64 * 1024 * 1024) return false;
+      if (this.canUseNativeLocalIndex() && !this.hasExternalRoots()) {
+        this.removeNativeLocalCache();
+        return false;
+      }
     } catch (error) {
       // Continue with the normal cache read when metadata is unavailable.
     }
@@ -222,6 +226,9 @@ class Indexer extends EventEmitter {
   }
 
   saveCache() {
+    if (this.canUseNativeLocalIndex() && !this.hasExternalRoots()) {
+      return;
+    }
     try {
       ensurePrivateDirectory(this.storageDir);
       writeJsonAtomic(this.cacheFile, {
@@ -231,6 +238,21 @@ class Indexer extends EventEmitter {
       });
     } catch (e) {
       console.error('Failed to save cache:', e);
+    }
+  }
+
+  hasExternalRoots() {
+    const localRoots = new Set(this.config.localRoots || []);
+    return (this.config.roots || []).some(root => !localRoots.has(root));
+  }
+
+  removeNativeLocalCache() {
+    for (const filePath of [this.cacheFile, `${this.cacheFile}.bak`]) {
+      try {
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      } catch (error) {
+        // A locked cache must not prevent native search from starting.
+      }
     }
   }
 

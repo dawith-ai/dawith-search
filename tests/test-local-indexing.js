@@ -59,6 +59,9 @@ async function main() {
       localRoots: [root],
       autoStartWatcher: false
     };
+    fs.writeFileSync(nativeIndexer.cacheFile, JSON.stringify({ roots: [root], records: [] }), 'utf8');
+    assert.strictEqual(nativeIndexer.loadCache(), false, 'native local scope must not load a JSON mirror');
+    assert.strictEqual(fs.existsSync(nativeIndexer.cacheFile), false, 'native local scope must prune the stale JSON mirror');
     await nativeIndexer.startIndexing();
     assert.strictEqual(nativeIndexer.records.length, 0, 'native local search must not duplicate the whole local tree');
     nativeIndexer.fileWatcher.close();

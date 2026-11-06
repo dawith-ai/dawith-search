@@ -445,21 +445,19 @@ class NativeSearchAdapter {
     if (parsed.isEmpty) return { supported: true, backend: 'spotlight', records: [] };
 
     const expression = buildSpotlightExpression(parsed);
-    const nameTerm = parsed.terms && parsed.terms.length === 1
-      && parsed.terms[0].length === 1
-      && !parsed.terms[0][0].isNegated
-      && !parsed.terms[0][0].hasWildcard
-      ? parsed.terms[0][0].text
-      : null;
     const limit = Math.max(1, Number(options.limit) || 1000);
     for (const root of searchRoots) {
       if (records.length >= limit) break;
       const result = await new Promise(resolve => {
+        // Keep the fast native name query for simple ASCII terms. `mdfind
+        // -name` is not reliable for Unicode filenames on all macOS locales,
+        // so composed/non-ASCII queries use an explicit metadata expression.
         const args = ['-onlyin', root];
-        // `-name` is much faster for the common filename query. Extension
-        // and type filters are still enforced by QueryParser.matches below.
-        if (nameTerm) args.push('-name', nameTerm);
-        else args.push(expression);
+        if (canUseSpotlightNameFastPath(parsed)) {
+          args.push('-name', parsed.terms[0][0].text);
+        } else {
+          args.push(expression);
+        }
         this.spawn('mdfind', args, {
           timeout: options.timeoutMs || 8000,
           maxBuffer: 16 * 1024 * 1024
@@ -522,10 +520,20 @@ function buildSpotlightExpression(parsed) {
   return clauses.length === 1 ? clauses[0] : `(${clauses.join(' && ')})`;
 }
 
+function canUseSpotlightNameFastPath(parsed) {
+  if (!parsed || parsed.matchPath || parsed.regex || parsed.extensions.length > 0
+    || parsed.type !== 'all' || parsed.terms.length !== 1 || parsed.terms[0].length !== 1) {
+    return false;
+  }
+  const clause = parsed.terms[0][0];
+  return !clause.isNegated && !clause.hasWildcard && /^[\x00-\x7F]+$/.test(clause.text);
+}
+
 module.exports = {
   NativeSearchAdapter,
   normalizeEverythingRecord,
   parseJsonOutput,
   translateNativeQuery,
-  buildSpotlightExpression
+  buildSpotlightExpression,
+  canUseSpotlightNameFastPath
 };

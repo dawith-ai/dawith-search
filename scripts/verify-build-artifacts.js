@@ -23,7 +23,7 @@ if (process.platform === 'darwin') {
   requireFile(path.join(root, 'dist', `Dawith Search-${version}-universal-mac.zip`));
 } else if (process.platform === 'win32') {
   requireFile(path.join(root, 'dist', `DawithSearch-${version}-portable.exe`));
-  requireFile(path.join(root, 'dist', `DawithSearch-${version}-web-setup.exe`));
+  requireFile(path.join(root, 'dist', 'nsis-web', `DawithSearch-${version}-web-setup.exe`));
 }
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';

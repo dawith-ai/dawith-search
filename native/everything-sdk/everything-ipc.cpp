@@ -1,6 +1,3 @@
-#define UNICODE
-#define _UNICODE
-
 #include <windows.h>
 
 #include <algorithm>
@@ -9,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#define EVERYTHINGUSERAPI
 #include "include/Everything.h"
 
 namespace {

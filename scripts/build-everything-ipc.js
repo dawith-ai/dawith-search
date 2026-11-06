@@ -27,13 +27,17 @@ execFileSync(cl, [
   '/MT',
   '/EHsc',
   '/W3',
+  '/DUNICODE',
+  '/D_UNICODE',
   `/I${sdkRoot}`,
   `/Fo${buildDir}${path.sep}`,
   sdkRoot + path.sep + 'everything-ipc.cpp',
   sdkRoot + path.sep + 'src' + path.sep + 'Everything.c',
   `/Fe${output}`,
   '/link',
-  'user32.lib'
+  'user32.lib',
+  'shell32.lib',
+  'advapi32.lib'
 ], { cwd: root, stdio: 'inherit', windowsHide: true });
 
 if (!fs.existsSync(output) || fs.statSync(output).size === 0) {

@@ -27,8 +27,6 @@ execFileSync(cl, [
   '/MT',
   '/EHsc',
   '/W3',
-  '/DUNICODE',
-  '/D_UNICODE',
   `/I${sdkRoot}`,
   `/Fo${buildDir}${path.sep}`,
   sdkRoot + path.sep + 'everything-ipc.cpp',

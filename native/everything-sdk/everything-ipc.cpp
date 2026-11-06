@@ -21,7 +21,7 @@ std::string toUtf8(const std::wstring& value) {
   const int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
   if (bytes <= 0) return {};
   std::string output(bytes, '\0');
-  WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), output.data(), bytes, nullptr, nullptr);
+  WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, value.data(), static_cast<int>(value.size()), &output[0], bytes, nullptr, nullptr);
   return output;
 }
 

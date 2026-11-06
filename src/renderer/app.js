@@ -48,6 +48,14 @@ const searchTargetDetail = document.getElementById('searchTargetDetail');
 const allRootsScopeDetail = document.getElementById('allRootsScopeDetail');
 const updateButton = document.getElementById('btnUpdate');
 const updateButtonLabel = document.getElementById('btnUpdateLabel');
+const indexingBanner = document.getElementById('indexingBanner');
+const indexingBannerTitle = document.getElementById('indexingBannerTitle');
+const indexingBannerDetail = document.getElementById('indexingBannerDetail');
+const indexingBannerCount = document.getElementById('indexingBannerCount');
+const indexingProgressBar = document.getElementById('indexingProgressBar');
+const modeChoiceModal = document.getElementById('modeChoiceModal');
+const uiModeStatus = document.getElementById('uiModeStatus');
+let currentUiMode = 'advanced';
 
 // Modals
 const quickLookModal = document.getElementById('quickLookModal');
@@ -115,6 +123,69 @@ function escapeHtml(str) {
 
 function escapeRegex(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function applyUiMode(mode) {
+  currentUiMode = mode === 'simple' ? 'simple' : 'advanced';
+  document.body.classList.toggle('ui-simple', currentUiMode === 'simple');
+  document.body.classList.toggle('ui-advanced', currentUiMode === 'advanced');
+  if (uiModeStatus) {
+    uiModeStatus.textContent = currentUiMode === 'simple'
+      ? '현재: 간편 모드 · 검색과 외부 폴더 추가만 바로 보입니다.'
+      : '현재: 다양한 기능 모드 · 분석·저장·변환·필터를 모두 표시합니다.';
+  }
+  document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode').forEach(button => {
+    const selected = (button.id === 'btnSetSimpleMode' && currentUiMode === 'simple')
+      || (button.id === 'btnSetAdvancedMode' && currentUiMode === 'advanced');
+    button.classList.toggle('active', selected);
+  });
+}
+
+async function saveUiMode(mode, closeChoice = false) {
+  applyUiMode(mode);
+  await window.dawithAPI.saveConfig({ uiMode: currentUiMode });
+  if (closeChoice && modeChoiceModal) modeChoiceModal.style.display = 'none';
+}
+
+function updateIndexingBanner(data = {}) {
+  if (!indexingBanner) return;
+  const status = data.status;
+  if (status === 'indexing') {
+    indexingBanner.hidden = false;
+    indexingBanner.classList.remove('is-error', 'is-complete');
+    indexingBannerTitle.textContent = '처음 색인을 진행하고 있습니다';
+    indexingBannerDetail.textContent = '파일이 많으면 시간이 걸릴 수 있습니다. 검색은 발견된 파일부터 바로 사용할 수 있습니다.';
+    indexingBannerCount.textContent = '0개 발견';
+    indexingProgressBar.style.width = '18%';
+    return;
+  }
+  if (status === 'indexing-progress') {
+    const stats = data.stats || data;
+    const files = Number(stats.totalFiles || 0);
+    const folders = Number(stats.totalFolders || 0);
+    const rootIndex = Number(stats.rootIndex || 0);
+    const totalRoots = Math.max(1, Number(stats.totalRoots || 1));
+    const elapsed = Number(stats.elapsedMs || 0);
+    const elapsedText = elapsed > 60000 ? `${Math.floor(elapsed / 60000)}분 ${Math.floor((elapsed % 60000) / 1000)}초` : `${Math.max(1, Math.floor(elapsed / 1000))}초`;
+    indexingBanner.hidden = false;
+    indexingBannerTitle.textContent = `색인 중 · ${rootIndex + 1}/${totalRoots} 위치`;
+    indexingBannerDetail.textContent = `${getPathLabel(stats.root || '로컬 위치')}를 읽는 중 · 경과 ${elapsedText} · 검색은 계속 사용할 수 있습니다.`;
+    indexingBannerCount.textContent = `${(files + folders).toLocaleString()}개 발견`;
+    indexingProgressBar.style.width = `${Math.min(96, Math.max(18, ((rootIndex + 1) / totalRoots) * 100))}%`;
+    return;
+  }
+  if (status === 'idle') {
+    indexingBanner.hidden = true;
+    indexingBanner.classList.remove('is-error');
+    return;
+  }
+  if (status === 'error') {
+    indexingBanner.hidden = false;
+    indexingBanner.classList.add('is-error');
+    indexingBannerTitle.textContent = '색인을 완료하지 못했습니다';
+    indexingBannerDetail.textContent = data.error || '접근 권한이 없는 폴더는 제외하고 다시 시도하세요.';
+    indexingProgressBar.style.width = '100%';
+  }
 }
 
 function getPathLabel(filePath) {
@@ -407,6 +478,8 @@ async function addSearchRoot() {
 
 async function initWorkspace() {
   const config = await window.dawithAPI.getConfig();
+  applyUiMode(config.uiMode || 'advanced');
+  if (!config.uiMode && modeChoiceModal) modeChoiceModal.style.display = 'flex';
   renderSidebarRoots(config.roots || [], config.localRoots || []);
   await Promise.all([refreshBookmarks(), refreshHistory()]);
   updateScopeUI();
@@ -680,7 +753,7 @@ async function openConversionDialog(items, destinationDir = '') {
     return;
   }
   if (!result.options.length) {
-    alert('이 파일 형식은 현재 변환을 지원하지 않습니다. PDF·PNG·JPG 또는 설치된 Office 변환기를 확인하세요.');
+    alert(result.notice || '이 파일 형식은 현재 변환을 지원하지 않습니다.');
     return;
   }
   conversionItems = validItems;
@@ -702,6 +775,9 @@ async function runConversion(operation) {
   const result = await window.dawithAPI.convertFiles(paths, operation, conversionDestination || undefined);
   if (!result.success) {
     conversionStatus.textContent = result.error || '변환에 실패했습니다.';
+    if (/암호|비밀번호|암호화/i.test(conversionStatus.textContent)) {
+      conversionStatus.classList.add('error');
+    }
     conversionOptions.querySelectorAll('button').forEach(button => { button.disabled = false; });
     return;
   }
@@ -1061,7 +1137,8 @@ clearBtn.addEventListener('click', () => {
 // Theme Toggle Logic
 function initTheme() {
   const savedTheme = localStorage.getItem('theme') || 'light-theme';
-  document.body.className = savedTheme;
+  document.body.classList.remove('light-theme', 'dark-theme');
+  document.body.classList.add(savedTheme);
   updateThemeIcon(savedTheme);
 }
 
@@ -1079,7 +1156,8 @@ if (btnThemeToggle) {
   btnThemeToggle.addEventListener('click', () => {
     const isLight = document.body.classList.contains('light-theme');
     const newTheme = isLight ? 'dark-theme' : 'light-theme';
-    document.body.className = newTheme;
+    document.body.classList.remove('light-theme', 'dark-theme');
+    document.body.classList.add(newTheme);
     updateThemeIcon(newTheme);
     localStorage.setItem('theme', newTheme);
   });
@@ -1460,9 +1538,15 @@ document.getElementById('btnExport').addEventListener('click', async () => {
 });
 
 // Settings Dialog
+document.getElementById('btnChooseSimpleMode')?.addEventListener('click', () => saveUiMode('simple', true));
+document.getElementById('btnChooseAdvancedMode')?.addEventListener('click', () => saveUiMode('advanced', true));
+document.getElementById('btnSetSimpleMode')?.addEventListener('click', () => saveUiMode('simple'));
+document.getElementById('btnSetAdvancedMode')?.addEventListener('click', () => saveUiMode('advanced'));
+
 document.getElementById('btnSettings').addEventListener('click', async () => {
   settingsModal.style.display = 'flex';
   const cfg = await window.dawithAPI.getConfig();
+  applyUiMode(cfg.uiMode || 'advanced');
   renderSettingsRoots(cfg.roots || []);
 });
 document.getElementById('btnCloseSettings').addEventListener('click', () => {
@@ -1555,6 +1639,7 @@ document.getElementById('btnClose').addEventListener('click', () => window.dawit
 
 // Realtime Index Status
 window.dawithAPI.onIndexStatus((data) => {
+  updateIndexingBanner(data);
   if (data.status === 'indexing') {
     statusDot.className = 'status-dot indexing';
     titlebarStatus.textContent = '색인 작업 진행 중...';

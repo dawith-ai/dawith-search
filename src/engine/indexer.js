@@ -70,7 +70,8 @@ class Indexer extends EventEmitter {
       // against accidental recursive directory structures.
       maxDepth: 64,
       autoStartWatcher: true,
-      searchBackend: 'auto'
+      searchBackend: 'auto',
+      uiMode: null
     };
 
     if (fs.existsSync(this.configFile)) {
@@ -254,7 +255,13 @@ class Indexer extends EventEmitter {
   async startIndexing() {
     if (this.isIndexing) return;
     this.isIndexing = true;
-    this.emit('indexing-started');
+    const indexingStartedAt = Date.now();
+    const roots = this.config.roots.filter(root => fs.existsSync(root));
+    this.emit('indexing-started', {
+      startedAt: indexingStartedAt,
+      totalRoots: roots.length,
+      roots
+    });
 
     const newRecords = [];
     // Publish an empty-but-live array immediately. Searches during a large
@@ -263,9 +270,13 @@ class Indexer extends EventEmitter {
     this.rebuildMap();
     this.updateStats();
     try {
-      for (const root of this.config.roots) {
-        if (!fs.existsSync(root)) continue;
-        await this.scanRoot(root, newRecords);
+      for (const [rootIndex, root] of roots.entries()) {
+        await this.scanRoot(root, newRecords, {
+          root,
+          rootIndex,
+          totalRoots: roots.length,
+          startedAt: indexingStartedAt
+        });
       }
 
       this.records = newRecords;
@@ -276,7 +287,9 @@ class Indexer extends EventEmitter {
       this.emit('indexing-finished', {
         totalFiles: this.stats.totalFiles,
         totalFolders: this.stats.totalFolders,
-        totalBytes: this.stats.totalBytes
+        totalBytes: this.stats.totalBytes,
+        elapsedMs: Date.now() - indexingStartedAt,
+        totalRoots: roots.length
       });
 
       if (this.config.autoStartWatcher) {
@@ -290,7 +303,7 @@ class Indexer extends EventEmitter {
     }
   }
 
-  async scanRoot(root, outputArray) {
+  async scanRoot(root, outputArray, progressContext = {}) {
     // Do not use a fail-fast crawler for a whole drive. One protected
     // directory (AppData, System Volume Information, a disconnected share)
     // must not abort the complete local index.
@@ -305,7 +318,11 @@ class Indexer extends EventEmitter {
       this.emit('indexing-progress', {
         totalFiles: this.stats.totalFiles,
         totalFolders: this.stats.totalFolders,
-        totalBytes: this.stats.totalBytes
+        totalBytes: this.stats.totalBytes,
+        root: progressContext.root || root,
+        rootIndex: progressContext.rootIndex || 0,
+        totalRoots: progressContext.totalRoots || 1,
+        elapsedMs: progressContext.startedAt ? Date.now() - progressContext.startedAt : 0
       });
     };
     await this.scanDirectory(root, outputArray, 0, this.config.maxDepth, publishProgress);
@@ -316,7 +333,11 @@ class Indexer extends EventEmitter {
       this.emit('indexing-progress', {
         totalFiles: this.stats.totalFiles,
         totalFolders: this.stats.totalFolders,
-        totalBytes: this.stats.totalBytes
+        totalBytes: this.stats.totalBytes,
+        root: progressContext.root || root,
+        rootIndex: progressContext.rootIndex || 0,
+        totalRoots: progressContext.totalRoots || 1,
+        elapsedMs: progressContext.startedAt ? Date.now() - progressContext.startedAt : 0
       });
     }
     return outputArray.length - startLength;

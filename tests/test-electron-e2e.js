@@ -78,7 +78,8 @@ function createFixture() {
     excludeHidden: false,
     maxDepth: 12,
     autoStartWatcher: false,
-    searchBackend: 'local'
+    searchBackend: 'local',
+    uiMode: 'advanced'
   }, null, 2));
 }
 
@@ -292,6 +293,14 @@ async function run() {
   assert.strictEqual(initialState.title, 'Dawith Search');
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
 
+  await evaluate("updateIndexingBanner({ status: 'indexing' })");
+  assert.strictEqual(await evaluate("document.querySelector('#indexingBanner')?.hidden"), false);
+  await evaluate("updateIndexingBanner({ status: 'indexing-progress', stats: { totalFiles: 12, totalFolders: 4, root: 'C:\\\\', rootIndex: 0, totalRoots: 1, elapsedMs: 2300 } })");
+  const indexingDetail = await evaluate("document.querySelector('#indexingBannerDetail')?.textContent || ''");
+  assert.ok(indexingDetail.includes('검색은 계속 사용할 수 있습니다'));
+  await evaluate("updateIndexingBanner({ status: 'idle' })");
+  record('초기 색인 진행 표시', '진행 배너·발견 항목·검색 가능 안내 확인');
+
   const initialSearchTarget = await evaluate(`({
     title: document.querySelector('#searchTargetTitle')?.textContent || '',
     detail: document.querySelector('#searchTargetDetail')?.textContent || '',
@@ -402,6 +411,11 @@ async function run() {
   const rootCount = await evaluate("document.querySelector('#rootCount')?.textContent || ''");
   assert.ok(rootCount.includes('로컬 자동'));
   record('설정·검색 루트 표시', '격리 fixture root 확인');
+  await click('#btnSetSimpleMode');
+  assert.strictEqual(await evaluate("document.body.classList.contains('ui-simple')"), true);
+  await click('#btnSetAdvancedMode');
+  assert.strictEqual(await evaluate("document.body.classList.contains('ui-advanced')"), true);
+  record('간편·다양한 기능 모드 전환', '설정에서 화면 구성을 즉시 전환');
   await click('#btnReindexNow');
   await waitForState('manual reindex', state => state.settingsDisplay === 'none' && /색인 항목:\s*[1-9]\d*개/.test(state.indexed));
   record('수동 전체 재색인', '설정의 Reindex 완료');

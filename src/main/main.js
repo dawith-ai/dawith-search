@@ -217,9 +217,9 @@ app.whenReady().then(() => {
   }
 
   // Forward indexer events to renderer
-  indexer.on('indexing-started', () => {
+  indexer.on('indexing-started', (stats = {}) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('index-status', { status: 'indexing' });
+      mainWindow.webContents.send('index-status', { status: 'indexing', ...stats });
     }
   });
 
@@ -414,7 +414,8 @@ ipcMain.handle('get-conversion-options', async (event, filePaths) => {
     const paths = (Array.isArray(filePaths) ? filePaths : [filePaths]).map(filePath => getAllowedPath(filePath));
     const stats = await Promise.all(paths.map(filePath => fs.promises.stat(filePath)));
     if (stats.some(stat => stat.isDirectory())) return { success: false, error: '폴더 자체는 변환할 수 없습니다.' };
-    return { success: true, options: Converter.getConversionOptions(paths) };
+    const options = Converter.getConversionOptions(paths);
+    return { success: true, options, notice: options.length ? '' : Converter.getConversionNotice(paths) };
   } catch (error) {
     return { success: false, error: error.message };
   }

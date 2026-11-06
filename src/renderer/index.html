@@ -71,7 +71,7 @@
         <button class="btn btn-update" id="btnUpdate" type="button" hidden title="새 버전으로 업데이트합니다">
           <span aria-hidden="true">↻</span> <span id="btnUpdateLabel">업데이트</span>
         </button>
-        <button class="btn btn-toggle" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
+        <button class="btn btn-toggle advanced-only" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
           <span class="icon">✦</span> 자연어 검색
         </button>
         <div class="tools-menu-wrap">
@@ -107,6 +107,16 @@
       </div>
     </header>
 
+    <section class="indexing-banner" id="indexingBanner" hidden aria-live="polite">
+      <div class="indexing-banner-icon" aria-hidden="true">⌁</div>
+      <div class="indexing-banner-copy">
+        <strong id="indexingBannerTitle">처음 색인을 준비하고 있습니다</strong>
+        <span id="indexingBannerDetail">파일이 많으면 몇 분 걸릴 수 있습니다. 앱을 켜 둔 채 기다려 주세요.</span>
+      </div>
+      <div class="indexing-banner-count" id="indexingBannerCount">0개 발견</div>
+      <div class="indexing-progress-track"><span id="indexingProgressBar"></span></div>
+    </section>
+
     <div class="workspace-shell">
       <aside class="workspace-sidebar" id="workspaceSidebar" aria-label="검색 작업 공간">
         <div class="sidebar-heading">
@@ -121,7 +131,7 @@
           <span>＋</span> 현재 검색 저장
         </button>
 
-        <div class="sidebar-section">
+        <div class="sidebar-section advanced-only">
           <div class="sidebar-section-title">업무 바로가기</div>
           <nav class="sidebar-nav" id="workPresets">
             <button class="sidebar-nav-item active" data-query="" type="button"><span class="nav-mark">⌕</span>전체 파일</button>
@@ -135,7 +145,7 @@
           </nav>
         </div>
 
-        <div class="sidebar-section">
+        <div class="sidebar-section advanced-only">
           <div class="sidebar-section-heading">
             <div class="sidebar-section-title">검색 범위</div>
             <button class="sidebar-section-action" id="btnSidebarAddRoot" type="button" title="외부·공유 폴더 추가">＋</button>
@@ -157,7 +167,7 @@
           </div>
         </div>
 
-        <div class="sidebar-section sidebar-history-section">
+        <div class="sidebar-section sidebar-history-section advanced-only">
           <div class="sidebar-section-heading">
             <div class="sidebar-section-title">최근 검색</div>
             <button class="sidebar-clear-btn" id="btnClearHistory" type="button">지우기</button>
@@ -173,7 +183,7 @@
 
       <div class="workspace-main">
     <!-- Category Filter Tabs -->
-    <nav class="filter-bar">
+    <nav class="filter-bar advanced-only">
       <div class="filter-tabs" id="filterTabs">
         <button class="tab-btn active" data-filter="">모두</button>
         <button class="tab-btn" data-filter="doc:">문서</button>
@@ -201,10 +211,10 @@
       <span class="selection-summary" id="selectionSummary">0개 선택</span>
       <span class="selection-hint">⌘/Ctrl을 누르고 여러 항목을 선택할 수 있습니다.</span>
       <div class="selection-actions">
-        <button class="btn btn-sm btn-ghost" id="btnCopySelectedPaths" type="button">경로 복사</button>
+        <button class="btn btn-sm btn-ghost advanced-only" id="btnCopySelectedPaths" type="button">경로 복사</button>
         <button class="btn btn-sm btn-ghost" id="btnConvertSelected" type="button">파일 변환</button>
-        <button class="btn btn-sm btn-ghost" id="btnBatchRename" type="button">이름 일괄 변경</button>
-        <button class="btn btn-sm btn-danger" id="btnDeleteSelected" type="button">휴지통으로 이동</button>
+        <button class="btn btn-sm btn-ghost advanced-only" id="btnBatchRename" type="button">이름 일괄 변경</button>
+        <button class="btn btn-sm btn-danger advanced-only" id="btnDeleteSelected" type="button">휴지통으로 이동</button>
         <button class="selection-clear" id="btnClearSelection" type="button" title="선택 해제">×</button>
       </div>
     </div>
@@ -272,6 +282,23 @@
         <div class="conversion-drop-hint">검색 결과의 폴더에 파일을 <kbd>Shift</kbd>를 누른 채 끌어 놓아도 이 메뉴를 열 수 있습니다.</div>
         <div class="conversion-options" id="conversionOptions"></div>
         <div class="conversion-status" id="conversionStatus" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay mode-choice-overlay" id="modeChoiceModal" style="display: none;">
+    <div class="modal-dialog mode-choice-dialog">
+      <div class="mode-choice-mark"><img src="../assets/icon.png" alt="Dawith CI"></div>
+      <span class="modal-kicker">DAWITH SEARCH</span>
+      <h3>어떤 화면으로 시작할까요?</h3>
+      <p class="modal-desc">나중에 설정에서 언제든 바꿀 수 있습니다.</p>
+      <div class="mode-choice-grid">
+        <button class="mode-choice-card" id="btnChooseSimpleMode" type="button">
+          <span class="mode-choice-icon">⌕</span><strong>간편 모드</strong><small>검색창과 결과 중심으로 깔끔하게 사용합니다.</small>
+        </button>
+        <button class="mode-choice-card" id="btnChooseAdvancedMode" type="button">
+          <span class="mode-choice-icon">✦</span><strong>다양한 기능 모드</strong><small>저장 검색, 분석, 변환, 필터를 모두 표시합니다.</small>
+        </button>
       </div>
     </div>
   </div>
@@ -395,6 +422,15 @@
         <button class="btn-close" id="btnCloseSettings">✕</button>
       </div>
       <div class="modal-body">
+        <div class="setting-group ui-mode-setting">
+          <label>화면 구성</label>
+          <p class="setting-help">버튼이 많아 복잡하게 느껴지면 간편 모드를 선택하세요. 검색 기능은 동일합니다.</p>
+          <div class="ui-mode-buttons">
+            <button class="btn btn-sm btn-ghost" id="btnSetSimpleMode" type="button">간편 모드</button>
+            <button class="btn btn-sm btn-ghost" id="btnSetAdvancedMode" type="button">다양한 기능 모드</button>
+          </div>
+          <p class="setting-help" id="uiModeStatus"></p>
+        </div>
         <div class="setting-group">
           <label>검색 범위</label>
           <p class="setting-help">내 PC의 로컬 파일은 폴더를 고르지 않아도 자동 검색합니다. 공유폴더·외부 경로만 아래에서 추가하세요.</p>

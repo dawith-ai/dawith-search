@@ -30,8 +30,10 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 - 한국어 자연어 검색 보조: “지난주 100GB 이상 동영상”, “어제 작성한 엑셀 파일” 등
 - 이미지·텍스트·오디오·비디오 Quick Look
 - CSV, TXT, JSON, EFU 내보내기
-- 검색 결과 파일 변환: PNG/JPG→PDF, PDF 병합·분할, 설치된 LibreOffice 기반 Office→PDF
+- 검색 결과 파일 변환: PNG/JPG→PDF, PDF 병합·분할, Windows 설치 Office·한글 또는 LibreOffice 기반 Office→PDF
 - 검색 결과에서 `변환` 버튼·우클릭 메뉴·Shift 드래그로 변환 흐름 진입 (원본 보존)
+- Windows 암호화·암호입력 파일은 변환 전에 명확한 안내를 표시하고 변환하지 않음
+- 첫 실행에서 간편 모드와 다양한 기능 모드를 선택하고 설정에서 변경 가능
 - 별표·가상 태그, 안전한 휴지통 삭제, 이름 변경
 - 저장된 검색(Bookmarks), 최근 검색 기록, 기관 업무용 빠른 검색, 폴더 범위 검색
 - 기관별 검색 폴더 추가, 로컬 개인정보 보호 안내, 키보드 중심 작업 흐름
@@ -53,8 +55,8 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.3-universal.dmg)
-- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.3-portable.exe)
+- [macOS universal (Apple Silicon + Intel) DMG](https://github.com/dawith-ai/dawith-search/releases/latest/download/Dawith.Search-1.1.4-universal.dmg)
+- [Windows x64 Portable](https://github.com/dawith-ai/dawith-search/releases/latest/download/DawithSearch-1.1.4-portable.exe)
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 

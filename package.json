@@ -47,6 +47,10 @@
       "output": "dist"
     },
     "compression": "maximum",
+    "electronLanguages": [
+      "en-US",
+      "ko"
+    ],
     "files": [
       "src/**/*",
       "bin/**/*",

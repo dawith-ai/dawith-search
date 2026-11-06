@@ -18,7 +18,7 @@ jobs:
         include:
           - os: ubuntu-latest
             e2e_command: xvfb-run -a npm run test:e2e
-          - os: macos-14
+          - os: macos-15
             e2e_command: npm run test:e2e
           - os: windows-latest
             e2e_command: npm run test:e2e
@@ -48,7 +48,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             command: npm run build:mac
           - os: windows-latest
             command: npm run build:win

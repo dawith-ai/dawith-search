@@ -2,8 +2,13 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { PDFDocument } = require('pdf-lib');
 const Converter = require('../src/engine/converter');
+const pdfLibEntry = require.resolve('pdf-lib');
+
+// Conversion support must not pull the PDF engine into the search process
+// until an actual PDF operation is requested.
+assert.strictEqual(require.cache[pdfLibEntry], undefined, 'pdf-lib must be lazy-loaded');
+const { PDFDocument } = require('pdf-lib');
 
 async function main() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dawith-converter-'));

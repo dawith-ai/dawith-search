@@ -2,7 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { execFile, execFileSync } = require('child_process');
-const { PDFDocument } = require('pdf-lib');
+
+let pdfDocumentModule = null;
+
+function getPdfDocument() {
+  if (!pdfDocumentModule) pdfDocumentModule = require('pdf-lib').PDFDocument;
+  return pdfDocumentModule;
+}
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg']);
 const OFFICE_EXTENSIONS = new Set(['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'hwp', 'hwpx']);
@@ -189,6 +195,7 @@ async function getConversionOptionsAsync(filePaths, runtime = {}) {
 }
 
 async function imageToPdf(filePaths, destinationDir) {
+  const PDFDocument = getPdfDocument();
   const document = await PDFDocument.create();
   for (const filePath of filePaths) {
     const bytes = await fs.promises.readFile(filePath);
@@ -204,6 +211,7 @@ async function imageToPdf(filePaths, destinationDir) {
 }
 
 async function mergePdfs(filePaths, destinationDir) {
+  const PDFDocument = getPdfDocument();
   const output = await PDFDocument.create();
   for (const filePath of filePaths) {
     const source = await PDFDocument.load(await fs.promises.readFile(filePath));
@@ -216,6 +224,7 @@ async function mergePdfs(filePaths, destinationDir) {
 }
 
 async function splitPdf(filePath, destinationDir) {
+  const PDFDocument = getPdfDocument();
   const source = await PDFDocument.load(await fs.promises.readFile(filePath));
   const outputs = [];
   for (const [index, sourceIndex] of source.getPageIndices().entries()) {

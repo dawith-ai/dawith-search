@@ -23,16 +23,10 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const Indexer = require('../engine/indexer');
-const StorageAnalyzer = require('../engine/storage-analyzer');
-const DuplicateFinder = require('../engine/duplicate-finder');
-const Exporter = require('../engine/exporter');
-const RemoteServer = require('../engine/remote-server');
 const BookmarkManager = require('../engine/bookmark-manager');
 const HistoryManager = require('../engine/history-manager');
-const EvidenceAnalyzer = require('../engine/evidence-analyzer');
 const RootManager = require('../engine/root-manager');
 const UpdateManager = require('./update-manager');
-const Converter = require('../engine/converter');
 
 let mainWindow = null;
 let guideWindow = null;
@@ -184,7 +178,6 @@ function setupTray() {
 
 app.whenReady().then(() => {
   indexer = new Indexer();
-  remoteServer = new RemoteServer(indexer);
   bookmarkManager = new BookmarkManager(indexer.storageDir);
   historyManager = new HistoryManager(indexer.storageDir);
 
@@ -419,6 +412,7 @@ ipcMain.handle('get-file-stats', async (event, filePath) => {
 
 ipcMain.handle('get-conversion-options', async (event, filePaths) => {
   try {
+    const Converter = require('../engine/converter');
     const paths = (Array.isArray(filePaths) ? filePaths : [filePaths]).map(filePath => getAllowedPath(filePath));
     const stats = await Promise.all(paths.map(filePath => fs.promises.stat(filePath)));
     if (stats.some(stat => stat.isDirectory())) return { success: false, error: '폴더 자체는 변환할 수 없습니다.' };
@@ -431,6 +425,7 @@ ipcMain.handle('get-conversion-options', async (event, filePaths) => {
 
 ipcMain.handle('convert-files', async (event, filePaths, operation, destinationDir) => {
   try {
+    const Converter = require('../engine/converter');
     const paths = (Array.isArray(filePaths) ? filePaths : [filePaths]).map(filePath => getAllowedPath(filePath));
     const destination = destinationDir ? getAllowedPath(destinationDir) : path.dirname(paths[0]);
     const destinationStat = await fs.promises.stat(destination);
@@ -446,6 +441,7 @@ ipcMain.handle('convert-files', async (event, filePaths, operation, destinationD
 
 ipcMain.handle('export-results', async (event, format, items) => {
   try {
+    const Exporter = require('../engine/exporter');
     const { filePath } = await dialog.showSaveDialog(mainWindow, {
       title: '검색 결과 내보내기',
       defaultPath: `dawith-search-results.${format || 'csv'}`,
@@ -467,6 +463,10 @@ ipcMain.handle('export-results', async (event, format, items) => {
 
 ipcMain.handle('start-remote-server', async (event, port) => {
   try {
+    if (!remoteServer) {
+      const RemoteServer = require('../engine/remote-server');
+      remoteServer = new RemoteServer(indexer);
+    }
     const res = await remoteServer.start(port || 8888);
     return { success: true, ...res };
   } catch (err) {
@@ -485,11 +485,13 @@ ipcMain.handle('get-remote-server-status', () => {
 
 ipcMain.handle('get-storage-analysis', () => {
   if (!indexer) return null;
+  const StorageAnalyzer = require('../engine/storage-analyzer');
   return StorageAnalyzer.analyze(indexer.records);
 });
 
 ipcMain.handle('analyze-path', async (event, filePath, options) => {
   try {
+    const EvidenceAnalyzer = require('../engine/evidence-analyzer');
     const safePath = getAllowedPath(filePath);
     const report = await EvidenceAnalyzer.analyzePath(safePath, options);
     lastEvidenceReport = report;
@@ -517,6 +519,7 @@ ipcMain.handle('save-analysis-report', async () => {
 
 ipcMain.handle('find-duplicates', async (event, options) => {
   if (!indexer) return { groups: [], totalDuplicates: 0, totalWastedBytes: 0 };
+  const DuplicateFinder = require('../engine/duplicate-finder');
   return await DuplicateFinder.findDuplicates(indexer.records, options);
 });
 

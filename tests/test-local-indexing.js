@@ -45,6 +45,24 @@ async function main() {
     assert.ok(progressEvents.length > 0, 'large local scans must publish partial indexing progress');
     assert.ok(progressEvents.some(stats => stats.totalFiles >= 250), 'partial progress must expose indexed files before completion');
     console.log(`Local indexing regression passed (deep file, protected directory, and ${progressEvents.length} partial progress event(s)).`);
+
+    const nativeIndexer = new Indexer({
+      storageDir: path.join(root, '.native-storage'),
+      nativeSearch: {
+        getStatus: () => ({ available: true }),
+        search: async () => ({ supported: true, backend: 'native', records: [] })
+      }
+    });
+    nativeIndexer.config = {
+      ...nativeIndexer.config,
+      roots: [root],
+      localRoots: [root],
+      autoStartWatcher: false
+    };
+    await nativeIndexer.startIndexing();
+    assert.strictEqual(nativeIndexer.records.length, 0, 'native local search must not duplicate the whole local tree');
+    nativeIndexer.fileWatcher.close();
+    console.log('Native-index regression passed (automatic local scope delegated without a duplicate JSON scan).');
   } finally {
     if (process.platform !== 'win32') fs.chmodSync(protectedDir, originalMode & 0o777);
     indexer.fileWatcher.close();

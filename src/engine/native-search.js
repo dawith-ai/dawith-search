@@ -8,6 +8,27 @@ const { getFullPath } = require('./path-utils');
 const WINDOWS_SORT_FIELDS = new Set(['name', 'path', 'size', 'mtime', 'ext']);
 const NATIVE_UNSUPPORTED_FILTERS = /(?:^|\s)(?:content|tag|tags|star|starred|dupe):/i;
 
+const NATIVE_CATEGORY_EXTENSIONS = {
+  doc: ['doc', 'docx', 'pdf', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'hwp', 'hwpx', 'csv', 'rtf', 'odt', 'ods', 'odp', 'md'],
+  document: ['doc', 'docx', 'pdf', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'hwp', 'hwpx', 'csv', 'rtf', 'odt', 'ods', 'odp', 'md'],
+  pic: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'heic', 'raw', 'psd', 'ai'],
+  picture: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'heic', 'raw', 'psd', 'ai'],
+  image: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'tiff', 'heic', 'raw', 'psd', 'ai'],
+  video: ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v', '3gp', 'ts', 'mts'],
+  audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma', 'opus', 'alac', 'mid', 'midi'],
+  zip: ['zip', '7z', 'rar', 'tar', 'gz', 'bz2', 'xz', 'iso', 'tgz', 'cab', 'jar'],
+  compressed: ['zip', '7z', 'rar', 'tar', 'gz', 'bz2', 'xz', 'iso', 'tgz', 'cab', 'jar'],
+  exe: ['exe', 'msi', 'bat', 'cmd', 'ps1', 'sh', 'com', 'vbs', 'reg', 'app'],
+  executable: ['exe', 'msi', 'bat', 'cmd', 'ps1', 'sh', 'com', 'vbs', 'reg', 'app']
+};
+
+function translateNativeQuery(query) {
+  return String(query || '').replace(
+    /(^|\s)(doc|document|pic|picture|image|video|audio|zip|compressed|exe|executable):/gi,
+    (match, prefix, category) => `${prefix}ext:${NATIVE_CATEGORY_EXTENSIONS[category.toLowerCase()].join(';')}`
+  );
+}
+
 function parseJsonOutput(stdout) {
   const text = String(stdout || '').replace(/^\uFEFF/, '').trim();
   if (!text) return [];
@@ -152,9 +173,9 @@ class NativeSearchAdapter {
     if (this.platform === 'win32') return Boolean(this.esPath);
     if (this.platform !== 'darwin') return false;
 
-    // Spotlight's -interpret mode is intentionally limited to plain text.
-    // Everything-specific operators remain on the deterministic local parser.
-    return /^[\p{L}\p{N}._\-\s]+$/u.test(query.trim());
+    // Spotlight is used as a candidate finder; QueryParser still applies the
+    // exact extension/type/date/size semantics after paths are returned.
+    return true;
   }
 
   async search(query, options = {}, roots = []) {
@@ -163,7 +184,7 @@ class NativeSearchAdapter {
     }
 
     if (this.platform === 'win32') {
-      return this.searchEverything(query, options);
+      return this.searchEverything(translateNativeQuery(query), options);
     }
     return this.searchSpotlight(query, options, roots);
   }
@@ -206,10 +227,27 @@ class NativeSearchAdapter {
     const records = [];
     const parsed = QueryParser.parse(query, options);
 
+    // Do not enumerate an entire home directory just to render the empty
+    // initial state. The first real query is delegated to Spotlight below.
+    if (parsed.isEmpty) return { supported: true, backend: 'spotlight', records: [] };
+
+    const expression = buildSpotlightExpression(parsed);
+    const nameTerm = parsed.terms && parsed.terms.length === 1
+      && parsed.terms[0].length === 1
+      && !parsed.terms[0][0].isNegated
+      && !parsed.terms[0][0].hasWildcard
+      ? parsed.terms[0][0].text
+      : null;
+    const limit = Math.max(1, Number(options.limit) || 1000);
     for (const root of searchRoots) {
+      if (records.length >= limit) break;
       const result = await new Promise(resolve => {
-        const expression = `kMDItemFSName == "*${query.replace(/"/g, '')}*"cd`;
-        this.spawn('mdfind', ['-onlyin', root, expression], {
+        const args = ['-onlyin', root];
+        // `-name` is much faster for the common filename query. Extension
+        // and type filters are still enforced by QueryParser.matches below.
+        if (nameTerm) args.push('-name', nameTerm);
+        else args.push(expression);
+        this.spawn('mdfind', args, {
           timeout: options.timeoutMs || 8000,
           maxBuffer: 16 * 1024 * 1024
         }, (error, stdout) => resolve({ error, stdout }));
@@ -235,16 +273,46 @@ class NativeSearchAdapter {
           ctime: stat.birthtimeMs || stat.ctimeMs,
           isDir: stat.isDirectory()
         });
-        if (QueryParser.matches(record, parsed)) records.push(record);
+        if (QueryParser.matches(record, parsed)) {
+          records.push(record);
+          if (records.length >= limit) break;
+        }
       }
     }
 
-    return { supported: true, backend: 'spotlight', records };
+    return { supported: true, backend: 'spotlight', records: records.slice(0, limit) };
   }
+}
+
+function escapeSpotlight(value) {
+  return String(value || '').replace(/([\\"'])/g, '\\$1');
+}
+
+function buildSpotlightExpression(parsed) {
+  const clauses = [];
+  for (const group of parsed.terms || []) {
+    const positive = group
+      .filter(clause => !clause.isNegated && !clause.hasWildcard)
+      .map(clause => `kMDItemFSName == "*${escapeSpotlight(clause.text)}*"cd`);
+    if (positive.length > 0) clauses.push(positive.length === 1 ? positive[0] : `(${positive.join(' || ')})`);
+  }
+
+  if (Array.isArray(parsed.extensions) && parsed.extensions.length > 0) {
+    const extensions = [...new Set(parsed.extensions)].map(ext =>
+      `kMDItemFSName == "*.${escapeSpotlight(ext)}"cd`
+    );
+    clauses.push(extensions.length === 1 ? extensions[0] : `(${extensions.join(' || ')})`);
+  }
+
+  if (parsed.type === 'folder') clauses.push('kMDItemContentTypeTree == "public.folder"');
+  if (clauses.length === 0) return 'kMDItemFSName == "*"cd';
+  return clauses.length === 1 ? clauses[0] : `(${clauses.join(' && ')})`;
 }
 
 module.exports = {
   NativeSearchAdapter,
   normalizeEverythingRecord,
-  parseJsonOutput
+  parseJsonOutput,
+  translateNativeQuery,
+  buildSpotlightExpression
 };

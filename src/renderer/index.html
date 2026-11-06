@@ -24,6 +24,11 @@
       </div>
     </div>
     <div class="titlebar-controls">
+      <div class="view-switcher" role="group" aria-label="화면 보기 전환">
+        <span class="view-switcher-label">보기</span>
+        <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
+        <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
+      </div>
       <button class="win-btn" id="btnMinimize" title="최소화">&#x2014;</button>
       <button class="win-btn" id="btnMaximize" title="최대화">&#x25A2;</button>
       <button class="win-btn win-close" id="btnClose" title="닫기">&#x2715;</button>
@@ -65,8 +70,8 @@
       </div>
 
       <div class="header-actions">
-        <button class="btn btn-primary btn-add-root" id="btnAddRootPrimary" type="button" title="공유폴더와 외부 검색 위치를 추가합니다">
-          <span aria-hidden="true">＋</span> 외부 폴더 추가
+        <button class="btn btn-primary btn-add-root" id="btnAddRootPrimary" type="button" title="공유폴더와 추가 검색 위치를 지정합니다">
+          <span aria-hidden="true">＋</span> 서치 경로 추가
         </button>
         <button class="btn btn-update" id="btnUpdate" type="button" hidden title="새 버전으로 업데이트합니다">
           <span aria-hidden="true">↻</span> <span id="btnUpdateLabel">업데이트</span>
@@ -74,11 +79,6 @@
         <button class="btn btn-toggle advanced-only" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
           <span class="icon">✦</span> 자연어 검색
         </button>
-        <div class="view-switcher" role="group" aria-label="화면 보기 전환">
-          <span class="view-switcher-label">보기</span>
-          <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
-          <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
-        </div>
         <div class="tools-menu-wrap">
           <button class="btn btn-ghost" id="btnTools" type="button" aria-expanded="false" aria-controls="toolsMenu">
             도구 <span class="menu-chevron">⌄</span>
@@ -153,7 +153,7 @@
         <div class="sidebar-section advanced-only">
           <div class="sidebar-section-heading">
             <div class="sidebar-section-title">검색 범위</div>
-            <button class="sidebar-section-action" id="btnSidebarAddRoot" type="button" title="외부·공유 폴더 추가">＋</button>
+          <button class="sidebar-section-action" id="btnSidebarAddRoot" type="button" title="서치 경로 추가">＋</button>
           </div>
           <button class="scope-all-button active" id="btnAllRootsScope" type="button" aria-pressed="true">
             <span class="scope-all-icon" aria-hidden="true">◎</span>
@@ -452,14 +452,14 @@
         </div>
         <div class="setting-group">
           <label>검색 범위</label>
-          <p class="setting-help">내 PC의 로컬 파일은 폴더를 고르지 않아도 자동 검색합니다. 공유폴더·외부 경로만 아래에서 추가하세요.</p>
+          <p class="setting-help">내 PC의 로컬 파일은 폴더를 고르지 않아도 자동 검색합니다. 공유폴더·외부 경로만 아래에서 서치 경로로 추가하세요.</p>
           <div class="root-setting-summary">
             <span>현재 검색 위치</span>
             <strong id="rootCount">0곳</strong>
           </div>
           <div class="roots-list" id="rootsList"></div>
           <div class="root-actions">
-            <button class="btn btn-sm btn-ghost mt-2" id="btnAddRoot">＋ 외부 폴더 선택</button>
+            <button class="btn btn-sm btn-ghost mt-2" id="btnAddRoot">＋ 서치 경로 선택</button>
             <button class="btn btn-sm btn-ghost mt-2" id="btnAddNetworkRoot">⌁ 공유 경로 직접 입력</button>
           </div>
           <div class="network-root-form" id="networkRootForm" hidden>

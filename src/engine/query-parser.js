@@ -109,9 +109,12 @@ function translateNaturalLanguage(raw) {
   // "지난주 작성한 엑셀 파일" -> dm:lastweek ext:xlsx,xls
   // "사진 중 바다" -> pic: 바다
   const patterns = [
-    { regex: /(?:최근|지난주|지난 주)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:lastweek ' },
-    { regex: /(?:어제)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:yesterday ' },
-    { regex: /(?:오늘)\s*(?:에\s*)?(?:작성|수정|다운로드)?/g, replace: 'dm:today ' },
+    { regex: /(?:최근|지난주|지난 주)\s*(?:에\s*)?(?:작성|수정|다운로드)(?:한|된)?/g, replace: 'dm:lastweek ' },
+    { regex: /(?:최근|지난주|지난 주)\s*(?:에\s*)?/g, replace: 'dm:lastweek ' },
+    { regex: /(?:어제)\s*(?:에\s*)?(?:작성|수정|다운로드)(?:한|된)?/g, replace: 'dm:yesterday ' },
+    { regex: /(?:어제)\s*(?:에\s*)?/g, replace: 'dm:yesterday ' },
+    { regex: /(?:오늘)\s*(?:에\s*)?(?:작성|수정|다운로드)(?:한|된)?/g, replace: 'dm:today ' },
+    { regex: /(?:오늘)\s*(?:에\s*)?/g, replace: 'dm:today ' },
     { regex: /(\d+)\s*(mb|gb|kb)\s*(?:이상|넘는|초과)/gi, replace: (m, value, unit) => `size:>${value}${unit} ` },
     { regex: /(\d+)\s*(mb|gb|kb)\s*(?:이하|미만)/gi, replace: (m, value, unit) => `size:<${value}${unit} ` },
     { regex: /(?:대용량 파일|큰 파일)/gi, replace: 'size:huge ' },
@@ -122,7 +125,7 @@ function translateNaturalLanguage(raw) {
     { regex: /(?:문서|보고서|문서들)/gi, replace: 'doc: ' },
     { regex: /(?:엑셀|스프레드시트)/gi, replace: 'ext:xlsx,xls ' },
     { regex: /(?:워드|한글문서)/gi, replace: 'ext:doc,docx,hwp,hwpx ' },
-    { regex: /(?:pdf문서|pdf 파일)/gi, replace: 'ext:pdf ' },
+    { regex: /pdf(?:\s*파일|\s*문서)?/gi, replace: 'ext:pdf ' },
     { regex: /(?:압축\s*파일|압축파일)/gi, replace: 'zip: ' },
     { regex: /(?:실행\s*파일|설치\s*파일)/gi, replace: 'exe: ' },
     { regex: /(?:폴더만|디렉토리만)/gi, replace: 'folder: ' }
@@ -136,7 +139,11 @@ function translateNaturalLanguage(raw) {
     }
   }
 
-  return query.replace(/\s+/g, ' ').trim();
+  return query
+    .replace(/\s+중\s+/g, ' ')
+    .replace(/\s+(?:파일|문서)\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /**
@@ -159,7 +166,25 @@ class QueryParser {
     }
 
     if (!raw) {
-      return { isEmpty: true, raw: '' };
+      return {
+        isEmpty: true,
+        raw: '',
+        caseSensitive: false,
+        wholeWord: false,
+        matchPath: false,
+        regex: null,
+        extensions: [],
+        type: 'all',
+        sizeConditions: [],
+        dateModifiedConditions: [],
+        dateCreatedConditions: [],
+        depth: null,
+        dupe: null,
+        content: null,
+        tags: [],
+        starred: null,
+        terms: []
+      };
     }
 
     const filters = {

@@ -134,7 +134,7 @@ function applyUiMode(mode) {
   document.body.classList.toggle('ui-advanced', currentUiMode === 'advanced');
   if (uiModeStatus) {
     uiModeStatus.textContent = currentUiMode === 'simple'
-      ? '현재: 간편 모드 · 검색과 외부 폴더 추가만 바로 보입니다.'
+      ? '현재: 간편 모드 · 검색과 서치 경로 추가만 바로 보입니다.'
       : '현재: 다양한 기능 모드 · 분석·저장·변환·필터를 모두 표시합니다.';
   }
   document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode, #btnViewSimple, #btnViewAdvanced').forEach(button => {
@@ -234,15 +234,15 @@ function updateSearchTargetUI() {
     searchTargetTitle.textContent = '검색 위치가 없습니다';
     searchTargetDetail.textContent = '로컬 자동 검색 범위를 불러오는 중입니다.';
   } else if (externalRoots.length > 0) {
-    searchTargetTitle.textContent = '내 PC 로컬 + 외부 폴더 전체';
-    searchTargetDetail.textContent = `로컬 전체 + 외부 ${externalRoots.length}곳을 합쳐 검색합니다.`;
+    searchTargetTitle.textContent = '내 PC 로컬 + 서치 경로 전체';
+    searchTargetDetail.textContent = `로컬 전체 + 추가 경로 ${externalRoots.length}곳을 합쳐 검색합니다.`;
   } else {
     searchTargetTitle.textContent = '내 PC 로컬 파일 전체';
     searchTargetDetail.textContent = '폴더를 따로 지정하지 않아도 로컬 전체를 자동 검색합니다.';
   }
   if (allRootsScopeDetail) {
     allRootsScopeDetail.textContent = configuredRoots.length
-      ? (externalRoots.length > 0 ? `로컬 전체 + 외부 ${externalRoots.length}곳` : '로컬 전체 자동 검색')
+      ? (externalRoots.length > 0 ? `로컬 전체 + 추가 경로 ${externalRoots.length}곳` : '로컬 전체 자동 검색')
       : '로컬 자동 검색 준비 중';
   }
   if (allRootsButton) {
@@ -379,7 +379,7 @@ function renderSettingsRoots(roots = [], localRoots = configuredLocalRoots) {
     <div class="root-item${isAutoLocal ? ' is-auto-local' : ''}" data-root-item="${escapeHtml(root)}">
       <span class="root-item-icon">${isAutoLocal ? '⌂' : '⌁'}</span>
       <span class="root-item-copy"><strong>${escapeHtml(getRootKindLabel(root))}</strong><code>${escapeHtml(root)}</code></span>
-      ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="외부 검색 위치에서 제거">×</button>`}
+      ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="서치 경로에서 제거">×</button>`}
     </div>
   `; }).join('');
 }
@@ -463,7 +463,7 @@ async function addSearchRoot() {
   try {
     const config = await window.dawithAPI.getConfig();
     if ((config.localRoots || []).some(root => isPathWithinRoot(result.path, root))) {
-      setRootStatus('로컬 폴더는 자동 검색 중입니다. 외부·공유 폴더만 추가하면 됩니다.');
+      setRootStatus('로컬 파일은 자동 검색 중입니다. 추가 서치 경로·공유 폴더만 지정하면 됩니다.');
       return;
     }
     const roots = Array.from(new Set([...(config.roots || []), result.path]));
@@ -555,7 +555,8 @@ async function executeSearch() {
 
 function triggerSearch() {
   clearTimeout(searchDebounceTimer);
-  searchDebounceTimer = setTimeout(executeSearch, 40);
+  // Keep typing responsive while avoiding one IPC/native query per key.
+  searchDebounceTimer = setTimeout(executeSearch, 120);
 }
 
 // Render Results Table
@@ -1669,7 +1670,7 @@ window.dawithAPI.onIndexStatus((data) => {
   } else if (data.status === 'indexing-progress') {
     titlebarStatus.textContent = `색인 중 · ${Number(data.stats?.totalFiles || 0).toLocaleString()}개 파일 발견`;
     statTotalIndexed.textContent = `색인 항목: ${Number((data.stats?.totalFiles || 0) + (data.stats?.totalFolders || 0)).toLocaleString()}개`;
-    executeSearch();
+    if (searchInput.value.trim() || currentFilter || scopeRoot) executeSearch();
   } else if (data.status === 'error') {
     statusDot.className = 'status-dot error';
     titlebarStatus.textContent = '색인 오류';
@@ -1690,3 +1691,8 @@ initBackendStatus();
 initWorkspace();
 executeSearch();
 setTimeout(() => checkForUpdates(false), 1200);
+// A release can be published while the app remains open. Re-check when the
+// window becomes active and periodically in the background so the update
+// button reflects the latest GitHub release without requiring a restart.
+window.addEventListener('focus', () => checkForUpdates(false));
+setInterval(() => checkForUpdates(false), 10 * 60 * 1000);

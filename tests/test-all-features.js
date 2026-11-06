@@ -12,7 +12,7 @@ const { isPathWithinRoot, normalizePathKey } = require('../src/engine/path-utils
 const TagManager = require('../src/engine/tag-manager');
 const BookmarkManager = require('../src/engine/bookmark-manager');
 const HistoryManager = require('../src/engine/history-manager');
-const { NativeSearchAdapter, normalizeEverythingRecord, parseJsonOutput } = require('../src/engine/native-search');
+const { NativeSearchAdapter, normalizeEverythingRecord, parseJsonOutput, translateNativeQuery, buildSpotlightExpression } = require('../src/engine/native-search');
 
 console.log('🧪 Running Comprehensive Multi-Edge-Case Debugging Suite...\n');
 
@@ -77,6 +77,8 @@ const fakeEs = new NativeSearchAdapter({
 assert.strictEqual(fakeEs.supports('report ext:txt'), true);
 assert.strictEqual(fakeEs.supports(''), true, 'Everything should own the blank whole-device query on Windows');
 assert.strictEqual(fakeEs.supports('tag:important'), false);
+assert.strictEqual(translateNativeQuery('doc: contract'), 'ext:doc;docx;pdf;xls;xlsx;ppt;pptx;txt;hwp;hwpx;csv;rtf;odt;ods;odp;md contract');
+assert.ok(buildSpotlightExpression(QueryParser.parse('pic: 바다')).includes('*.png'));
 assert.strictEqual(parseJsonOutput('{"name":"one.txt"}\n{"name":"two.txt"}').length, 2);
 fakeEs.search('report', { limit: 10 }).then(result => {
   assert.strictEqual(result.supported, true);
@@ -220,6 +222,9 @@ assert.strictEqual(QueryParser.matches({ name: 'folder', isDir: true, size: 0 },
 let qBadRegex = QueryParser.parse('regex:[broken');
 assert.strictEqual(QueryParser.matches({ name: '[broken-report.txt', isDir: false }, qBadRegex), true);
 assert.ok(translateNaturalLanguage('100GB 이상 동영상').includes('size:>100GB'));
+assert.strictEqual(translateNaturalLanguage('지난주에 작성한 엑셀 파일'), 'dm:lastweek ext:xlsx,xls');
+assert.strictEqual(translateNaturalLanguage('오늘 수정한 PDF'), 'dm:today ext:pdf');
+assert.strictEqual(translateNaturalLanguage('사진 중 바다'), 'pic: 바다');
 console.log('  ✓ Directory size semantics, malformed regex fallback, and natural-language units passed');
 
 // 3. Duplicate Finder Edge Cases

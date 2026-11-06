@@ -247,8 +247,16 @@ app.whenReady().then(() => {
     }
   });
 
-  // If not cached, start indexing immediately in background
-  if (!loaded || indexer.records.length === 0) {
+  // Everything/Spotlight already owns the automatic local-device index. Only
+  // start our crawler when a local backend is required or an external search
+  // path needs its own index. This prevents an empty native cache from
+  // triggering a needless whole-device scan on every launch.
+  const localRoots = new Set(indexer.config.localRoots || []);
+  const externalRoots = (indexer.config.roots || []).filter(root => !localRoots.has(root));
+  const needsCrawler = !indexer.canUseNativeLocalIndex()
+    ? (!loaded || indexer.records.length === 0)
+    : externalRoots.length > 0 && (!loaded || indexer.records.length === 0);
+  if (needsCrawler) {
     setTimeout(() => {
       indexer.startIndexing();
     }, 500);

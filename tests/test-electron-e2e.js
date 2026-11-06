@@ -294,6 +294,8 @@ async function run() {
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
 
   assert.strictEqual(await evaluate("document.querySelectorAll('.mode-choice-preview').length"), 2);
+  assert.strictEqual(await evaluate("document.querySelector('.titlebar-controls #btnViewSimple') !== null"), true);
+  assert.strictEqual(await evaluate("document.querySelector('.header-actions #btnViewSimple') === null"), true);
   await click('#btnViewSimple');
   await waitFor('simple view switch', async () => (await evaluate("document.body.classList.contains('ui-simple')")) === true);
   await click('#btnViewAdvanced');
@@ -432,7 +434,7 @@ async function run() {
   await click('#btnAddRootPrimary');
   await waitForState('primary root settings', state => state.settingsDisplay === 'flex');
   const primaryRootButton = await evaluate("document.querySelector('#btnAddRootPrimary')?.textContent || ''");
-  assert.ok(primaryRootButton.includes('외부 폴더 추가'));
+  assert.ok(primaryRootButton.includes('서치 경로 추가'));
   await click('#btnCloseSettings');
   record('메인 화면 검색 위치 추가 진입', '헤더의 명확한 추가 버튼과 설정 연결 확인');
 
@@ -476,9 +478,9 @@ async function run() {
   await click('#btnSettings');
   await waitForState('mixed root summary', state => state.settingsDisplay === 'flex');
   const mixedRootSummary = await evaluate("document.querySelector('#searchTargetTitle')?.textContent || ''");
-  assert.strictEqual(mixedRootSummary, '내 PC 로컬 + 외부 폴더 전체');
+  assert.strictEqual(mixedRootSummary, '내 PC 로컬 + 서치 경로 전체');
   const mixedRootDetail = await evaluate("document.querySelector('#searchTargetDetail')?.textContent || ''");
-  assert.ok(mixedRootDetail.includes('로컬 전체 + 외부 1곳을 합쳐 검색합니다.'));
+  assert.ok(mixedRootDetail.includes('로컬 전체 + 추가 경로 1곳을 합쳐 검색합니다.'));
   record('로컬·공유 폴더 합산 대상', '두 위치를 모두 검색하는 상태를 명시적으로 표시');
   await evaluate(`window.dawithAPI.saveConfig({ roots: [${JSON.stringify(fixtureRoot)}] })`, true);
   await click('#btnCloseSettings');

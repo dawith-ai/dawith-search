@@ -153,8 +153,16 @@ body {
 
 .titlebar-controls {
   display: flex;
+  align-items: center;
+  gap: 6px;
   height: 100%;
   -webkit-app-region: no-drag;
+}
+
+.titlebar-controls .view-switcher {
+  flex: 0 0 auto;
+  height: 31px;
+  margin-right: 4px;
 }
 
 .win-btn {
@@ -687,7 +695,7 @@ body.dark-theme .search-target-summary.is-scoped {
 }
 
 .view-switch-btn {
-  min-width: 38px;
+  min-width: 42px;
   height: 27px;
   padding: 0 7px;
   border: 0;
@@ -1865,6 +1873,11 @@ input:focus-visible,
   }
 
   .search-intro h1 { font-size: 16px; }
+
+  .titlebar-controls { gap: 2px; }
+  .titlebar-controls .view-switcher { margin-right: 0; }
+  .view-switcher-label { display: none; }
+  .view-switch-btn { min-width: 36px; padding: 0 5px; }
 
   .search-helper span:last-child { display: none; }
 

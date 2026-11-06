@@ -195,6 +195,15 @@ class Indexer extends EventEmitter {
 
   loadCache() {
     if (!fs.existsSync(this.cacheFile)) return false;
+    // A native index is already optimized for whole-device lookup. Loading a
+    // huge JSON mirror only to search it again makes startup and every local
+    // fallback query noticeably heavy. External roots are re-indexed below.
+    try {
+      const cacheSize = fs.statSync(this.cacheFile).size;
+      if (this.canUseNativeLocalIndex() && cacheSize > 64 * 1024 * 1024) return false;
+    } catch (error) {
+      // Continue with the normal cache read when metadata is unavailable.
+    }
     try {
       const data = readJsonWithBackup(this.cacheFile, null);
       if (!data) return false;
@@ -256,11 +265,17 @@ class Indexer extends EventEmitter {
     if (this.isIndexing) return;
     this.isIndexing = true;
     const indexingStartedAt = Date.now();
-    const roots = this.config.roots.filter(root => fs.existsSync(root));
+    const configuredRoots = this.config.roots.filter(root => fs.existsSync(root));
+    const localRoots = new Set(this.config.localRoots || []);
+    const roots = this.canUseNativeLocalIndex()
+      ? configuredRoots.filter(root => !localRoots.has(root))
+      : configuredRoots;
+    const scanCounters = { totalFiles: 0, totalFolders: 0, totalBytes: 0 };
     this.emit('indexing-started', {
       startedAt: indexingStartedAt,
       totalRoots: roots.length,
-      roots
+      roots,
+      nativeRoots: configuredRoots.length - roots.length
     });
 
     const newRecords = [];
@@ -268,20 +283,23 @@ class Indexer extends EventEmitter {
     // whole-drive scan should return partial results instead of staying blank.
     this.records = newRecords;
     this.rebuildMap();
-    this.updateStats();
+    this.stats = { totalFiles: 0, totalFolders: 0, totalBytes: 0, lastIndexedAt: this.stats.lastIndexedAt };
     try {
       for (const [rootIndex, root] of roots.entries()) {
         await this.scanRoot(root, newRecords, {
           root,
           rootIndex,
           totalRoots: roots.length,
-          startedAt: indexingStartedAt
+          startedAt: indexingStartedAt,
+          counters: scanCounters
         });
       }
 
       this.records = newRecords;
       this.rebuildMap();
-      this.updateStats();
+      this.stats.totalFiles = scanCounters.totalFiles;
+      this.stats.totalFolders = scanCounters.totalFolders;
+      this.stats.totalBytes = scanCounters.totalBytes;
       this.stats.lastIndexedAt = Date.now();
       this.saveCache();
       this.emit('indexing-finished', {
@@ -293,7 +311,10 @@ class Indexer extends EventEmitter {
       });
 
       if (this.config.autoStartWatcher) {
-        this.fileWatcher.watch(this.config.roots);
+        const watchedRoots = this.canUseNativeLocalIndex()
+          ? this.config.roots.filter(root => !(this.config.localRoots || []).includes(root))
+          : this.config.roots;
+        if (watchedRoots.length > 0) this.fileWatcher.watch(watchedRoots);
       }
     } catch (error) {
       this.emit('indexing-error', error);
@@ -309,31 +330,41 @@ class Indexer extends EventEmitter {
     // must not abort the complete local index.
     const startLength = outputArray.length;
     let publishedCount = outputArray.length;
+    const counters = progressContext.counters || { totalFiles: 0, totalFolders: 0, totalBytes: 0 };
     const publishProgress = () => {
-      if (outputArray.length - publishedCount < 250) return;
+      if (outputArray.length - publishedCount < 2000) return;
       this.records = outputArray;
-      this.rebuildMap();
-      this.updateStats();
+      this.stats.totalFiles = counters.totalFiles;
+      this.stats.totalFolders = counters.totalFolders;
+      this.stats.totalBytes = counters.totalBytes;
       publishedCount = outputArray.length;
       this.emit('indexing-progress', {
-        totalFiles: this.stats.totalFiles,
-        totalFolders: this.stats.totalFolders,
-        totalBytes: this.stats.totalBytes,
+        totalFiles: counters.totalFiles,
+        totalFolders: counters.totalFolders,
+        totalBytes: counters.totalBytes,
         root: progressContext.root || root,
         rootIndex: progressContext.rootIndex || 0,
         totalRoots: progressContext.totalRoots || 1,
         elapsedMs: progressContext.startedAt ? Date.now() - progressContext.startedAt : 0
       });
     };
-    await this.scanDirectory(root, outputArray, 0, this.config.maxDepth, publishProgress);
+    await this.scanDirectory(root, outputArray, 0, this.config.maxDepth, record => {
+      if (record.isDir) counters.totalFolders += 1;
+      else {
+        counters.totalFiles += 1;
+        counters.totalBytes += record.size || 0;
+      }
+      publishProgress();
+    });
     if (outputArray.length !== publishedCount) {
       this.records = outputArray;
-      this.rebuildMap();
-      this.updateStats();
+      this.stats.totalFiles = counters.totalFiles;
+      this.stats.totalFolders = counters.totalFolders;
+      this.stats.totalBytes = counters.totalBytes;
       this.emit('indexing-progress', {
-        totalFiles: this.stats.totalFiles,
-        totalFolders: this.stats.totalFolders,
-        totalBytes: this.stats.totalBytes,
+        totalFiles: counters.totalFiles,
+        totalFolders: counters.totalFolders,
+        totalBytes: counters.totalBytes,
         root: progressContext.root || root,
         rootIndex: progressContext.rootIndex || 0,
         totalRoots: progressContext.totalRoots || 1,
@@ -369,8 +400,8 @@ class Indexer extends EventEmitter {
       ctime: stat.birthtimeMs || stat.ctimeMs,
       isDir,
       ext: isDir ? '' : path.extname(name).replace(/^\./, '').toLowerCase(),
-      tags: this.tagManager.getTags(fullPath),
-      starred: this.tagManager.isStarred(fullPath)
+      // Tags and starred state live in TagManager. Do not duplicate them in
+      // the file index: whole-device scans should keep records compact.
     };
   }
 
@@ -416,10 +447,7 @@ class Indexer extends EventEmitter {
       }
 
       const ext = isDir ? '' : path.extname(name).replace(/^\./, '').toLowerCase();
-      const tags = this.tagManager.getTags(fullPath);
-      const starred = this.tagManager.isStarred(fullPath);
-
-      outputArray.push({
+      const record = {
         name,
         path: dir,
         fullPath,
@@ -427,11 +455,10 @@ class Indexer extends EventEmitter {
         mtime,
         ctime,
         isDir,
-        ext,
-        tags,
-        starred
-      });
-      if (onProgress) onProgress();
+        ext
+      };
+      outputArray.push(record);
+      if (onProgress) onProgress(record);
 
       if (isDir) {
         subdirs.push(fullPath);
@@ -461,8 +488,7 @@ class Indexer extends EventEmitter {
       ctime: stats ? (stats.birthtimeMs || stats.ctimeMs) : Date.now(),
       isDir,
       ext,
-      tags: this.tagManager.getTags(fullPath),
-      starred: this.tagManager.isStarred(fullPath)
+      // Tags and starred state are hydrated only for matching queries.
     };
 
     const newIdx = this.records.length;
@@ -587,13 +613,15 @@ class Indexer extends EventEmitter {
         // Tags and starred state can change without rebuilding the file index.
         // Hydrate them for every local search so a just-toggled result is
         // immediately searchable and cannot be overwritten by stale cache data.
-        const searchableItem = {
-          ...item,
-          tags: this.tagManager.getTags(fullPath),
-          starred: this.tagManager.isStarred(fullPath)
-        };
+        const searchableItem = { ...item };
+        if ((parsed.tags || []).length > 0) searchableItem.tags = this.tagManager.getTags(fullPath);
+        if (parsed.starred !== null && parsed.starred !== undefined) searchableItem.starred = this.tagManager.isStarred(fullPath);
         if (scopeRoot && !this.isWithinScope(fullPath, scopeRoot)) continue;
         if (QueryParser.matches(searchableItem, parsed)) {
+          // Hydrate presentation metadata only for matched rows. This keeps a
+          // large local search cheap while keeping star state immediately
+          // visible after a toggle.
+          if (searchableItem.starred === undefined) searchableItem.starred = this.tagManager.isStarred(fullPath);
           matched.push(searchableItem);
           if (!parsed.content && matched.length >= limit) break;
         }
@@ -637,6 +665,11 @@ class Indexer extends EventEmitter {
 
   isWithinConfiguredRoot(fullPath) {
     return (this.config.roots || []).some(root => this.isWithinScope(fullPath, root));
+  }
+
+  canUseNativeLocalIndex() {
+    if (this.config.searchBackend === 'local') return false;
+    return Boolean(this.nativeSearch && typeof this.nativeSearch.getStatus === 'function' && this.nativeSearch.getStatus().available);
   }
 
   sortResults(items, options = {}) {

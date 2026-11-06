@@ -21,7 +21,7 @@ function compareVersions(left, right) {
 
 function getAssetName(version, platform) {
   if (platform === 'win32') return `DawithSearch-${version}-portable.exe`;
-  if (platform === 'darwin') return `Dawith Search-${version}-universal.dmg`;
+  if (platform === 'darwin') return `Dawith.Search-${version}-universal.dmg`;
   return null;
 }
 

@@ -12,7 +12,7 @@ assert.strictEqual(compareVersions('1.0.7', '1.0.6'), 1);
 assert.strictEqual(compareVersions('v1.0.7', '1.0.7'), 0);
 assert.strictEqual(compareVersions('1.0.6', '1.0.7'), -1);
 assert.strictEqual(getAssetName('1.0.7', 'win32'), 'DawithSearch-1.0.7-portable.exe');
-assert.strictEqual(getAssetName('1.0.7', 'darwin'), 'Dawith.Search-1.0.7-universal.dmg');
+assert.strictEqual(getAssetName('1.0.7', 'darwin'), 'Dawith Search-1.0.7-universal.dmg');
 assert.strictEqual(getAssetName('1.0.7', 'linux'), null);
 
 function mockGithubRequest(payload) {

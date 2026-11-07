@@ -1,20 +1,27 @@
 const fs = require('fs');
 const path = require('path');
 
-const bundleRoot = path.join('src-tauri', 'target', 'release', 'bundle');
-if (!fs.existsSync(bundleRoot)) {
-  throw new Error(`Tauri bundle directory does not exist: ${bundleRoot}`);
-}
-
 const files = [];
 function walk(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
     const fullPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) walk(fullPath);
+    if (entry.isDirectory() && entry.name === 'bundle') walkBundle(fullPath);
+    else if (entry.isDirectory()) walk(fullPath);
+  }
+}
+function walkBundle(directory) {
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) walkBundle(fullPath);
     else files.push(fullPath);
   }
 }
-walk(bundleRoot);
+
+const targetRoot = path.join('src-tauri', 'target');
+if (!fs.existsSync(targetRoot)) {
+  throw new Error(`Tauri target directory does not exist: ${targetRoot}`);
+}
+walk(targetRoot);
 
 const expected = process.platform === 'win32'
   ? files.filter(file => file.toLowerCase().endsWith('.exe'))

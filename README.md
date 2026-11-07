@@ -1,6 +1,6 @@
 # Dawith Search
 
-macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하는 Electron 데스크톱 앱입니다. 검색 문법, 실시간 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
+macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하는 Dawith 데스크톱 앱입니다. 기본 경량 런타임은 Tauri/Rust이며, Electron 런타임은 기능 비교·롤백용으로 보존합니다. 검색 문법, 실시간 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
 
 사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 기본값은 내 PC 로컬 전체 자동 검색이며, 공유폴더·외부 경로만 직접 추가합니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
 
@@ -59,7 +59,7 @@ npm ci
 npm start
 ```
 
-`npm start`는 개발 모드 데스크톱 앱을 실행합니다. GitHub 저장소 자체는 웹 앱 주소가 아니라 소스 코드 주소입니다. 설치 파일은 [앱 다운로드(Releases)](https://github.com/dawith-ai/dawith-search/releases)에서 받습니다.
+`npm start`는 Electron legacy 개발 모드이고, `npm run start:tauri`는 경량 Tauri 개발 모드입니다. GitHub 저장소 자체는 웹 앱 주소가 아니라 소스 코드 주소입니다. 설치 파일은 [앱 다운로드(Releases)](https://github.com/dawith-ai/dawith-search/releases)에서 받습니다.
 
 ### 현재 공개 앱 주소
 
@@ -97,6 +97,7 @@ npm audit --audit-level=high
 npm run build:win   # Windows portable EXE
 npm run build:win:arm64 # Windows ARM64 portable EXE
 npm run build:mac   # macOS universal DMG + ZIP (Apple Silicon + Intel)
+npm run build:tauri # Tauri 경량 패키지 (Rust toolchain 필요)
 ```
 
 ## CLI

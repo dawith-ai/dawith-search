@@ -213,14 +213,14 @@ fn query_terms(query: &str) -> Vec<String> {
 fn mac_spotlight_expression(query: &str) -> String {
     let mut clauses = Vec::new();
     let lower = query.to_ascii_lowercase();
-    let category_extensions = if lower.contains("doc:") {
-        Some(["doc", "docx", "pdf", "xls", "xlsx", "ppt", "pptx", "txt", "hwp", "hwpx", "csv", "rtf", "odt", "ods", "odp", "md"])
+    let category_extensions: Option<Vec<&str>> = if lower.contains("doc:") {
+        Some(vec!["doc", "docx", "pdf", "xls", "xlsx", "ppt", "pptx", "txt", "hwp", "hwpx", "csv", "rtf", "odt", "ods", "odp", "md"])
     } else if lower.contains("pic:") || lower.contains("image:") {
-        Some(["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "heic"])
+        Some(vec!["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "heic"])
     } else if lower.contains("video:") {
-        Some(["mp4", "mkv", "avi", "mov", "wmv", "webm"])
+        Some(vec!["mp4", "mkv", "avi", "mov", "wmv", "webm"])
     } else if lower.contains("audio:") {
-        Some(["mp3", "wav", "flac", "aac", "ogg", "m4a"])
+        Some(vec!["mp3", "wav", "flac", "aac", "ogg", "m4a"])
     } else {
         None
     };

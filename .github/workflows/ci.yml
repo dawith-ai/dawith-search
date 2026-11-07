@@ -117,7 +117,6 @@ jobs:
         run: npm ci
       - name: Build Windows native search helpers
         if: matrix.os == 'windows-latest'
-        shell: bash
         run: npm run build:everything-ipc:win && npm run build:goz:win
       - name: Build Tauri package
         run: npm run build:tauri

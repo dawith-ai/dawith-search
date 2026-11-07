@@ -27,7 +27,25 @@ if (missingCommands.length) {
   throw new Error(`Tauri bridge commands are not registered: ${missingCommands.join(', ')}`);
 }
 
-for (const command of ['search', 'get_config', 'save_config', 'choose_root', 'open_file', 'open_folder', 'reindex']) {
+for (const command of [
+  'search',
+  'get_config',
+  'save_config',
+  'choose_root',
+  'open_file',
+  'open_folder',
+  'get_file_content',
+  'get_file_url',
+  'list_bookmarks',
+  'add_bookmark',
+  'list_search_history',
+  'add_search_history',
+  'add_tag',
+  'toggle_star',
+  'get_conversion_options',
+  'convert_files',
+  'reindex'
+]) {
   if (!invokedCommands.includes(command) || !registeredCommands.includes(command)) {
     throw new Error(`Required Tauri core command is missing: ${command}`);
   }

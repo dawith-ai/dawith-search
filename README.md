@@ -65,7 +65,7 @@ npm start
 
 - [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
-- [macOS Tauri 경량 DMG (Apple Silicon)](https://drive.google.com/file/d/12JmmNkn5yQKBLtyKV0eIg4a59dzcOSi2/view?usp=drivesdk)
+- [macOS Tauri 경량 universal DMG (Intel + Apple Silicon)](https://drive.google.com/file/d/1Fcx4GPY4LzhArkWkyeEmBe907RRqI3-r/view?usp=drivesdk)
 - [Windows Tauri 경량 설치기 (x64)](https://drive.google.com/file/d/1N4izIwbdkkjDF7gYyrsHo6YXu1YBndyn/view?usp=drivesdk)
 - [기존 Electron 릴리스 파일](https://github.com/dawith-ai/dawith-search/releases/latest) — Tauri 기능 검증 전 비교·롤백용
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)

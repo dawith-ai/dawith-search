@@ -409,7 +409,7 @@ fn conversion_options(paths: &[PathBuf]) -> Value {
             "detail": "설치된 Poppler pdfunite를 사용합니다."
         }));
     }
-    options
+    Value::Array(options)
 }
 
 fn fallback_walk(query: &str, roots: &[PathBuf], config: &Value, limit: usize) -> Vec<Value> {
@@ -585,8 +585,11 @@ fn add_bookmark(state: State<'_, AppState>, bookmark: Value) -> Result<Value, St
     if name.is_empty() || (query.is_empty() && scope_root.is_empty()) {
         return Ok(json!({ "success": false, "error": "검색어나 검색 범위를 입력하세요." }));
     }
-    if !scope_root.is_empty() && !is_allowed_path(Path::new(&scope_root), &state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?) {
-        return Ok(json!({ "success": false, "error": "허용된 검색 경로 안에서만 저장할 수 있습니다." }));
+    if !scope_root.is_empty() {
+        let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.".to_string())?;
+        if !is_allowed_path(Path::new(&scope_root), &config) {
+            return Ok(json!({ "success": false, "error": "허용된 검색 경로 안에서만 저장할 수 있습니다." }));
+        }
     }
     let file = storage_path(&state, "bookmarks.json");
     let mut value = read_json(&file, json!({ "version": 1, "items": [] }));

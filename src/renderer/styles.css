@@ -487,11 +487,11 @@ body {
 
 /* Header & Search Bar */
 .search-header {
-  padding: 19px 22px 15px;
+  padding: 12px 22px 11px;
   display: grid;
   grid-template-columns: minmax(205px, 0.7fr) minmax(360px, 1.6fr) auto;
   gap: 22px;
-  align-items: end;
+  align-items: center;
   background: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
   box-shadow: 0 5px 20px rgba(16, 28, 48, 0.035);
@@ -675,6 +675,7 @@ body.dark-theme .search-target-summary.is-scoped {
   align-items: center;
   gap: 8px;
   position: relative;
+  align-self: center;
 }
 
 .view-switcher {

@@ -505,6 +505,11 @@ function getActiveQuery() {
   return `${currentFilter ? `${currentFilter} ` : ''}${searchInput.value.trim()}`.trim();
 }
 
+function shouldUseNaturalLanguage(query) {
+  if (isAiMode) return true;
+  return /(?:오늘|어제|지난주|문서|사진|이미지|동영상|엑셀|스프레드시트|큰 파일|대용량|중복 파일|이상|이하)/i.test(query);
+}
+
 async function executeSearch() {
   const requestId = ++searchRequestId;
   const rawInput = searchInput.value.trim();
@@ -514,7 +519,7 @@ async function executeSearch() {
 
   try {
     const res = await window.dawithAPI.search(query, {
-      useAI: isAiMode,
+      useAI: shouldUseNaturalLanguage(query),
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
       // Keep the result table responsive. The backend still reports the
@@ -540,12 +545,17 @@ async function executeSearch() {
         ? 'goz NTFS'
         : res.backend === 'everything'
         ? 'Everything'
-        : res.backend === 'spotlight' ? 'Spotlight' : '로컬 색인';
+        : res.backend === 'spotlight' ? 'Spotlight'
+        : res.backend === 'local-indexing' ? '내장 로컬 색인 중'
+        : '내장 로컬 색인';
     }
 
     statMatches.textContent = `${res.totalMatches.toLocaleString()}개 항목 발견`;
     statElapsed.textContent = `${res.elapsedMs} ms`;
     statTotalIndexed.textContent = `색인 항목: ${res.totalIndexed.toLocaleString()}개`;
+    if (res.indexing) {
+      titlebarStatus.textContent = `색인 중 · ${res.totalIndexed.toLocaleString()}개 항목 준비됨`;
+    }
 
     if (query.trim()) {
       clearTimeout(historyDebounceTimer);
@@ -561,8 +571,9 @@ async function executeSearch() {
 
 function triggerSearch() {
   clearTimeout(searchDebounceTimer);
-  // Keep typing responsive while avoiding one IPC/native query per key.
-  searchDebounceTimer = setTimeout(executeSearch, 120);
+  // The native/local index is queryable in memory. Keep the field responsive
+  // without making every keypress wait behind a full-disk walk.
+  searchDebounceTimer = setTimeout(executeSearch, 45);
 }
 
 // Render Results Table
@@ -576,7 +587,7 @@ function renderResults(items, currentQuery) {
       ? '검색 결과가 없습니다'
       : '검색을 시작하세요';
     document.getElementById('emptySub').textContent = hasQuery
-      ? '다른 키워드나 필터 조건을 사용해 보세요.'
+      ? '색인 중이면 잠시 뒤 자동으로 결과가 늘어납니다. 다른 키워드나 필터 조건도 사용해 보세요.'
       : '파일명이나 폴더명을 입력하면 이 PC의 파일을 바로 찾습니다.';
     document.getElementById('emptyExamples').style.display = hasQuery ? 'none' : 'flex';
     return;

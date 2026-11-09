@@ -4,6 +4,7 @@ use rfd::FileDialog;
 use serde_json::{json, Value};
 use std::fs;
 use std::io::{Read, Write};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
@@ -13,6 +14,16 @@ use walkdir::WalkDir;
 struct AppState {
     config: Mutex<Value>,
     data_dir: PathBuf,
+    local_index: Mutex<LocalIndex>,
+}
+
+#[derive(Default)]
+struct LocalIndex {
+    records: Vec<Value>,
+    indexing: bool,
+    ready: bool,
+    total_files: usize,
+    total_folders: usize,
 }
 
 fn home_dir() -> PathBuf {
@@ -43,18 +54,27 @@ fn default_local_roots() -> Vec<String> {
             ])
             .output()
         {
-            for line in String::from_utf8_lossy(&output.stdout).lines() {
-                let drive = line.trim();
-                if drive.len() == 2 && drive.ends_with(':') {
-                    roots.push(format!("{drive}\\"));
+            if output.status.success() {
+                for line in String::from_utf8_lossy(&output.stdout).lines() {
+                    let drive = line.trim();
+                    if drive.len() == 2 && drive.ends_with(':') {
+                        roots.push(format!("{drive}\\"));
+                    }
                 }
+            }
             }
         }
         if !roots.is_empty() {
             return roots;
         }
-        if let Some(system_drive) = std::env::var_os("SystemDrive") {
-            return vec![format!("{}\\", system_drive.to_string_lossy())];
+        let fallback_drive = std::env::var_os("SystemDrive").or_else(|| {
+            std::env::var_os("USERPROFILE").and_then(|profile| profile.to_string_lossy().get(..2).map(std::ffi::OsString::from))
+        });
+        if let Some(system_drive) = fallback_drive {
+            let drive = system_drive.to_string_lossy();
+            if drive.len() == 2 && drive.ends_with(':') {
+                return vec![format!("{drive}\\")];
+            }
         }
     }
     vec![home_dir().to_string_lossy().into_owned()]
@@ -77,10 +97,37 @@ fn default_config() -> Value {
 
 fn read_config(dir: &Path) -> Value {
     let file = dir.join("config.json");
-    fs::read_to_string(file)
+    let mut config = fs::read_to_string(file)
         .ok()
         .and_then(|text| serde_json::from_str(&text).ok())
-        .unwrap_or_else(default_config)
+        .unwrap_or_else(default_config);
+
+    // Older Tauri builds persisted only the user profile (or an empty roots
+    // array). Keep explicit external roots, but always restore the automatic
+    // local-device scope when that option is enabled. This is what makes an
+    // existing install find Desktop/Documents after an update.
+    let auto_local = config.get("autoLocalRoots").and_then(Value::as_bool).unwrap_or(true);
+    if auto_local {
+        let local_roots = default_local_roots();
+        if let Some(object) = config.as_object_mut() {
+            let mut roots = object
+                .get("roots")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            for root in &local_roots {
+                if !roots.iter().any(|value| value.as_str() == Some(root)) {
+                    roots.push(Value::String(root.clone()));
+                }
+            }
+            object.insert("roots".to_string(), Value::Array(roots));
+            object.insert(
+                "localRoots".to_string(),
+                Value::Array(local_roots.into_iter().map(Value::String).collect()),
+            );
+        }
+    }
+    config
 }
 
 fn atomic_write(path: &Path, value: &Value) -> Result<(), String> {
@@ -187,6 +234,13 @@ fn is_allowed_path(path: &Path, config: &Value) -> bool {
     })
 }
 
+fn is_path_within(candidate: &Path, root: &Path) -> bool {
+    let candidate = normalize_path(candidate);
+    let scope = normalize_path(root);
+    let scope = if scope.len() > 1 { scope.trim_end_matches('/').to_string() } else { scope };
+    candidate == scope || candidate.starts_with(&format!("{scope}/"))
+}
+
 fn path_record(path: &Path) -> Option<Value> {
     let metadata = fs::metadata(path).ok()?;
     let name = path.file_name()?.to_string_lossy().into_owned();
@@ -217,6 +271,191 @@ fn path_record(path: &Path) -> Option<Value> {
         "tags": [],
         "starred": false
     }))
+}
+
+fn excluded_names(config: &Value) -> Vec<String> {
+    config
+        .get("excludeFolders")
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|value| value.to_ascii_lowercase())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn should_skip_entry(entry: &walkdir::DirEntry, config: &Value, excluded: &[String]) -> bool {
+    let name = entry.file_name().to_string_lossy();
+    if config.get("excludeHidden").and_then(Value::as_bool).unwrap_or(true) && name.starts_with('.') {
+        return true;
+    }
+    excluded.iter().any(|item| item == &name.to_ascii_lowercase())
+}
+
+fn local_index_roots(config: &Value) -> Vec<PathBuf> {
+    let configured = config_roots(config);
+    let mut roots = Vec::new();
+    let mut seen = HashSet::new();
+
+    // Scan the user profile first. Desktop/Documents become searchable while
+    // the rest of a large Windows volume continues in the background.
+    if cfg!(windows) {
+        let home = home_dir();
+        if configured.iter().any(|root| is_allowed_path(&home, config)) {
+            let key = normalize_path(&home);
+            seen.insert(key);
+            roots.push(home);
+        }
+    }
+    for root in configured {
+        let key = normalize_path(&root);
+        if seen.insert(key) {
+            roots.push(root);
+        }
+    }
+    roots
+}
+
+fn publish_index_snapshot(
+    app: &AppHandle,
+    records: &[Value],
+    total_files: usize,
+    total_folders: usize,
+    root: &Path,
+    root_index: usize,
+    total_roots: usize,
+    started_at: u128,
+) {
+    if let Ok(mut index) = app.state::<AppState>().local_index.lock() {
+        index.records = records.to_vec();
+        index.ready = !records.is_empty();
+        index.total_files = total_files;
+        index.total_folders = total_folders;
+    }
+    let _ = app.emit(
+        "index-status",
+        json!({
+            "status": "indexing-progress",
+            "stats": {
+                "totalFiles": total_files,
+                "totalFolders": total_folders,
+                "root": root.to_string_lossy(),
+                "rootIndex": root_index,
+                "totalRoots": total_roots,
+                "elapsedMs": now_millis().saturating_sub(started_at as u64)
+            }
+        }),
+    );
+}
+
+fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
+    if cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false) {
+        let _ = app.emit("index-status", json!({ "status": "idle", "stats": { "native": true } }));
+        return Ok(false);
+    }
+    let state = app.state::<AppState>();
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    {
+        let mut index = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
+        if index.indexing {
+            return Ok(false);
+        }
+        index.indexing = true;
+        index.ready = false;
+        index.records.clear();
+        index.total_files = 0;
+        index.total_folders = 0;
+    }
+    let started_at = now_millis();
+    let _ = app.emit(
+        "index-status",
+        json!({ "status": "indexing", "stats": { "totalFiles": 0, "totalFolders": 0 } }),
+    );
+
+    let worker_app = app.clone();
+    std::thread::spawn(move || {
+        let roots = local_index_roots(&config)
+            .into_iter()
+            .filter(|root| root.exists())
+            .collect::<Vec<_>>();
+        let excluded = excluded_names(&config);
+        let max_depth = config
+            .get("maxDepth")
+            .and_then(Value::as_u64)
+            .unwrap_or(64)
+            .clamp(1, 256) as usize;
+        let mut records = Vec::new();
+        let mut seen = HashSet::new();
+        let mut total_files = 0usize;
+        let mut total_folders = 0usize;
+
+        for (root_index, root) in roots.iter().enumerate() {
+            let walker = WalkDir::new(root)
+                .follow_links(false)
+                .max_depth(max_depth + 1)
+                .into_iter()
+                .filter_entry(|entry| !should_skip_entry(entry, &config, &excluded));
+            for entry in walker.filter_map(Result::ok) {
+                let path = entry.path();
+                if !is_allowed_path(path, &config) || !seen.insert(normalize_path(path)) {
+                    continue;
+                }
+                if let Some(record) = path_record(path) {
+                    if record.get("isDir").and_then(Value::as_bool).unwrap_or(false) {
+                        total_folders += 1;
+                    } else {
+                        total_files += 1;
+                    }
+                    records.push(record);
+                }
+                if records.len() % 2000 == 0 {
+                    publish_index_snapshot(
+                        &worker_app,
+                        &records,
+                        total_files,
+                        total_folders,
+                        root,
+                        root_index,
+                        roots.len(),
+                        started_at as u128,
+                    );
+                }
+            }
+            publish_index_snapshot(
+                &worker_app,
+                &records,
+                total_files,
+                total_folders,
+                root,
+                root_index,
+                roots.len(),
+                started_at as u128,
+            );
+        }
+
+        if let Ok(mut index) = worker_app.state::<AppState>().local_index.lock() {
+            index.records = records;
+            index.ready = true;
+            index.indexing = false;
+            index.total_files = total_files;
+            index.total_folders = total_folders;
+        }
+        let _ = worker_app.emit(
+            "index-status",
+            json!({
+                "status": "idle",
+                "stats": {
+                    "totalFiles": total_files,
+                    "totalFolders": total_folders,
+                    "elapsedMs": now_millis().saturating_sub(started_at)
+                }
+            }),
+        );
+    });
+    Ok(true)
 }
 
 fn native_record(item: &Value) -> Option<Value> {
@@ -261,6 +500,173 @@ fn query_terms(query: &str) -> Vec<String> {
         .map(|part| part.trim_matches('"').to_string())
         .filter(|part| !part.is_empty())
         .collect()
+}
+
+fn translate_natural_query(raw: &str) -> String {
+    let mut query = raw.trim().to_string();
+    let replacements = [
+        ("지난 주에", "dm:lastweek "),
+        ("지난주에", "dm:lastweek "),
+        ("지난 주", "dm:lastweek "),
+        ("지난주", "dm:lastweek "),
+        ("어제", "dm:yesterday "),
+        ("오늘", "dm:today "),
+        ("큰 파일", "size:huge "),
+        ("대용량 파일", "size:huge "),
+        ("중복 파일", "dupe:name "),
+        ("동영상", "video: "),
+        ("비디오", "video: "),
+        ("사진", "pic: "),
+        ("이미지", "pic: "),
+        ("문서", "doc: "),
+        ("엑셀", "ext:xlsx,xls "),
+        ("스프레드시트", "ext:xlsx,xls "),
+        ("PDF", "ext:pdf "),
+        ("폴더만", "folder: "),
+    ];
+    for (from, to) in replacements {
+        query = query.replace(from, to);
+    }
+    let tokens = query.split_whitespace().collect::<Vec<_>>();
+    let mut expanded = Vec::new();
+    let mut index = 0;
+    while index < tokens.len() {
+        let token = tokens[index];
+        let lower_token = token.to_ascii_lowercase();
+        if index + 1 < tokens.len()
+            && tokens[index + 1].starts_with("이상")
+            && ["kb", "mb", "gb", "tb"].iter().any(|unit| lower_token.ends_with(unit))
+        {
+            expanded.push(format!("size:>{token}"));
+            index += 2;
+            continue;
+        }
+        expanded.push(token.to_string());
+        index += 1;
+    }
+    expanded.join(" ")
+}
+
+fn category_extensions(category: &str) -> &'static [&'static str] {
+    match category {
+        "doc" | "document" => &["doc", "docx", "pdf", "xls", "xlsx", "ppt", "pptx", "txt", "hwp", "hwpx", "csv", "rtf", "odt", "ods", "odp", "md"],
+        "pic" | "picture" | "image" => &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "tiff", "heic", "raw", "psd", "ai"],
+        "video" => &["mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "3gp", "ts", "mts"],
+        "audio" => &["mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "opus", "alac", "mid", "midi"],
+        "zip" | "compressed" => &["zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso", "tgz", "cab", "jar"],
+        "exe" | "executable" => &["exe", "msi", "bat", "cmd", "ps1", "sh", "com", "vbs", "reg", "app"],
+        _ => &[],
+    }
+}
+
+fn translate_native_query(query: &str) -> String {
+    let mut tokens = Vec::new();
+    for token in query.split_whitespace() {
+        let lower = token.to_ascii_lowercase();
+        if let Some(category) = lower.strip_suffix(':') {
+            let extensions = category_extensions(category);
+            if !extensions.is_empty() {
+                tokens.push(format!("ext:{}", extensions.join(";")));
+                continue;
+            }
+        }
+        tokens.push(token.to_string());
+    }
+    tokens.join(" ")
+}
+
+fn parse_size_bytes(value: &str) -> Option<(char, u64)> {
+    let value = value.trim().to_ascii_lowercase();
+    let (operator, number) = if let Some(value) = value.strip_prefix(">=") { ('G', value) }
+        else if let Some(value) = value.strip_prefix("<=") { ('L', value) }
+        else if let Some(value) = value.strip_prefix('>') { ('>', value) }
+        else if let Some(value) = value.strip_prefix('<') { ('<', value) }
+        else { ('=', value.as_str()) };
+    let mut digits = number.trim();
+    let unit = if digits.ends_with("tb") { digits = &digits[..digits.len() - 2]; 1024u64.pow(4) }
+        else if digits.ends_with("gb") { digits = &digits[..digits.len() - 2]; 1024u64.pow(3) }
+        else if digits.ends_with("mb") { digits = &digits[..digits.len() - 2]; 1024u64.pow(2) }
+        else if digits.ends_with("kb") { digits = &digits[..digits.len() - 2]; 1024u64 }
+        else { 1 };
+    let numeric = digits.trim().parse::<f64>().ok()?;
+    Some((operator, (numeric * unit as f64) as u64))
+}
+
+fn query_matches(record: &Value, raw_query: &str, use_natural_language: bool) -> bool {
+    let query = if use_natural_language { translate_natural_query(raw_query) } else { raw_query.to_string() };
+    if query.trim().is_empty() {
+        return true;
+    }
+    let name = record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase();
+    let full_path = record.get("fullPath").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase();
+    let extension = record.get("ext").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase();
+    let is_dir = record.get("isDir").and_then(Value::as_bool).unwrap_or(false);
+    let size = record.get("size").and_then(Value::as_u64).unwrap_or(0);
+    let mtime = record.get("mtime").and_then(Value::as_u64).unwrap_or(0);
+    let mut target = name.as_str();
+    let mut required_extensions = Vec::new();
+    let mut required_type: Option<bool> = None;
+    let mut terms: Vec<Vec<(String, bool)>> = Vec::new();
+
+    for token in query.split_whitespace() {
+        let clean = token.trim_matches(|character| character == '"' || character == '\'' || character == '(' || character == ')');
+        let lower = clean.to_ascii_lowercase();
+        if lower.ends_with(':') {
+            let category = lower.trim_end_matches(':');
+            if category == "folder" || category == "directory" { required_type = Some(true); continue; }
+            if category == "file" { required_type = Some(false); continue; }
+            let extensions = category_extensions(category);
+            if !extensions.is_empty() { required_extensions.extend(extensions.iter().map(|value| (*value).to_string())); continue; }
+        }
+        if let Some(value) = lower.strip_prefix("ext:") {
+            required_extensions.extend(value.split(&[',', ';'][..]).filter(|item| !item.is_empty()).map(|item| item.trim_start_matches('.').to_string()));
+            continue;
+        }
+        if let Some(value) = lower.strip_prefix("path:").or_else(|| lower.strip_prefix("p:")) {
+            target = full_path.as_str();
+            if !value.is_empty() { terms.push(vec![(value.to_string(), false)]); }
+            continue;
+        }
+        if let Some(value) = lower.strip_prefix("size:") {
+            if value == "huge" && size < 16 * 1024 * 1024 { return false; }
+            if let Some((operator, bytes)) = parse_size_bytes(value) {
+                let matched = match operator { 'G' => size >= bytes, 'L' => size <= bytes, '>' => size > bytes, '<' => size < bytes, _ => size == bytes };
+                if !matched { return false; }
+            }
+            continue;
+        }
+        if let Some(value) = lower.strip_prefix("dm:") {
+            let seconds: u64 = if value == "today" || value == "yesterday" { 86_400 } else if value == "lastweek" { 7 * 86_400 } else { 0 };
+            if seconds > 0 && mtime < now_millis().saturating_sub(seconds * 1000) { return false; }
+            continue;
+        }
+        if lower == "starred:" || lower == "star:" {
+            if !record.get("starred").and_then(Value::as_bool).unwrap_or(false) { return false; }
+            continue;
+        }
+        if let Some(tag) = lower.strip_prefix("tag:") {
+            let has_tag = record
+                .get("tags")
+                .and_then(Value::as_array)
+                .map(|tags| tags.iter().filter_map(Value::as_str).any(|value| value.eq_ignore_ascii_case(tag)))
+                .unwrap_or(false);
+            if !has_tag { return false; }
+            continue;
+        }
+        if lower.starts_with("content:") || lower.starts_with("dupe:") { continue; }
+        let clauses = clean.split('|').filter(|item| !item.is_empty()).map(|item| {
+            let (negated, value) = if let Some(value) = item.strip_prefix('!').or_else(|| item.strip_prefix('-')) { (true, value) } else { (false, item) };
+            (value.to_ascii_lowercase(), negated)
+        }).collect::<Vec<_>>();
+        if !clauses.is_empty() { terms.push(clauses); }
+    }
+
+    if required_type.is_some_and(|expected| expected != is_dir) { return false; }
+    if !required_extensions.is_empty() && (!required_extensions.iter().any(|value| value == &extension) || is_dir) { return false; }
+    terms.iter().all(|clauses| clauses.iter().any(|(term, negated)| {
+        let matched = target.contains(term);
+        if *negated { !matched } else { matched }
+    }))
 }
 
 fn mac_spotlight_expression(query: &str) -> String {
@@ -423,6 +829,56 @@ fn conversion_options(paths: &[PathBuf]) -> Value {
     Value::Array(options)
 }
 
+fn search_local_index(
+    state: &AppState,
+    config: &Value,
+    query: &str,
+    options: &Value,
+    metadata: &Value,
+    limit: usize,
+) -> Result<(Vec<Value>, usize, usize, bool), String> {
+    let scope = options.get("scopeRoot").and_then(Value::as_str).map(PathBuf::from);
+    let use_natural_language = options.get("useAI").and_then(Value::as_bool).unwrap_or(false);
+    let index = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
+    let total_indexed = index.records.len();
+    let duplicate_by_size = query.to_ascii_lowercase().contains("dupe:size");
+    let duplicate_by_name = query.to_ascii_lowercase().contains("dupe:name") || query.to_ascii_lowercase().contains("dupe:");
+    let mut duplicate_counts = HashMap::<String, usize>::new();
+    if duplicate_by_size || duplicate_by_name {
+        for record in &index.records {
+            let key = if duplicate_by_size {
+                record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
+            } else {
+                record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
+            };
+            if !key.is_empty() && key != "0" { *duplicate_counts.entry(key).or_insert(0) += 1; }
+        }
+    }
+    let mut total_matches = 0usize;
+    let mut results = Vec::new();
+    for record in &index.records {
+        let full_path = record.get("fullPath").and_then(Value::as_str).unwrap_or("");
+        if let Some(scope) = &scope {
+            if !is_path_within(Path::new(full_path), scope) { continue; }
+        } else if !is_allowed_path(Path::new(full_path), config) {
+            continue;
+        }
+        let duplicate_key = if duplicate_by_size {
+            record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
+        } else {
+            record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
+        };
+        if (duplicate_by_size || duplicate_by_name) && duplicate_counts.get(&duplicate_key).copied().unwrap_or(0) < 2 { continue; }
+        let mut hydrated = record.clone();
+        hydrate_records(std::slice::from_mut(&mut hydrated), metadata);
+        if !query_matches(&hydrated, query, use_natural_language) { continue; }
+        total_matches += 1;
+        if results.len() < limit { results.push(hydrated); }
+    }
+    hydrate_records(&mut results, metadata);
+    Ok((results, total_matches, total_indexed, index.indexing))
+}
+
 fn fallback_walk(query: &str, roots: &[PathBuf], config: &Value, limit: usize) -> Vec<Value> {
     let terms = query_terms(query)
         .iter()
@@ -506,8 +962,14 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
     let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
     let metadata = metadata_value(&state);
     let roots = effective_roots(&config, &options)?;
-    let native_query = query_with_scope(&query, &options);
-    if let Some(native) = search_everything(&app, &native_query, limit) {
+    let use_natural_language = options.get("useAI").and_then(Value::as_bool).unwrap_or(false);
+    let normalized_query = if use_natural_language { translate_natural_query(&query) } else { query.clone() };
+    let native_query = query_with_scope(&translate_native_query(&normalized_query), &options);
+    let native_can_handle_query = !normalized_query.to_ascii_lowercase().split_whitespace().any(|token| {
+        token.starts_with("content:") || token.starts_with("tag:") || token == "starred:" || token == "star:" || token.starts_with("dupe:")
+    });
+    if native_can_handle_query {
+        if let Some(native) = search_everything(&app, &native_query, limit) {
         if let Ok(payload) = native {
             let items = payload
                 .get("items")
@@ -517,10 +979,12 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
                         .iter()
                         .filter_map(native_record)
                         .filter(|item| {
-                            item.get("fullPath")
+                            let in_configured_root = item
+                                .get("fullPath")
                                 .and_then(Value::as_str)
                                 .map(|path| is_allowed_path(Path::new(path), &config))
-                                .unwrap_or(false)
+                                .unwrap_or(false);
+                            in_configured_root && query_matches(item, &normalized_query, false)
                         })
                         .collect::<Vec<_>>()
                 })
@@ -530,19 +994,17 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
             } else {
                 payload.get("total").cloned().unwrap_or_else(|| json!(items.len()))
             };
-            if items.is_empty() && !query.trim().is_empty() {
-                let fallback = fallback_walk(&query, &roots, &config, limit);
-                if !fallback.is_empty() {
-                    let mut fallback = fallback;
-                    hydrate_records(&mut fallback, &metadata);
-                    let fallback_total = fallback.len();
+            if items.is_empty() && (!query.trim().is_empty() || options.get("scopeRoot").is_some()) {
+                let (local_results, local_total, indexed, indexing) = search_local_index(&state, &config, &normalized_query, &options, &metadata, limit)?;
+                if local_total > 0 || indexed > 0 {
                     return Ok(json!({
-                        "results": fallback,
-                        "totalMatches": fallback_total,
-                        "totalIndexed": 0,
+                        "results": local_results,
+                        "totalMatches": local_total,
+                        "totalIndexed": indexed,
                         "elapsedMs": started.elapsed().as_millis(),
-                        "backend": "local-fallback",
-                        "warning": "Everything IPC에 결과가 없어 내장 로컬 검색으로 보완했습니다."
+                        "backend": if indexing { "local-indexing" } else { "local-index" },
+                        "indexing": indexing,
+                        "warning": if indexing { "첫 색인이 진행 중이라 현재까지 발견된 파일만 표시합니다." } else { "Everything IPC 결과가 없어 내장 로컬 색인을 사용했습니다." }
                     }));
                 }
             }
@@ -558,20 +1020,30 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
             }));
         }
     }
-    let results = if cfg!(target_os = "macos") {
-        search_spotlight(&query, &roots, limit)?
-    } else {
-        fallback_walk(&query, &roots, &config, limit)
-    };
-    let mut results = results;
-    hydrate_records(&mut results, &metadata);
-    let total_matches = results.len();
+    }
+    if cfg!(target_os = "macos") {
+        let results = search_spotlight(&normalized_query, &roots, limit)?;
+        let mut results = results;
+        hydrate_records(&mut results, &metadata);
+        let total_matches = results.len();
+        return Ok(json!({
+            "results": results,
+            "totalMatches": total_matches,
+            "totalIndexed": 0,
+            "elapsedMs": started.elapsed().as_millis(),
+            "backend": "spotlight"
+        }));
+    }
+
+    let (results, total_matches, total_indexed, indexing) = search_local_index(&state, &config, &normalized_query, &options, &metadata, limit)?;
     Ok(json!({
         "results": results,
         "totalMatches": total_matches,
-        "totalIndexed": 0,
+        "totalIndexed": total_indexed,
         "elapsedMs": started.elapsed().as_millis(),
-        "backend": if cfg!(target_os = "macos") { "spotlight" } else { "local-native" }
+        "backend": if indexing { "local-indexing" } else { "local-index" },
+        "indexing": indexing,
+        "warning": if indexing { Value::String("첫 색인이 진행 중이라 현재까지 발견된 파일만 표시합니다.".to_string()) } else { Value::Null }
     }))
 }
 
@@ -906,11 +1378,19 @@ fn get_backend_status(app: AppHandle) -> Value {
         if let Some((_helper, true)) = everything_ipc_ready(&app) {
             return json!({ "backend": "everything-ipc", "label": "Everything IPC 연결됨", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
         }
+        if let Ok(index) = app.state::<AppState>().local_index.lock() {
+            if index.indexing {
+                return json!({ "backend": "local-indexing", "label": "내장 로컬 색인 중", "available": true, "detail": format!("{}개 파일을 읽는 중입니다. Desktop을 포함한 로컬 전체를 순서대로 색인합니다.", index.total_files) });
+            }
+            if index.ready {
+                return json!({ "backend": "local-index", "label": "내장 로컬 색인 준비됨", "available": true, "detail": format!("{}개 파일을 읽었습니다. Everything 없이도 즉시 검색합니다.", index.total_files) });
+            }
+        }
         return json!({
             "backend": "local-native",
-            "label": "내장 로컬 검색 준비됨",
+            "label": "내장 로컬 색인 준비 중",
             "available": true,
-            "detail": "Everything이 실행 중이 아니어서 내장 로컬 검색으로 파일을 찾습니다."
+            "detail": "Everything이 실행 중이 아니어서 내장 로컬 색인을 준비합니다."
         });
     }
     if cfg!(target_os = "macos") {
@@ -984,8 +1464,8 @@ fn copy_path(file_path: String) -> Result<Value, String> {
 
 #[tauri::command]
 fn reindex(app: AppHandle) -> Result<Value, String> {
-    app.emit("index-status", json!({ "status": "idle", "stats": { "native": true } })).map_err(|error| error.to_string())?;
-    Ok(json!({ "success": true, "native": true }))
+    let started = start_local_indexing(&app)?;
+    Ok(json!({ "success": true, "started": started }))
 }
 
 #[tauri::command]
@@ -1023,7 +1503,11 @@ fn main() {
     let data_dir = data_dir();
     let config = read_config(&data_dir);
     tauri::Builder::default()
-        .manage(AppState { config: Mutex::new(config), data_dir })
+        .manage(AppState { config: Mutex::new(config), data_dir, local_index: Mutex::new(LocalIndex::default()) })
+        .setup(|app| {
+            start_local_indexing(&app.handle()).map_err(std::io::Error::other)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             search,
             get_config,
@@ -1078,6 +1562,28 @@ mod tests {
         let config = json!({ "roots": ["/Users/dawith"] });
         assert!(is_allowed_path(Path::new("/Users/dawith/Desktop/report.pdf"), &config));
         assert!(!is_allowed_path(Path::new("/Users/dawith-other/report.pdf"), &config));
+    }
+
+    #[test]
+    fn category_and_natural_queries_match_local_records() {
+        let record = json!({
+            "name": "2026 사례관리 보고서.pdf",
+            "fullPath": "C:/Users/dawith/Desktop/2026 사례관리 보고서.pdf",
+            "ext": "pdf",
+            "size": 2 * 1024 * 1024,
+            "mtime": now_millis(),
+            "isDir": false
+        });
+        assert!(query_matches(&record, "doc:", false));
+        assert!(!query_matches(&record, "pic:", false));
+        assert!(query_matches(&record, "사례관리 문서", true));
+    }
+
+    #[test]
+    fn native_category_query_expands_to_extensions() {
+        let query = translate_native_query("doc: 계약서");
+        assert!(query.contains("ext:doc;docx"));
+        assert!(query.contains("계약서"));
     }
 }
 

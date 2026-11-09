@@ -159,8 +159,8 @@ function updateIndexingBanner(data = {}) {
   if (status === 'indexing') {
     indexingBanner.hidden = false;
     indexingBanner.classList.remove('is-error', 'is-complete');
-    indexingBannerTitle.textContent = '처음 색인을 진행하고 있습니다';
-    indexingBannerDetail.textContent = '파일이 많으면 시간이 걸릴 수 있습니다. 검색은 발견된 파일부터 바로 사용할 수 있습니다.';
+    indexingBannerTitle.textContent = '로컬 디스크를 살펴보는 중입니다';
+    indexingBannerDetail.textContent = '드라이브와 추가한 공유 위치의 파일 목록을 읽고 있습니다. 발견된 파일부터 바로 검색할 수 있습니다.';
     indexingBannerCount.textContent = '0개 발견';
     indexingProgressBar.style.width = '18%';
     return;
@@ -174,8 +174,8 @@ function updateIndexingBanner(data = {}) {
     const elapsed = Number(stats.elapsedMs || 0);
     const elapsedText = elapsed > 60000 ? `${Math.floor(elapsed / 60000)}분 ${Math.floor((elapsed % 60000) / 1000)}초` : `${Math.max(1, Math.floor(elapsed / 1000))}초`;
     indexingBanner.hidden = false;
-    indexingBannerTitle.textContent = `색인 중 · ${rootIndex + 1}/${totalRoots} 위치`;
-    indexingBannerDetail.textContent = `${getPathLabel(stats.root || '로컬 위치')}를 읽는 중 · 경과 ${elapsedText} · 검색은 계속 사용할 수 있습니다.`;
+    indexingBannerTitle.textContent = `로컬 디스크 스캔 중 · ${getPathLabel(stats.root || '로컬 위치')} (${rootIndex + 1}/${totalRoots})`;
+    indexingBannerDetail.textContent = `${getPathLabel(stats.root || '로컬 위치')}에서 파일 목록을 읽는 중입니다 · 경과 ${elapsedText} · 검색은 계속 사용할 수 있습니다.`;
     indexingBannerCount.textContent = `${(files + folders).toLocaleString()}개 발견`;
     indexingProgressBar.style.width = `${Math.min(96, Math.max(18, ((rootIndex + 1) / totalRoots) * 100))}%`;
     return;
@@ -379,7 +379,10 @@ function renderSettingsRoots(roots = [], localRoots = configuredLocalRoots) {
     <div class="root-item${isAutoLocal ? ' is-auto-local' : ''}" data-root-item="${escapeHtml(root)}">
       <span class="root-item-icon">${isAutoLocal ? '⌂' : '⌁'}</span>
       <span class="root-item-copy"><strong>${escapeHtml(getRootKindLabel(root))}</strong><code>${escapeHtml(root)}</code></span>
-      ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="서치 경로에서 제거">×</button>`}
+      <span class="root-item-actions">
+        <button class="root-open" type="button" data-open-root="${escapeHtml(root)}" title="이 위치를 파일 탐색기에서 엽니다" aria-label="검색 위치 열기: ${escapeHtml(root)}">열기</button>
+        ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="이 검색 위치를 제거합니다" aria-label="검색 위치 제거: ${escapeHtml(root)}">제거</button>`}
+      </span>
     </div>
   `; }).join('');
 }
@@ -452,34 +455,82 @@ async function refreshSettingsRoots() {
   return config;
 }
 
+function setButtonBusy(button, busy, busyLabel, idleLabel) {
+  if (!button) return;
+  if (busy) {
+    button.dataset.idleLabel = idleLabel || button.textContent.trim();
+    button.disabled = true;
+    button.textContent = busyLabel;
+  } else {
+    button.disabled = false;
+    button.textContent = idleLabel || button.dataset.idleLabel || button.textContent;
+  }
+}
+
 function setRootStatus(message, state = 'ready') {
   titlebarStatus.textContent = message;
   statusDot.className = state === 'error' ? 'status-dot error' : 'status-dot';
 }
 
+async function reindexFromSettings({ close = false } = {}) {
+  const button = document.getElementById('btnReindexNow');
+  const idleLabel = button?.dataset.idleLabel || button?.textContent.trim() || '↻ 추가한 위치 다시 읽기';
+  setButtonBusy(button, true, '읽는 중…', idleLabel);
+  setRootStatus('추가한 폴더와 공유 위치를 다시 읽는 중…');
+  try {
+    const result = await window.dawithAPI.reindex();
+    if (result && result.success === false) throw new Error(result.error || '다시 읽기에 실패했습니다.');
+    setRootStatus('검색 위치를 다시 읽기 시작했습니다. 검색은 계속 사용할 수 있습니다.');
+    if (close) settingsModal.style.display = 'none';
+    return result;
+  } catch (error) {
+    setRootStatus(error.message || '검색 위치를 다시 읽지 못했습니다.', 'error');
+    throw error;
+  } finally {
+    setButtonBusy(button, false, '', idleLabel);
+  }
+}
+
 async function addSearchRoot() {
   const result = await window.dawithAPI.chooseRoot();
   if (!result || result.canceled || !result.path) return;
+  const button = document.getElementById('btnAddRoot');
+  setButtonBusy(button, true, '확인 중…', '＋ 폴더·드라이브 선택');
   try {
+    const inspected = await window.dawithAPI.inspectRoot(result.path);
+    if (inspected && inspected.success === false) throw new Error(inspected.error || '선택한 위치에 연결할 수 없습니다.');
     const config = await window.dawithAPI.getConfig();
     if ((config.localRoots || []).some(root => isPathWithinRoot(result.path, root))) {
-      setRootStatus('로컬 파일은 자동 검색 중입니다. 추가 서치 경로·공유 폴더만 지정하면 됩니다.');
+      setRootStatus('내 PC 로컬 파일은 이미 자동 검색 중입니다. 공유폴더나 외부 위치를 추가해 주세요.');
       return;
     }
     const roots = Array.from(new Set([...(config.roots || []), result.path]));
     await window.dawithAPI.saveConfig({ roots });
-    renderSidebarRoots(roots);
-    renderSettingsRoots(roots);
-    setRootStatus('검색 위치가 추가되었습니다. 색인 중…');
-    window.dawithAPI.reindex().catch(error => {
+    renderSidebarRoots(roots, config.localRoots || []);
+    renderSettingsRoots(roots, config.localRoots || []);
+    setRootStatus(`${inspected?.label || '검색 위치'}가 추가되었습니다. 다시 읽는 중…`);
+    reindexFromSettings().catch(error => {
       console.error('Failed to reindex after adding root:', error);
-      setRootStatus('검색 위치는 저장됐지만 색인에 실패했습니다.', 'error');
     });
   } catch (error) {
     console.error('Failed to add search root:', error);
     setRootStatus('검색 위치를 추가하지 못했습니다.', 'error');
     alert(`검색 위치를 추가하지 못했습니다.\n${error.message || error}`);
+  } finally {
+    setButtonBusy(button, false, '', '＋ 폴더·드라이브 선택');
   }
+}
+
+async function openRootSettings({ focusNetwork = false } = {}) {
+  settingsModal.style.display = 'flex';
+  const config = await refreshSettingsRoots();
+  if (focusNetwork) {
+    networkRootForm.hidden = false;
+    networkRootInput.focus();
+  } else {
+    document.getElementById('btnAddRoot')?.focus();
+  }
+  return config;
 }
 
 async function initWorkspace() {
@@ -869,7 +920,8 @@ async function showQuickLook(item) {
   if (res.success) {
     bodyEl.innerHTML = `<pre>${escapeHtml(res.content)}</pre>`;
   } else {
-    bodyEl.innerHTML = '<div style="text-align:center; color:#94a3b8;">미리보기를 지원하지 않는 바이너리 파일입니다.<br><button class="btn btn-primary mt-2 ql-open-default" type="button">기본 프로그램으로 열기</button></div>';
+    const message = res.error || '미리보기를 지원하지 않는 바이너리 파일입니다.';
+    bodyEl.innerHTML = `<div style="text-align:center; color:#64748b; line-height:1.7;">${escapeHtml(message)}<br><button class="btn btn-primary mt-2 ql-open-default" type="button">기본 프로그램으로 열기</button></div>`;
     bodyEl.querySelector('.ql-open-default').addEventListener('click', () => openItem(item));
   }
 }
@@ -1265,8 +1317,7 @@ document.getElementById('btnAllRootsScope').addEventListener('click', () => {
   executeSearch();
 });
 document.getElementById('btnAddRootPrimary').addEventListener('click', async () => {
-  settingsModal.style.display = 'flex';
-  await refreshSettingsRoots();
+  await openRootSettings();
   document.getElementById('rootsList')?.scrollIntoView({ block: 'nearest' });
 });
 document.getElementById('btnAddRoot').addEventListener('click', addSearchRoot);
@@ -1579,10 +1630,8 @@ viewSimpleButton?.addEventListener('click', () => saveUiMode('simple'));
 viewAdvancedButton?.addEventListener('click', () => saveUiMode('advanced'));
 
 document.getElementById('btnSettings').addEventListener('click', async () => {
-  settingsModal.style.display = 'flex';
-  const cfg = await window.dawithAPI.getConfig();
+  const cfg = await openRootSettings();
   applyUiMode(cfg.uiMode || 'advanced');
-  renderSettingsRoots(cfg.roots || []);
 });
 document.getElementById('btnCloseSettings').addEventListener('click', () => {
   settingsModal.style.display = 'none';
@@ -1601,38 +1650,48 @@ function closeNetworkRootForm() {
 
 document.getElementById('btnAddNetworkRoot').addEventListener('click', () => {
   networkRootForm.hidden = false;
+  networkRootStatus.textContent = '예: \\\\server\\share 또는 Z:\\문서. 현재 Windows 계정으로 접근 가능한 위치만 추가됩니다.';
+  networkRootStatus.classList.remove('error', 'success');
   networkRootInput.focus();
 });
 document.getElementById('btnCancelNetworkRoot').addEventListener('click', closeNetworkRootForm);
 document.getElementById('btnSaveNetworkRoot').addEventListener('click', async () => {
   const input = networkRootInput.value.trim();
+  const button = document.getElementById('btnSaveNetworkRoot');
   if (!input) {
     networkRootStatus.textContent = '공유 폴더 경로를 입력하세요.';
     networkRootStatus.classList.add('error');
+    networkRootInput.focus();
     return;
   }
+  setButtonBusy(button, true, '연결 확인 중…', '연결 확인 및 추가');
   networkRootStatus.textContent = '공유 폴더 연결과 권한을 확인하는 중입니다…';
   networkRootStatus.classList.remove('error', 'success');
-  const inspected = await window.dawithAPI.inspectRoot(input);
-  if (!inspected.success) {
-    networkRootStatus.textContent = inspected.error;
+  try {
+    const inspected = await window.dawithAPI.inspectRoot(input);
+    if (!inspected.success) {
+      networkRootStatus.textContent = inspected.error;
+      networkRootStatus.classList.add('error');
+      return;
+    }
+    const config = await window.dawithAPI.getConfig();
+    const roots = Array.from(new Set([...(config.roots || []), inspected.path]));
+    await window.dawithAPI.saveConfig({ roots });
+    renderSidebarRoots(roots, config.localRoots || []);
+    renderSettingsRoots(roots, config.localRoots || []);
+    closeNetworkRootForm();
+    setRootStatus(`${inspected.label}가 추가되었습니다. 다시 읽는 중…`);
+    // Keep the settings window open so the user can see the new location and
+    // the progress banner while a large or remote share is indexed.
+    reindexFromSettings().catch(error => {
+      console.error('Failed to reindex after adding root:', error);
+    });
+  } catch (error) {
+    networkRootStatus.textContent = error.message || '공유폴더를 추가하지 못했습니다.';
     networkRootStatus.classList.add('error');
-    return;
+  } finally {
+    setButtonBusy(button, false, '', '연결 확인 및 추가');
   }
-  const config = await window.dawithAPI.getConfig();
-  const roots = Array.from(new Set([...(config.roots || []), inspected.path]));
-  await window.dawithAPI.saveConfig({ roots });
-  renderSidebarRoots(roots);
-  renderSettingsRoots(roots);
-  networkRootStatus.textContent = `${inspected.label} 연결 확인 완료. 색인을 시작합니다.`;
-  networkRootStatus.classList.add('success');
-  closeNetworkRootForm();
-  // Do not keep the settings form blocked while a large or remote share is indexed.
-  // The main process owns the long-running scan and will continue to publish status
-  // events even when the user returns to the search workspace.
-  window.dawithAPI.reindex().catch(error => {
-    console.error('Failed to reindex after adding root:', error);
-  });
 });
 networkRootInput.addEventListener('keydown', event => {
   if (event.key === 'Enter') document.getElementById('btnSaveNetworkRoot').click();
@@ -1640,23 +1699,43 @@ networkRootInput.addEventListener('keydown', event => {
 });
 
 document.getElementById('rootsList').addEventListener('click', async event => {
+  const openButton = event.target.closest('[data-open-root]');
+  if (openButton) {
+    try {
+      const result = await window.dawithAPI.openFolder(openButton.dataset.openRoot);
+      if (result && result.success === false) throw new Error(result.error || '폴더를 열 수 없습니다.');
+    } catch (error) {
+      setRootStatus(error.message || '폴더를 열 수 없습니다.', 'error');
+    }
+    return;
+  }
   const button = event.target.closest('[data-remove-root]');
   if (!button) return;
   const root = button.dataset.removeRoot;
+  if (!window.confirm(`이 검색 위치를 제거할까요?\n${root}\n\n파일은 삭제되지 않습니다.`)) return;
   const config = await window.dawithAPI.getConfig();
   const roots = (config.roots || []).filter(item => item !== root);
   if (!roots.length) {
     alert('검색 위치는 한 곳 이상 필요합니다. 다른 위치를 먼저 추가하세요.');
     return;
   }
-  await window.dawithAPI.saveConfig({ roots });
-  renderSidebarRoots(roots);
-  renderSettingsRoots(roots);
-  await window.dawithAPI.reindex();
+  setButtonBusy(button, true, '제거 중…', '제거');
+  try {
+    await window.dawithAPI.saveConfig({ roots });
+    renderSidebarRoots(roots, config.localRoots || []);
+    renderSettingsRoots(roots, config.localRoots || []);
+    setRootStatus('검색 위치를 제거했습니다. 다시 읽는 중…');
+    await reindexFromSettings();
+  } catch (error) {
+    setRootStatus(error.message || '검색 위치를 제거하지 못했습니다.', 'error');
+  }
 });
 document.getElementById('btnReindexNow').addEventListener('click', async () => {
-  await window.dawithAPI.reindex();
-  settingsModal.style.display = 'none';
+  try {
+    await reindexFromSettings({ close: true });
+  } catch (error) {
+    console.error('Failed to reindex search roots:', error);
+  }
 });
 document.getElementById('btnInstallGoz')?.addEventListener('click', async () => {
   const status = document.getElementById('nativeEngineStatus');

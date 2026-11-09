@@ -54,7 +54,7 @@
     analyzePath: unsupported,
     saveAnalysisReport: unsupported,
     findDuplicates: unsupported,
-    installGozBackend: unsupported,
+    installGozBackend: () => invoke('install_goz_backend'),
     checkForUpdates: () => Promise.resolve({ supported: false, available: false }),
     downloadUpdate: unsupported,
     onIndexStatus: (callback) => {

@@ -71,6 +71,9 @@ function createWindow() {
     minHeight: 550,
     frame: false, // Modern custom borderless titlebar
     backgroundColor: '#ffffff',
+    icon: process.platform === 'win32'
+      ? path.join(__dirname, '../assets/icon.ico')
+      : path.join(__dirname, '../assets/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -366,6 +369,21 @@ ipcMain.handle('get-file-content', async (event, filePath) => {
     const safePath = getAllowedPath(filePath);
     const stat = await fs.promises.stat(safePath);
     if (stat.isDirectory()) return { success: false, error: 'Is directory' };
+
+    const ext = path.extname(safePath).slice(1).toLowerCase();
+    if (ext === 'hwp' || ext === 'hwpx') {
+      const header = Buffer.alloc(8);
+      const headerHandle = await fs.promises.open(safePath, 'r');
+      try {
+        await headerHandle.read(header, 0, header.length, 0);
+      } finally {
+        await headerHandle.close();
+      }
+      if (header.equals(Buffer.from([0x9b, 0x20, 0x44, 0x52, 0x4d, 0x4f, 0x4e, 0x45]))) {
+        return { success: false, error: '이 HWP는 DRM 보안 문서라 본문을 직접 읽을 수 없습니다. 파일명(제목)으로는 계속 검색됩니다. 본문까지 검색하려면 한글에서 보안 해제본으로 저장한 뒤 다시 검색해 주세요.' };
+      }
+      return { success: false, error: 'HWP 본문 미리보기는 Tauri Windows 엔진에서 지원됩니다. 파일은 기본 한글 프로그램으로 열 수 있습니다.' };
+    }
     
     // Read text preview up to 2MB
     const limit = 2 * 1024 * 1024;

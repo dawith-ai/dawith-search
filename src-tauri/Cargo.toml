@@ -16,6 +16,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 rfd = "0.15"
 trash = "5"
 walkdir = "2"
+hwp = { git = "https://github.com/openhwp/openhwp", package = "hwp" }
 
 [features]
 default = ["custom-protocol"]

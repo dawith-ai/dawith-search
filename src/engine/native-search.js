@@ -114,9 +114,18 @@ class NativeSearchAdapter {
     this.platform = options.platform || process.platform;
     this.spawn = options.spawn || execFile;
     this.execFileSync = options.execFileSync || execFileSync;
-    this.everythingIpcPath = options.everythingIpcPath || this.findEverythingIpcCli();
-    this.gozPath = options.gozPath || this.findGozCli();
-    this.esPath = options.esPath || this.findEverythingCli();
+    // An explicit empty path is useful for deterministic adapter tests and for
+    // callers that intentionally want to disable one native backend. Do not
+    // replace it with auto-detection through a truthiness check.
+    this.everythingIpcPath = Object.prototype.hasOwnProperty.call(options, 'everythingIpcPath')
+      ? options.everythingIpcPath
+      : this.findEverythingIpcCli();
+    this.gozPath = Object.prototype.hasOwnProperty.call(options, 'gozPath')
+      ? options.gozPath
+      : this.findGozCli();
+    this.esPath = Object.prototype.hasOwnProperty.call(options, 'esPath')
+      ? options.esPath
+      : this.findEverythingCli();
     this.everythingIpcStatus = null;
     this.everythingIpcStatusCheckedAt = 0;
     this.gozStatus = null;
@@ -206,6 +215,7 @@ class NativeSearchAdapter {
     const candidates = [
       process.env.DAWITH_ES_PATH,
       process.env.ProgramFiles ? path.join(process.env.ProgramFiles, 'Everything', 'es.exe') : null,
+      process.env['ProgramFiles(x86)'] ? path.join(process.env['ProgramFiles(x86)'], 'Everything', 'es.exe') : null,
       process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Everything', 'es.exe') : null,
       'es.exe'
     ].filter(Boolean);

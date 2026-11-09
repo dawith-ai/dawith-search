@@ -6,11 +6,11 @@ macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하
 
 ## 검색 백엔드
 
-- Windows: 실행 중인 Voidtools Everything에 공식 SDK IPC로 연결하는 `everything-ipc.exe`를 먼저 사용합니다. Everything이 실행되지 않거나 DB가 준비되지 않으면 패키지에 포함된 MIT 오픈소스 `goz` 클라이언트와 `gozd` NTFS MFT/USN Journal 엔진, 설치된 `es.exe`, Dawith 자체 색인 순으로 자동 fallback합니다. `DAWITH_EVERYTHING_IPC_PATH`/`DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
+- Windows: 실행 중인 Voidtools Everything이 있으면 MIT 고지가 보존된 SDK IPC bridge를 사용하고, 결과가 빠진 사용자 폴더는 내장 보완 색인으로 합칩니다. Everything IPC가 없으면 MIT 오픈소스 `goz` 클라이언트와 `gozd` NTFS MFT/USN Journal 엔진, 설치된 `es.exe`, Dawith 자체 색인 순으로 자동 fallback합니다. 앱은 사용자의 `Everything.exe`를 복사하거나 재배포하지 않습니다. `DAWITH_EVERYTHING_IPC_PATH`/`DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
 - macOS: 단순 파일명 검색은 Spotlight `mdfind`를 사용하고, `ext:`, `size:`, `dm:`, `content:`, 태그 같은 복합 검색은 앱의 로컬 인덱서로 처리합니다.
 - 기타 플랫폼: Node.js 파일시스템 기반 초기 색인과 `chokidar` 기반 변경 감시를 사용합니다. 접근할 수 없는 폴더는 건너뛰고 검색 가능한 파일은 계속 색인합니다.
 
-네이티브 백엔드가 없거나 해당 쿼리를 지원하지 않으면 자동으로 로컬 색인으로 폴백합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
+네이티브 백엔드가 없거나 해당 쿼리를 지원하지 않으면 자동으로 로컬 색인으로 폴백합니다. Windows Tauri 패키지는 `build:tauri` 단계에서 IPC bridge와 `goz/gozd`를 함께 빌드하며, `gozd` 서비스 설치는 설정 화면에서 사용자가 명시적으로 승인할 때만 UAC를 요청합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
 
 ### 속도 벤치마크
 

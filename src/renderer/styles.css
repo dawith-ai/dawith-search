@@ -1704,6 +1704,44 @@ kbd {
   font-weight: 700;
 }
 
+.root-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.root-open,
+.root-remove {
+  padding: 4px 7px;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.root-open:hover,
+.root-remove:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.root-remove:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn:disabled,
+.root-open:disabled,
+.root-remove:disabled {
+  cursor: wait;
+  opacity: .55;
+}
+
 .root-item code {
   min-width: 0;
   overflow: hidden;

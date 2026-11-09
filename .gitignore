@@ -5,3 +5,10 @@ release/
 *.log
 .DS_Store
 Thumbs.db
+
+# Local build outputs; release installers are uploaded separately.
+src-tauri/target/
+src-tauri/gen/
+bin/native/windows/**/*.lib
+bin/native/windows/**/*.exp
+.playwright-cli/

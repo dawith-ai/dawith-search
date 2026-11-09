@@ -66,6 +66,7 @@ console.log('\n1b. Testing native backend adapters:');
 let capturedGozArgs = null;
 const fakeGoz = new NativeSearchAdapter({
   platform: 'win32',
+  everythingIpcPath: '',
   gozPath: 'C:\\Tools\\goz.exe',
   esPath: '',
   execFileSync: () => { throw new Error('gozd is not running in the contract test'); },
@@ -123,6 +124,8 @@ fakeEverythingIpc.search('report', { limit: 10 }).then(result => {
 let capturedEverythingArgs = null;
 const fakeEs = new NativeSearchAdapter({
   platform: 'win32',
+  everythingIpcPath: '',
+  gozPath: '',
   esPath: 'C:\\Tools\\es.exe',
   spawn: (command, args, options, callback) => {
     capturedEverythingArgs = args;

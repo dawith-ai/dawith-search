@@ -294,23 +294,39 @@ fn should_skip_entry(entry: &walkdir::DirEntry, config: &Value, excluded: &[Stri
     excluded.iter().any(|item| item == &name.to_ascii_lowercase())
 }
 
-fn local_index_roots(config: &Value) -> Vec<PathBuf> {
+fn local_index_roots(config: &Value, native_ready: bool) -> Vec<PathBuf> {
     let configured = config_roots(config);
     let mut roots = Vec::new();
     let mut seen = HashSet::new();
 
-    // Scan the user profile first. Desktop/Documents become searchable while
-    // the rest of a large Windows volume continues in the background.
-    if cfg!(windows) {
+    // Even when Everything is available, keep a small local supplement for
+    // user-owned folders. Everything may omit a redirected Desktop, an
+    // excluded folder, or a path that was created after its last update.
+    // Avoid scanning the whole drive twice in that mode.
+    if cfg!(windows) && native_ready {
         let home = home_dir();
-        if configured.iter().any(|root| is_allowed_path(&home, config)) {
+        if is_allowed_path(&home, config) {
             let key = normalize_path(&home);
             seen.insert(key);
             roots.push(home);
         }
     }
+    let local_roots = config
+        .get("localRoots")
+        .and_then(Value::as_array)
+        .map(|roots| {
+            roots
+                .iter()
+                .filter_map(Value::as_str)
+                .map(|root| normalize_path(Path::new(root)))
+                .collect::<HashSet<_>>()
+        })
+        .unwrap_or_default();
     for root in configured {
         let key = normalize_path(&root);
+        if native_ready && cfg!(windows) && local_roots.contains(&key) {
+            continue;
+        }
         if seen.insert(key) {
             roots.push(root);
         }
@@ -351,10 +367,7 @@ fn publish_index_snapshot(
 }
 
 fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
-    if cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false) {
-        let _ = app.emit("index-status", json!({ "status": "idle", "stats": { "native": true } }));
-        return Ok(false);
-    }
+    let native_ready = cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false);
     let state = app.state::<AppState>();
     let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
     {
@@ -376,7 +389,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
 
     let worker_app = app.clone();
     std::thread::spawn(move || {
-        let roots = local_index_roots(&config)
+        let roots = local_index_roots(&config, native_ready)
             .into_iter()
             .filter(|root| root.exists())
             .collect::<Vec<_>>();
@@ -458,7 +471,10 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
 }
 
 fn native_record(item: &Value) -> Option<Value> {
-    let full_path = item.get("path")?.as_str()?;
+    let full_path = item
+        .get("path")
+        .or_else(|| item.get("filename"))?
+        .as_str()?;
     let path = PathBuf::from(full_path);
     if let Some(record) = path_record(&path) {
         return Some(record);
@@ -732,6 +748,12 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
 }
 
 fn helper_path(app: &AppHandle) -> Option<PathBuf> {
+    if let Some(path) = std::env::var_os("DAWITH_EVERYTHING_IPC_PATH") {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Some(path);
+        }
+    }
     let resource_dir = app.path().resource_dir().ok()?;
     let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
     let path = resource_dir
@@ -741,6 +763,51 @@ fn helper_path(app: &AppHandle) -> Option<PathBuf> {
         .join(arch)
         .join("everything-ipc.exe");
     path.exists().then_some(path)
+}
+
+fn native_binary_path(app: &AppHandle, name: &str) -> Option<PathBuf> {
+    if !cfg!(windows) {
+        return None;
+    }
+    if let Some(path) = std::env::var_os(match name {
+        "goz.exe" => "DAWITH_GOZ_PATH",
+        "gozd.exe" => "DAWITH_GOZD_PATH",
+        _ => "DAWITH_NATIVE_PATH",
+    }) {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Some(path);
+        }
+    }
+    let resource_dir = app.path().resource_dir().ok()?;
+    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
+    let path = resource_dir
+        .join("bin")
+        .join("native")
+        .join("windows")
+        .join(arch)
+        .join(name);
+    path.exists().then_some(path)
+}
+
+fn goz_path(app: &AppHandle) -> Option<PathBuf> {
+    native_binary_path(app, "goz.exe")
+}
+
+fn gozd_path(app: &AppHandle) -> Option<PathBuf> {
+    native_binary_path(app, "gozd.exe")
+}
+
+fn goz_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
+    let client = goz_path(app)?;
+    let ready = Command::new(&client)
+        .arg("--server-version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    Some((client, ready))
 }
 
 fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Result<Value, String>> {
@@ -761,6 +828,51 @@ fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Resul
         Ok(output) => Err(String::from_utf8_lossy(&output.stderr).trim().to_string()),
         Err(error) => Err(error.to_string()),
     })
+}
+
+fn search_goz(app: &AppHandle, query: &str, limit: usize) -> Option<Result<Value, String>> {
+    let client = goz_path(app)?;
+    let output = Command::new(client)
+        .arg("-argv")
+        .arg("--json")
+        .arg("-n")
+        .arg(limit.to_string())
+        .arg(query)
+        .output();
+    Some(match output {
+        Ok(output) if output.status.success() || !output.stdout.is_empty() => {
+            serde_json::from_slice::<Value>(&output.stdout).map_err(|error| error.to_string())
+        }
+        Ok(output) => Err(String::from_utf8_lossy(&output.stderr).trim().to_string()),
+        Err(error) => Err(error.to_string()),
+    })
+}
+
+fn merge_records(primary: Vec<Value>, supplemental: Vec<Value>, limit: usize) -> (Vec<Value>, usize) {
+    let mut seen = HashSet::new();
+    let mut merged = Vec::new();
+    let mut supplemental_added = 0usize;
+    for (is_supplemental, item) in primary
+        .into_iter()
+        .map(|item| (false, item))
+        .chain(supplemental.into_iter().map(|item| (true, item)))
+    {
+        let key = item
+            .get("fullPath")
+            .and_then(Value::as_str)
+            .map(|path| normalize_path(Path::new(path)))
+            .unwrap_or_default();
+        if key.is_empty() || !seen.insert(key) {
+            continue;
+        }
+        if is_supplemental {
+            supplemental_added += 1;
+        }
+        if merged.len() < limit {
+            merged.push(item);
+        }
+    }
+    (merged, supplemental_added)
 }
 
 fn everything_ipc_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
@@ -787,6 +899,53 @@ fn file_extension(path: &Path) -> String {
     path.extension()
         .map(|value| value.to_string_lossy().to_ascii_lowercase())
         .unwrap_or_default()
+}
+
+fn extract_hwp_text(path: &Path) -> Result<String, String> {
+    let bytes = fs::read(path).map_err(|error| error.to_string())?;
+    if bytes.starts_with(&[0x9b, 0x20, 0x44, 0x52, 0x4d, 0x4f, 0x4e, 0x45]) {
+        return Err("이 HWP는 DRM 보안 문서라 앱에서 본문을 직접 읽을 수 없습니다. 파일명(제목)으로는 계속 검색됩니다. 본문까지 검색하려면 한글에서 문서를 연 뒤 보안 해제본으로 저장하거나, 권한이 있는 위치에서 다시 추가해 주세요.".to_string());
+    }
+    let document = hwp::HwpDocument::from_bytes(&bytes).map_err(|error| error.to_string())?;
+    Ok(document.extract_text().to_string())
+}
+
+fn content_terms(query: &str) -> Vec<String> {
+    query
+        .split_whitespace()
+        .filter_map(|token| token.to_ascii_lowercase().strip_prefix("content:").map(str::to_string))
+        .map(|term| term.trim_matches(['"', '\'']).to_string())
+        .filter(|term| !term.is_empty())
+        .collect()
+}
+
+fn is_plain_text_extension(extension: &str) -> bool {
+    matches!(extension, "txt" | "md" | "markdown" | "json" | "js" | "jsx" | "ts" | "tsx" | "html" | "css" | "scss" | "py" | "c" | "cpp" | "h" | "hpp" | "java" | "cs" | "go" | "rs" | "php" | "rb" | "swift" | "xml" | "yaml" | "yml" | "ini" | "cfg" | "conf" | "csv" | "tsv" | "sql" | "sh" | "bat" | "cmd" | "ps1" | "log" | "env" | "properties" | "toml")
+}
+
+fn record_matches_content(record: &Value, query: &str) -> bool {
+    let terms = content_terms(query);
+    if terms.is_empty() {
+        return true;
+    }
+    if record.get("isDir").and_then(Value::as_bool).unwrap_or(false) {
+        return false;
+    }
+    let path = Path::new(record.get("fullPath").and_then(Value::as_str).unwrap_or(""));
+    let extension = file_extension(path);
+    let content = if extension == "hwp" {
+        extract_hwp_text(path).ok()
+    } else if is_plain_text_extension(&extension) {
+        fs::metadata(path)
+            .ok()
+            .filter(|metadata| metadata.len() <= 5 * 1024 * 1024)
+            .and_then(|_| fs::read_to_string(path).ok())
+    } else {
+        None
+    };
+    let Some(content) = content else { return false; };
+    let content = content.to_ascii_lowercase();
+    terms.iter().all(|term| content.contains(term))
 }
 
 fn is_image_extension(extension: &str) -> bool {
@@ -871,6 +1030,7 @@ fn search_local_index(
         let mut hydrated = record.clone();
         hydrate_records(std::slice::from_mut(&mut hydrated), metadata);
         if !query_matches(&hydrated, query, use_natural_language) { continue; }
+        if !record_matches_content(&hydrated, query) { continue; }
         total_matches += 1;
         if results.len() < limit { results.push(hydrated); }
     }
@@ -968,8 +1128,13 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
         token.starts_with("content:") || token.starts_with("tag:") || token == "starred:" || token == "star:" || token.starts_with("dupe:")
     });
     if native_can_handle_query {
-        if let Some(native) = search_everything(&app, &native_query, limit) {
-        if let Ok(payload) = native {
+        let mut native_backend = "everything-ipc";
+        let mut payload = search_everything(&app, &native_query, limit).and_then(Result::ok);
+        if payload.is_none() && goz_ready(&app).map(|(_, ready)| ready).unwrap_or(false) {
+            native_backend = "goz";
+            payload = search_goz(&app, &native_query, limit).and_then(Result::ok);
+        }
+        if let Some(payload) = payload {
             let items = payload
                 .get("items")
                 .and_then(Value::as_array)
@@ -988,37 +1153,30 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
+            let (local_results, _local_total, local_indexed, indexing) = search_local_index(&state, &config, &normalized_query, &options, &metadata, limit)?;
+            let (mut items, local_added) = merge_records(items, local_results, limit);
+            let native_total = payload.get("total").and_then(Value::as_u64).unwrap_or(items.len() as u64);
             let total = if options.get("scopeRoot").is_some() {
                 json!(items.len())
             } else {
-                payload.get("total").cloned().unwrap_or_else(|| json!(items.len()))
+                json!(native_total + local_added as u64)
             };
-            if items.is_empty() && (!query.trim().is_empty() || options.get("scopeRoot").is_some()) {
-                let (local_results, local_total, indexed, indexing) = search_local_index(&state, &config, &normalized_query, &options, &metadata, limit)?;
-                if local_total > 0 || indexed > 0 {
-                    return Ok(json!({
-                        "results": local_results,
-                        "totalMatches": local_total,
-                        "totalIndexed": indexed,
-                        "elapsedMs": started.elapsed().as_millis(),
-                        "backend": if indexing { "local-indexing" } else { "local-index" },
-                        "indexing": indexing,
-                        "warning": if indexing { "첫 색인이 진행 중이라 현재까지 발견된 파일만 표시합니다." } else { "Everything IPC 결과가 없어 내장 로컬 색인을 사용했습니다." }
-                    }));
-                }
-            }
-            let mut items = items;
             hydrate_records(&mut items, &metadata);
-            let total_indexed = total.clone();
+            let total_indexed = json!(native_total.max(local_indexed as u64));
             return Ok(json!({
                 "results": items,
                 "totalMatches": total,
                 "totalIndexed": total_indexed,
                 "elapsedMs": started.elapsed().as_millis(),
-                "backend": "everything-ipc"
+                "backend": native_backend,
+                "indexing": indexing,
+                "warning": if local_added > 0 {
+                    Value::String("내장 보완 색인 결과를 함께 표시했습니다.".to_string())
+                } else {
+                    Value::Null
+                }
             }));
         }
-    }
     }
     if cfg!(target_os = "macos") {
         let results = search_spotlight(&normalized_query, &roots, limit)?;
@@ -1253,6 +1411,13 @@ fn get_file_content(file_path: String, state: State<'_, AppState>) -> Result<Val
     if metadata.is_dir() { return Ok(json!({ "success": false, "error": "폴더는 미리보기할 수 없습니다." })); }
     let limit = 2 * 1024 * 1024;
     let truncated = metadata.len() > limit as u64;
+    let extension = file_extension(&path);
+    if extension == "hwp" {
+        return Ok(match extract_hwp_text(&path) {
+            Ok(content) => json!({ "success": true, "size": metadata.len(), "mtime": metadata.modified().ok().and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok()).map(|value| value.as_millis()).unwrap_or(0), "content": content, "truncated": false }),
+            Err(error) => json!({ "success": false, "error": error }),
+        });
+    }
     let mut bytes = Vec::with_capacity(metadata.len().min(limit as u64) as usize);
     fs::File::open(&path)
         .map_err(|error| error.to_string())?
@@ -1377,6 +1542,9 @@ fn get_backend_status(app: AppHandle) -> Value {
         if let Some((_helper, true)) = everything_ipc_ready(&app) {
             return json!({ "backend": "everything-ipc", "label": "Everything IPC 연결됨", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
         }
+        if let Some((client, true)) = goz_ready(&app) {
+            return json!({ "backend": "goz", "label": "goz NTFS 엔진 연결됨", "available": true, "detail": format!("{} · MIT 오픈소스 MFT/USN Journal 엔진", client.to_string_lossy()) });
+        }
         if let Ok(index) = app.state::<AppState>().local_index.lock() {
             if index.indexing {
                 return json!({ "backend": "local-indexing", "label": "내장 로컬 색인 중", "available": true, "detail": format!("{}개 파일을 읽는 중입니다. Desktop을 포함한 로컬 전체를 순서대로 색인합니다.", index.total_files) });
@@ -1396,6 +1564,27 @@ fn get_backend_status(app: AppHandle) -> Value {
         return json!({ "backend": "spotlight", "label": "Spotlight 연동", "available": true, "detail": "macOS 시스템 색인을 사용합니다." });
     }
     json!({ "backend": "local-native", "label": "내장 로컬 검색", "available": true, "detail": "Rust fallback 검색을 사용합니다." })
+}
+
+#[tauri::command]
+fn install_goz_backend(app: AppHandle) -> Value {
+    if !cfg!(windows) {
+        return json!({ "success": false, "supported": false, "message": "Windows에서만 사용할 수 있습니다." });
+    }
+    let Some(daemon) = gozd_path(&app) else {
+        return json!({ "success": false, "supported": true, "message": "gozd.exe가 패키지에 없습니다. Windows 패키지를 다시 설치하세요." });
+    };
+    let escaped = daemon.to_string_lossy().replace('\'', "''");
+    let command = format!("Start-Process -FilePath '{}' -ArgumentList 'install' -Verb RunAs -Wait", escaped);
+    match Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"])
+        .arg(&command)
+        .output()
+    {
+        Ok(output) if output.status.success() => json!({ "success": true, "supported": true, "message": "goz Windows NTFS 엔진 설치 요청이 완료되었습니다. 잠시 후 상태를 다시 확인하세요." }),
+        Ok(output) => json!({ "success": false, "supported": true, "message": String::from_utf8_lossy(&output.stderr).trim().to_string() }),
+        Err(error) => json!({ "success": false, "supported": true, "message": error.to_string() }),
+    }
 }
 
 #[tauri::command]
@@ -1525,6 +1714,7 @@ fn main() {
             choose_root,
             inspect_root,
             get_backend_status,
+            install_goz_backend,
             get_file_stats,
             get_file_content,
             get_file_url,
@@ -1552,15 +1742,28 @@ mod tests {
 
     #[test]
     fn root_scope_allows_children() {
-        let config = json!({ "roots": ["/"] });
-        assert!(is_allowed_path(Path::new("/Users/dawith/Desktop/report.pdf"), &config));
+        let root = if cfg!(windows) { PathBuf::from(r"C:\") } else { PathBuf::from("/") };
+        let child = root.join("Users").join("dawith").join("Desktop").join("report.pdf");
+        let config = json!({ "roots": [root.to_string_lossy()] });
+        assert!(is_allowed_path(&child, &config));
     }
 
     #[test]
     fn scope_boundary_does_not_match_sibling() {
-        let config = json!({ "roots": ["/Users/dawith"] });
-        assert!(is_allowed_path(Path::new("/Users/dawith/Desktop/report.pdf"), &config));
-        assert!(!is_allowed_path(Path::new("/Users/dawith-other/report.pdf"), &config));
+        let root = if cfg!(windows) {
+            PathBuf::from(r"C:\Users\dawith")
+        } else {
+            PathBuf::from("/Users/dawith")
+        };
+        let child = root.join("Desktop").join("report.pdf");
+        let sibling = if cfg!(windows) {
+            PathBuf::from(r"C:\Users\dawith-other\report.pdf")
+        } else {
+            PathBuf::from("/Users/dawith-other/report.pdf")
+        };
+        let config = json!({ "roots": [root.to_string_lossy()] });
+        assert!(is_allowed_path(&child, &config));
+        assert!(!is_allowed_path(&sibling, &config));
     }
 
     #[test]
@@ -1579,10 +1782,39 @@ mod tests {
     }
 
     #[test]
+    fn drm_hwp_title_is_searchable_without_reading_body() {
+        let record = json!({
+            "name": "돌봄통합지원법 대응 안내문.hwp",
+            "fullPath": "C:/Users/dawith/Desktop/돌봄통합지원법 대응 안내문.hwp",
+            "ext": "hwp",
+            "size": 74256,
+            "mtime": now_millis(),
+            "isDir": false
+        });
+        assert!(query_matches(&record, "돌봄통합지원법 대응 안내문", false));
+        assert!(query_matches(&record, "doc: 돌봄통합지원법", false));
+    }
+
+    #[test]
     fn native_category_query_expands_to_extensions() {
         let query = translate_native_query("doc: 계약서");
         assert!(query.contains("ext:doc;docx"));
         assert!(query.contains("계약서"));
+    }
+
+    #[test]
+    fn hwp_extraction_smoke_from_env() {
+        let Ok(path) = std::env::var("DAWITH_HWP_TEST_FILE") else { return; };
+        match extract_hwp_text(Path::new(&path)) {
+            Ok(text) => {
+                assert!(!text.trim().is_empty(), "HWP extraction returned empty text");
+                println!("HWP_TEXT_PREVIEW={}", text.chars().take(300).collect::<String>());
+            }
+            Err(error) => {
+                assert!(error.contains("DRM"), "unexpected HWP extraction error: {error}");
+                println!("HWP_READABILITY={error}");
+            }
+        }
     }
 }
 

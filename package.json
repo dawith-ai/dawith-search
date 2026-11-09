@@ -23,7 +23,7 @@
     "build:win": "npm run build:everything-ipc:win && npm run build:goz:win && npm run verify:native:win && node scripts/create-windows-icon.js && electron-builder --win --x64 --publish never",
     "build:win:arm64": "node scripts/build-goz.js --arch arm64 && node scripts/verify-native-binaries.js --arch arm64 && node scripts/create-windows-icon.js && electron-builder --win --arm64 --publish never",
     "build:mac": "electron-builder --mac --universal --publish never",
-    "build:tauri": "tauri build",
+    "build:tauri": "npm run build:everything-ipc:win && npm run build:goz:win && npm run verify:native:win && tauri build",
     "test:tauri-contract": "node scripts/check-tauri-contract.js",
     "verify:tauri": "node scripts/verify-tauri-artifacts.js"
   },

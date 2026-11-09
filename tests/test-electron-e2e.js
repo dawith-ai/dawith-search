@@ -434,7 +434,7 @@ async function run() {
   await click('#btnAddRootPrimary');
   await waitForState('primary root settings', state => state.settingsDisplay === 'flex');
   const primaryRootButton = await evaluate("document.querySelector('#btnAddRootPrimary')?.textContent || ''");
-  assert.ok(primaryRootButton.includes('서치 경로 추가'));
+  assert.ok(primaryRootButton.includes('폴더·공유 위치 추가'));
   await click('#btnCloseSettings');
   record('메인 화면 검색 위치 추가 진입', '헤더의 명확한 추가 버튼과 설정 연결 확인');
 

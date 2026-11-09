@@ -747,6 +747,16 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
     Ok(records)
 }
 
+// Older installers bundled `../bin/native/**` under `_up_/bin/native`, so
+// check both the mapped `bin/native` layout and that legacy location.
+fn bundled_native_path(resource_dir: &Path, name: &str) -> Option<PathBuf> {
+    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
+    [resource_dir.to_path_buf(), resource_dir.join("_up_")]
+        .into_iter()
+        .map(|base| base.join("bin").join("native").join("windows").join(arch).join(name))
+        .find(|path| path.exists())
+}
+
 fn helper_path(app: &AppHandle) -> Option<PathBuf> {
     if let Some(path) = std::env::var_os("DAWITH_EVERYTHING_IPC_PATH") {
         let path = PathBuf::from(path);
@@ -755,14 +765,7 @@ fn helper_path(app: &AppHandle) -> Option<PathBuf> {
         }
     }
     let resource_dir = app.path().resource_dir().ok()?;
-    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
-    let path = resource_dir
-        .join("bin")
-        .join("native")
-        .join("windows")
-        .join(arch)
-        .join("everything-ipc.exe");
-    path.exists().then_some(path)
+    bundled_native_path(&resource_dir, "everything-ipc.exe")
 }
 
 fn native_binary_path(app: &AppHandle, name: &str) -> Option<PathBuf> {
@@ -780,14 +783,7 @@ fn native_binary_path(app: &AppHandle, name: &str) -> Option<PathBuf> {
         }
     }
     let resource_dir = app.path().resource_dir().ok()?;
-    let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
-    let path = resource_dir
-        .join("bin")
-        .join("native")
-        .join("windows")
-        .join(arch)
-        .join(name);
-    path.exists().then_some(path)
+    bundled_native_path(&resource_dir, name)
 }
 
 fn goz_path(app: &AppHandle) -> Option<PathBuf> {
@@ -1793,6 +1789,23 @@ mod tests {
         });
         assert!(query_matches(&record, "돌봄통합지원법 대응 안내문", false));
         assert!(query_matches(&record, "doc: 돌봄통합지원법", false));
+    }
+
+    #[test]
+    fn bundled_native_path_finds_mapped_and_legacy_layouts() {
+        let arch = if cfg!(target_arch = "aarch64") { "arm64" } else { "x64" };
+        let base = std::env::temp_dir().join(format!("dawith-native-{}", now_millis()));
+        let legacy = base.join("_up_").join("bin").join("native").join("windows").join(arch);
+        fs::create_dir_all(&legacy).unwrap();
+        fs::write(legacy.join("everything-ipc.exe"), b"").unwrap();
+        assert_eq!(bundled_native_path(&base, "everything-ipc.exe"), Some(legacy.join("everything-ipc.exe")));
+
+        let mapped = base.join("bin").join("native").join("windows").join(arch);
+        fs::create_dir_all(&mapped).unwrap();
+        fs::write(mapped.join("everything-ipc.exe"), b"").unwrap();
+        assert_eq!(bundled_native_path(&base, "everything-ipc.exe"), Some(mapped.join("everything-ipc.exe")));
+        assert_eq!(bundled_native_path(&base, "goz.exe"), None);
+        let _ = fs::remove_dir_all(&base);
     }
 
     #[test]

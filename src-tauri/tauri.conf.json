@@ -27,7 +27,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "dmg"],
-    "resources": ["../bin/native/**/*"],
+    "resources": { "../bin/native/windows/x64/*.exe": "bin/native/windows/x64/" },
     "icon": ["../src/assets/icon.png", "../src/assets/icon.ico"]
   }
 }

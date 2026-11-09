@@ -62,7 +62,6 @@ fn default_local_roots() -> Vec<String> {
                     }
                 }
             }
-            }
         }
         if !roots.is_empty() {
             return roots;

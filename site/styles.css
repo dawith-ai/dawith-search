@@ -139,3 +139,4 @@ code { padding: 2px 4px; border-radius: 4px; background: #f0f4f1; color: #3d6f57
 @media (max-width: 390px) {
   .side-link { padding-inline: 7px; }.side-link span:last-child { display: none; }.side-link.active span:last-child { display: inline; }.kpi-grid { grid-template-columns: 1fr; }.topbar-actions { margin-left: auto; }.dashboard-head h1 { font-size: 35px; }.operation-flow { gap: 3px; }.flow-step span { font-size: 8px; }.flow-step b { width: 20px; height: 20px; flex-basis: 20px; }.operation-flow > i { font-size: 11px; }.download-card { padding: 17px; }
 }
+.detected-card { box-shadow: 0 0 0 2px #2c7958; }.detected-chip { margin-left: auto; margin-right: 8px; padding: 3px 7px; border-radius: 999px; background: #e3f3e8; color: #1f6a4b; font-size: 9px; font-weight: 800; }.download-note { grid-column: -2 / -1; margin: 12px 0 0; font-size: 11px; }.download-note a { color: #2c7958; font-weight: 750; }

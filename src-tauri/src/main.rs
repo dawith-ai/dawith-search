@@ -178,11 +178,12 @@ fn is_allowed_path(path: &Path, config: &Value) -> bool {
     let candidate = normalize_path(path);
     config_roots(config).iter().any(|root| {
         let scope = normalize_path(root);
-        candidate == scope
-            || candidate
-                .strip_prefix(&scope)
-                .map(|rest| rest.starts_with('/'))
-                .unwrap_or(false)
+        let scope = if scope.len() > 1 {
+            scope.trim_end_matches('/').to_string()
+        } else {
+            scope
+        };
+        candidate == scope || candidate.starts_with(&format!("{scope}/"))
     })
 }
 
@@ -357,6 +358,16 @@ fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Resul
     })
 }
 
+fn everything_ipc_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
+    let helper = helper_path(app)?;
+    let ready = Command::new(&helper)
+        .arg("--status")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+    Some((helper, ready))
+}
+
 fn command_available(command: &str) -> bool {
     Command::new(command)
         .arg("--version")
@@ -519,6 +530,22 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
             } else {
                 payload.get("total").cloned().unwrap_or_else(|| json!(items.len()))
             };
+            if items.is_empty() && !query.trim().is_empty() {
+                let fallback = fallback_walk(&query, &roots, &config, limit);
+                if !fallback.is_empty() {
+                    let mut fallback = fallback;
+                    hydrate_records(&mut fallback, &metadata);
+                    let fallback_total = fallback.len();
+                    return Ok(json!({
+                        "results": fallback,
+                        "totalMatches": fallback_total,
+                        "totalIndexed": 0,
+                        "elapsedMs": started.elapsed().as_millis(),
+                        "backend": "local-fallback",
+                        "warning": "Everything IPC에 결과가 없어 내장 로컬 검색으로 보완했습니다."
+                    }));
+                }
+            }
             let mut items = items;
             hydrate_records(&mut items, &metadata);
             let total_indexed = total.clone();
@@ -875,8 +902,16 @@ fn inspect_root(root_path: String) -> Value {
 
 #[tauri::command]
 fn get_backend_status(app: AppHandle) -> Value {
-    if cfg!(windows) && helper_path(&app).is_some() {
-        return json!({ "backend": "everything-ipc", "label": "Everything IPC 연결 준비됨", "available": true, "detail": "공식 SDK IPC helper" });
+    if cfg!(windows) {
+        if let Some((_helper, true)) = everything_ipc_ready(&app) {
+            return json!({ "backend": "everything-ipc", "label": "Everything IPC 연결됨", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
+        }
+        return json!({
+            "backend": "local-native",
+            "label": "내장 로컬 검색 준비됨",
+            "available": true,
+            "detail": "Everything이 실행 중이 아니어서 내장 로컬 검색으로 파일을 찾습니다."
+        });
     }
     if cfg!(target_os = "macos") {
         return json!({ "backend": "spotlight", "label": "Spotlight 연동", "available": true, "detail": "macOS 시스템 색인을 사용합니다." });
@@ -1026,5 +1061,23 @@ fn main() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Dawith Search Tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn root_scope_allows_children() {
+        let config = json!({ "roots": ["/"] });
+        assert!(is_allowed_path(Path::new("/Users/dawith/Desktop/report.pdf"), &config));
+    }
+
+    #[test]
+    fn scope_boundary_does_not_match_sibling() {
+        let config = json!({ "roots": ["/Users/dawith"] });
+        assert!(is_allowed_path(Path::new("/Users/dawith/Desktop/report.pdf"), &config));
+        assert!(!is_allowed_path(Path::new("/Users/dawith-other/report.pdf"), &config));
+    }
 }
 

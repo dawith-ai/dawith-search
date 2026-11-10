@@ -1,6 +1,6 @@
 [package]
 name = "dawith-search"
-version = "1.2.3"
+version = "1.2.4"
 description = "Lightweight cross-platform file search for Dawith"
 authors = ["Dawith"]
 edition = "2021"

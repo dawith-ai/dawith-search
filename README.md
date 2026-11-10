@@ -63,7 +63,7 @@ npm start
 
 ### 현재 공개 앱 주소
 
-- [설치 안내 홈페이지](https://dawith-search-guide.vercel.app/)
+- [설치 안내 홈페이지](https://dawith-ai.github.io/dawith-search/) (GitHub Pages, 푸시하면 자동 배포) · [Vercel 사본](https://dawith-search-guide.vercel.app/)
 - [최신 릴리스 페이지](https://github.com/dawith-ai/dawith-search/releases/latest)
 - [Google Drive 최신 배포 폴더 (Windows · macOS)](https://drive.google.com/drive/folders/1MAfWcXfVfIS_ZwIC1BGLFTr1xhkCwGvH)
 - [macOS Tauri 경량 universal DMG (Intel + Apple Silicon)](https://drive.google.com/file/d/1bWCPJVQljomx8Fqv0NBWGoH8OHqz2azd/view?usp=drivesdk)

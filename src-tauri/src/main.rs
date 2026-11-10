@@ -351,6 +351,7 @@ fn local_index_roots(config: &Value, native_ready: bool) -> Vec<PathBuf> {
 fn publish_index_snapshot(
     app: &AppHandle,
     records: &[Value],
+    published: &mut usize,
     total_files: usize,
     total_folders: usize,
     root: &Path,
@@ -359,7 +360,11 @@ fn publish_index_snapshot(
     started_at: u128,
 ) {
     if let Ok(mut index) = app.state::<AppState>().local_index.lock() {
-        index.records = records.to_vec();
+        // Append only what was found since the last snapshot. Copying the
+        // whole list every 2000 entries held the lock long enough to stall
+        // searches typed during indexing.
+        index.records.extend_from_slice(&records[*published..]);
+        *published = records.len();
         index.ready = !records.is_empty();
         index.total_files = total_files;
         index.total_folders = total_folders;
@@ -414,6 +419,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             .unwrap_or(64)
             .clamp(1, 256) as usize;
         let mut records = Vec::new();
+        let mut published = 0usize;
         let mut seen = HashSet::new();
         let mut total_files = 0usize;
         let mut total_folders = 0usize;
@@ -441,6 +447,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
                     publish_index_snapshot(
                         &worker_app,
                         &records,
+                        &mut published,
                         total_files,
                         total_folders,
                         root,
@@ -453,6 +460,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             publish_index_snapshot(
                 &worker_app,
                 &records,
+                &mut published,
                 total_files,
                 total_folders,
                 root,
@@ -1053,6 +1061,8 @@ fn search_local_index(
             if !key.is_empty() && key != "0" { *duplicate_counts.entry(key).or_insert(0) += 1; }
         }
     }
+    let lower_query = query.to_ascii_lowercase();
+    let needs_metadata = lower_query.contains("tag:") || lower_query.contains("starred:") || lower_query.contains("star:");
     let mut total_matches = 0usize;
     let mut results = Vec::new();
     for record in &index.records {
@@ -1068,12 +1078,18 @@ fn search_local_index(
             record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
         };
         if (duplicate_by_size || duplicate_by_name) && duplicate_counts.get(&duplicate_key).copied().unwrap_or(0) < 2 { continue; }
-        let mut hydrated = record.clone();
-        hydrate_records(std::slice::from_mut(&mut hydrated), metadata);
-        if !query_matches(&hydrated, query, use_natural_language) { continue; }
-        if !record_matches_content(&hydrated, query) { continue; }
+        // Tags and stars live in metadata, so only those queries need each
+        // record hydrated before matching; others clone just the matches.
+        let matched = if needs_metadata {
+            let mut hydrated = record.clone();
+            hydrate_records(std::slice::from_mut(&mut hydrated), metadata);
+            query_matches(&hydrated, query, use_natural_language)
+        } else {
+            query_matches(record, query, use_natural_language)
+        };
+        if !matched || !record_matches_content(record, query) { continue; }
         total_matches += 1;
-        if results.len() < limit { results.push(hydrated); }
+        if results.len() < limit { results.push(record.clone()); }
     }
     hydrate_records(&mut results, metadata);
     Ok((results, total_matches, total_indexed, index.indexing))

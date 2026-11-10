@@ -12,6 +12,12 @@ let isAiMode = false;
 let currentSortBy = 'name';
 let currentSortOrder = 'asc';
 let searchDebounceTimer = null;
+let lastInputAt = 0;
+let lastSearchAt = 0;
+let lastRenderedSignature = '';
+let searchInFlight = false;
+let searchQueued = false;
+let resultsRenderToken = 0;
 let historyDebounceTimer = null;
 let currentContextItem = null;
 let scopeRoot = '';
@@ -561,8 +567,29 @@ function shouldUseNaturalLanguage(query) {
   return /(?:오늘|어제|지난주|문서|사진|이미지|동영상|엑셀|스프레드시트|큰 파일|대용량|중복 파일|이상|이하)/i.test(query);
 }
 
+// Everything answers one query at a time, so firing a search per keystroke
+// queues them and the table lags behind the typing. Keep a single search in
+// flight and, when it finishes, run only the latest input.
 async function executeSearch() {
+  if (searchInFlight) {
+    searchQueued = true;
+    return;
+  }
+  searchInFlight = true;
+  try {
+    await runSearch();
+  } finally {
+    searchInFlight = false;
+    if (searchQueued) {
+      searchQueued = false;
+      executeSearch();
+    }
+  }
+}
+
+async function runSearch() {
   const requestId = ++searchRequestId;
+  lastSearchAt = Date.now();
   const rawInput = searchInput.value.trim();
   const query = (currentFilter ? currentFilter + ' ' : '') + rawInput;
 
@@ -583,11 +610,18 @@ async function executeSearch() {
     // response overwrite the result for the latest user query.
     if (requestId !== searchRequestId) return;
 
-    searchResults = res.results || [];
-    selectedIndex = searchResults.length > 0 ? 0 : -1;
-    selectedIndexes = searchResults.length > 0 ? new Set([0]) : new Set();
-    updateSelectionUI();
-    renderResults(searchResults, rawInput);
+    const nextResults = res.results || [];
+    // Rebuilding identical rows resets scroll and selection and makes the
+    // table flicker; keep the current rows when nothing changed.
+    const signature = rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
+    if (signature !== lastRenderedSignature) {
+      lastRenderedSignature = signature;
+      searchResults = nextResults;
+      selectedIndex = searchResults.length > 0 ? 0 : -1;
+      selectedIndexes = searchResults.length > 0 ? new Set([0]) : new Set();
+      updateSelectionUI();
+      renderResults(searchResults, rawInput);
+    }
 
     if (backendStatus) {
       backendStatus.textContent = res.backend === 'everything-ipc'
@@ -621,14 +655,25 @@ async function executeSearch() {
 }
 
 function triggerSearch() {
+  lastInputAt = Date.now();
   clearTimeout(searchDebounceTimer);
-  // The native/local index is queryable in memory. Keep the field responsive
-  // without making every keypress wait behind a full-disk walk.
-  searchDebounceTimer = setTimeout(executeSearch, 45);
+  // Wait for a short typing pause so each keystroke (and each Hangul
+  // composition step) does not start its own native search.
+  searchDebounceTimer = setTimeout(executeSearch, 120);
+}
+
+// Background indexing reports progress every few thousand entries. Refresh
+// the visible results at most every few seconds, and never while typing.
+function refreshResultsForIndexing() {
+  if (!(searchInput.value.trim() || currentFilter || scopeRoot)) return;
+  const now = Date.now();
+  if (now - lastInputAt < 1500 || now - lastSearchAt < 5000) return;
+  executeSearch();
 }
 
 // Render Results Table
 function renderResults(items, currentQuery) {
+  const renderToken = ++resultsRenderToken;
   tableBody.innerHTML = '';
 
   if (items.length === 0) {
@@ -645,9 +690,7 @@ function renderResults(items, currentQuery) {
   }
   emptyState.style.display = 'none';
 
-  const fragment = document.createDocumentFragment();
-
-  items.forEach((item, idx) => {
+  const buildRow = (item, idx) => {
     const row = document.createElement('div');
     row.className = `table-row ${selectedIndexes.has(idx) ? 'selected' : ''}`;
     row.dataset.index = idx;
@@ -736,11 +779,30 @@ function renderResults(items, currentQuery) {
       showContextMenu(e.clientX, e.clientY, item);
     });
 
-    fragment.appendChild(row);
-  });
+    return row;
+  };
 
-  tableBody.appendChild(fragment);
+  const appendRows = (start, end) => {
+    const fragment = document.createDocumentFragment();
+    for (let idx = start; idx < end; idx++) fragment.appendChild(buildRow(items[idx], idx));
+    tableBody.appendChild(fragment);
+  };
+
+  // Building all rows at once blocked the UI for 100-150 ms per search.
+  // Show the first screen immediately and add the rest one frame at a time;
+  // a newer render cancels the remaining batches.
+  const batchSize = 40;
+  let next = Math.min(items.length, batchSize);
+  appendRows(0, next);
   scrollToSelected();
+  const appendNextBatch = () => {
+    if (renderToken !== resultsRenderToken || next >= items.length) return;
+    const end = Math.min(items.length, next + batchSize);
+    appendRows(next, end);
+    next = end;
+    requestAnimationFrame(appendNextBatch);
+  };
+  requestAnimationFrame(appendNextBatch);
 }
 
 function selectRow(index) {
@@ -1783,7 +1845,7 @@ window.dawithAPI.onIndexStatus((data) => {
   } else if (data.status === 'indexing-progress') {
     titlebarStatus.textContent = `색인 중 · ${Number(data.stats?.totalFiles || 0).toLocaleString()}개 파일 발견`;
     statTotalIndexed.textContent = `색인 항목: ${Number((data.stats?.totalFiles || 0) + (data.stats?.totalFolders || 0)).toLocaleString()}개`;
-    if (searchInput.value.trim() || currentFilter || scopeRoot) executeSearch();
+    refreshResultsForIndexing();
   } else if (data.status === 'error') {
     statusDot.className = 'status-dot error';
     titlebarStatus.textContent = '색인 오류';

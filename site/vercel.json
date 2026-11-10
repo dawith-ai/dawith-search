@@ -1,0 +1,4 @@
+{
+  "cleanUrls": true,
+  "redirects": [{ "source": "/downloads", "destination": "/download", "permanent": true }]
+}

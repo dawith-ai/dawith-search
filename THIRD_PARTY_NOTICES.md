@@ -1,5 +1,14 @@
 # Third-party notices
 
+> Everything is a product and trademark of voidtools. Dawith Search is an
+> independent project and is not affiliated with, endorsed by, or sponsored by
+> voidtools. Dawith Search does not include or redistribute Everything; it only
+> talks to an Everything instance the user installed separately.
+
+The full license texts of the bundled components are installed with the app
+in its `licenses` folder (`LICENSE-Everything-SDK.txt`, `LICENSE-goz.txt`,
+`THIRD_PARTY_LICENSES-rust.txt`).
+
 ## goz
 
 Windows NTFS filename indexing is provided by the vendored `native/goz` project.

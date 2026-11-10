@@ -355,3 +355,7 @@ html { scroll-padding-top: 76px; }
   html { scroll-behavior: auto; }
   .reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* Trademark / non-affiliation line under the footer links. */
+.site-footer { flex-wrap: wrap; padding-bottom: 14px; }
+.footer-tm { flex-basis: 100%; order: 9; margin-top: -6px; color: #a3b0a8; font-size: 9.5px; }

@@ -18,3 +18,34 @@ project. The SDK source notice is preserved in
 The application must not copy or redistribute the user's installed
 `Everything.exe`. If the SDK helper is unavailable, the app uses `goz` or its
 own local fallback index.
+
+## Libraries bundled in the Windows/macOS Tauri app
+
+Versions are the ones locked in `src-tauri/Cargo.lock`. Each crate's license
+text ships with its source on crates.io or in the linked repository.
+
+| Component | Version | License | Source |
+|---|---|---|---|
+| Tauri | 2.12.5 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tauri |
+| serde | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
+| serde_json | 1.0.154 | MIT OR Apache-2.0 | https://github.com/serde-rs/json |
+| walkdir | 2.5.0 | Unlicense OR MIT | https://github.com/BurntSushi/walkdir |
+| OpenHWP `hwp` | git c605402 | MIT | https://github.com/openhwp/openhwp |
+| lopdf | 0.34.0 | MIT | https://github.com/J-F-Liu/lopdf |
+| image | 0.25.10 | MIT OR Apache-2.0 | https://github.com/image-rs/image |
+| ureq | 2.12.1 | MIT OR Apache-2.0 | https://github.com/algesten/ureq |
+| sha2 | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
+| trash | 5.3.0 | MIT | https://github.com/Byron/trash-rs |
+| rfd | 0.15.4 | MIT | https://github.com/PolyMeilex/rfd |
+
+Transitive dependencies keep their own licenses; `cargo tree` lists them.
+
+## Libraries in the legacy Electron build (1.1.x)
+
+| Component | Version | License | Source |
+|---|---|---|---|
+| Electron | 45.0.0 | MIT | https://github.com/electron/electron |
+| chokidar | 3.6.0 | MIT | https://github.com/paulmillr/chokidar |
+| pdf-lib | 1.17.1 | MIT | https://github.com/Hopding/pdf-lib |
+| Express | 4.22.3 | MIT | https://github.com/expressjs/express |
+| node-qrcode | 1.5.4 | MIT | https://github.com/soldair/node-qrcode |

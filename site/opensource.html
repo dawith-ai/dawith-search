@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f4f7f4" />
+    <meta name="description" content="Dawith Search가 사용하는 오픈소스 프로젝트와 라이선스 목록입니다." />
+    <meta property="og:title" content="Dawith Search 오픈소스" />
+    <meta property="og:description" content="Dawith Search가 사용하는 오픈소스 프로젝트와 라이선스." />
+    <meta property="og:type" content="website" />
+    <title>Dawith Search 오픈소스</title>
+    <link rel="icon" href="./ci.png" type="image/png" />
+    <link rel="stylesheet" href="./styles.css" />
+      <script src="./effects.js" defer></script>
+  </head>
+  <body class="dl-page">
+    <header class="dl-header">
+      <div class="dl-header-inner">
+        <a class="brand" href="./" aria-label="Dawith Search 홈"><img src="./ci.png" alt="" aria-hidden="true" /><span>Dawith <small>Search · 파일 작업대</small></span></a>
+        <nav class="dl-nav" aria-label="사이트 메뉴">
+          <a href="./">홈</a>
+          <a href="./download.html">다운로드</a>
+          <a href="./faq.html">자주 묻는 질문</a>
+          <a href="./help.html">도움말</a>
+          <a class="active" href="./opensource.html" aria-current="page">오픈소스</a>
+          <a href="./contact.html">문의</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="dl-main">
+      <section class="dl-hero">
+        <p class="eyebrow">OPEN SOURCE</p>
+        <h1>이 오픈소스들 덕분에<br />만들 수 있었습니다.</h1>
+        <p class="dl-lead">Dawith Search도 <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">MIT License</a>로 공개한 오픈소스입니다. 여기에는 주요 프로젝트만 적었고, 전체 고지는 저장소의 <a href="https://github.com/dawith-ai/dawith-search/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">THIRD_PARTY_NOTICES</a> 파일에 있습니다.</p>
+      </section>
+
+      <section class="dl-section" id="windows">
+        <h2>Windows 1.2 버전</h2>
+        <div class="oss-groups">
+          <div class="oss-group">
+            <h3>앱 바탕</h3>
+            <ul>
+              <li><a href="https://github.com/tauri-apps/tauri" target="_blank" rel="noreferrer">Tauri</a><small>창과 화면을 띄우는 앱의 틀 · MIT 또는 Apache-2.0</small></li>
+              <li><a href="https://github.com/serde-rs/serde" target="_blank" rel="noreferrer">serde</a><small>설정과 데이터 읽고 쓰기 · MIT 또는 Apache-2.0</small></li>
+              <li><a href="https://github.com/serde-rs/json" target="_blank" rel="noreferrer">serde_json</a><small>JSON 처리 · MIT 또는 Apache-2.0</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>빠른 검색</h3>
+            <ul>
+              <li><a href="https://www.voidtools.com/en-us/support/everything/sdk/" target="_blank" rel="noreferrer">Everything SDK</a><small>실행 중인 Everything에 IPC로 검색 요청 · MIT</small></li>
+              <li><a href="https://github.com/mustafaahci/goz" target="_blank" rel="noreferrer">goz</a><small>NTFS MFT를 읽는 검색 엔진(goz, gozd) · MIT</small></li>
+              <li><a href="https://github.com/BurntSushi/walkdir" target="_blank" rel="noreferrer">walkdir</a><small>자체 색인용 폴더 탐색 · MIT 또는 Unlicense</small></li>
+            </ul>
+            <p class="oss-group-note">Everything 본체는 Voidtools의 별도 프로그램입니다. Dawith Search에는 들어 있지 않고, 설치된 Everything.exe를 복사하지도 않습니다.</p>
+          </div>
+          <div class="oss-group">
+            <h3>한글(HWP)</h3>
+            <ul>
+              <li><a href="https://github.com/openhwp/openhwp" target="_blank" rel="noreferrer">OpenHWP</a><small>한글 문서 본문 읽기(hwp) · MIT</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>PDF·이미지 변환</h3>
+            <ul>
+              <li><a href="https://github.com/J-F-Liu/lopdf" target="_blank" rel="noreferrer">lopdf</a><small>PDF 만들기, 합치기, 나누기 · MIT</small></li>
+              <li><a href="https://github.com/image-rs/image" target="_blank" rel="noreferrer">image</a><small>이미지 읽기와 형식 바꾸기 · MIT 또는 Apache-2.0</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>업데이트·검증</h3>
+            <ul>
+              <li><a href="https://github.com/algesten/ureq" target="_blank" rel="noreferrer">ureq</a><small>새 버전 확인과 내려받기(HTTPS) · MIT 또는 Apache-2.0</small></li>
+              <li><a href="https://github.com/RustCrypto/hashes" target="_blank" rel="noreferrer">sha2</a><small>내려받은 파일의 SHA-256 확인 · MIT 또는 Apache-2.0</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>파일 작업</h3>
+            <ul>
+              <li><a href="https://github.com/ArturKovacs/trash" target="_blank" rel="noreferrer">trash</a><small>휴지통으로 삭제 · MIT</small></li>
+              <li><a href="https://github.com/PolyMeilex/rfd" target="_blank" rel="noreferrer">rfd</a><small>폴더 선택 창 · MIT</small></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="dl-section" id="electron">
+        <h2>이전 Electron 버전</h2>
+        <p class="oss-section-note">macOS용과 휴대용 EXE(1.1.8)가 이 버전입니다. 저장소에는 기능 비교와 롤백용으로 남겨 두었습니다.</p>
+        <div class="oss-groups">
+          <div class="oss-group">
+            <h3>앱 바탕</h3>
+            <ul>
+              <li><a href="https://github.com/electron/electron" target="_blank" rel="noreferrer">Electron</a><small>데스크톱 앱의 틀 · MIT</small></li>
+              <li><a href="https://github.com/paulmillr/chokidar" target="_blank" rel="noreferrer">chokidar</a><small>파일 변경 감시 · MIT</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>PDF</h3>
+            <ul>
+              <li><a href="https://github.com/Hopding/pdf-lib" target="_blank" rel="noreferrer">pdf-lib</a><small>PDF 만들기, 합치기, 나누기 · MIT</small></li>
+            </ul>
+          </div>
+          <div class="oss-group">
+            <h3>모바일 원격 공유</h3>
+            <ul>
+              <li><a href="https://github.com/expressjs/express" target="_blank" rel="noreferrer">Express</a><small>휴대폰에서 검색하는 원격 서버 · MIT</small></li>
+              <li><a href="https://github.com/soldair/node-qrcode" target="_blank" rel="noreferrer">node-qrcode</a><small>접속 주소 QR 코드 · MIT</small></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="dl-section" id="references">
+        <h2>참고한 프로젝트</h2>
+        <p class="oss-section-note">코드는 가져오지 않고 기능과 설계를 참고했습니다.</p>
+        <ul class="oss-refs">
+          <li><a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything</a> AND·OR·NOT, <code>ext:</code>, <code>size:</code> 같은 검색 문법을 참고했습니다.</li>
+          <li><a href="https://github.com/MalyStern/sift-file-search" target="_blank" rel="noreferrer">Sift File Search</a> 저장 검색, 최근 검색, 키보드만으로 다루는 방식을 참고했습니다.</li>
+          <li><a href="https://github.com/Pixel-Master/File-Find" target="_blank" rel="noreferrer">File-Find</a> 검색 캐시, 제외 목록, 권한 안내를 참고했습니다.</li>
+          <li><a href="https://github.com/DieDust/FilesMate" target="_blank" rel="noreferrer">FilesMate</a> 폴더 범위, 즐겨찾기, 미리보기를 묶어 쓰는 방식을 참고했습니다.</li>
+        </ul>
+        <p class="dl-table-note"><a href="https://github.com/dawith-ai/dawith-search/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">오픈소스 고지</a> · <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">라이선스</a></p>
+      </section>
+    </main>
+
+    <footer class="site-footer dl-footer"><span class="footer-brand">Dawith Search</span><span>파일은 이 PC 밖으로 나가지 않습니다.</span><span><a href="./download.html">다운로드</a> · <a href="./faq.html">자주 묻는 질문</a> · <a href="./help.html">도움말</a> · <a href="./opensource.html">오픈소스</a> · <a href="./contact.html">문의</a> · <a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://github.com/dawith-ai/dawith-search/releases" target="_blank" rel="noreferrer">릴리스</a> · <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">라이선스</a></span></footer>
+  </body>
+</html>

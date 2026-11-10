@@ -295,6 +295,33 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="indexIntroModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="indexIntroTitle">
+    <div class="modal-dialog index-intro-dialog">
+      <div class="modal-header">
+        <div>
+          <span class="modal-kicker" id="indexIntroKicker">처음 준비 중</span>
+          <h3 id="indexIntroTitle">파일 목록을 준비하고 있습니다</h3>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" id="indexIntroBody">처음 한 번 PC와 추가한 위치의 파일 목록을 읽고 있습니다. 다 읽으면 모든 위치를 빠짐없이 검색할 수 있습니다. 잠시만 기다려 주세요.</p>
+        <div class="index-intro-progress" aria-live="polite">
+          <div class="index-intro-track"><span id="indexIntroBar"></span></div>
+          <div class="index-intro-meta"><strong id="indexIntroCount">0개 확인</strong><span id="indexIntroWhere">시작하는 중…</span></div>
+        </div>
+        <ul class="index-intro-tips">
+          <li>파일이 많거나 공유폴더가 있으면 몇 분 걸릴 수 있습니다.</li>
+          <li>공유폴더나 외장 디스크는 오른쪽 위 <b>폴더·공유 위치 추가</b>로 넣습니다.</li>
+          <li>이 창을 닫아도 준비는 계속되고, 진행 상황은 위쪽 막대에 보입니다.</li>
+        </ul>
+        <div class="index-intro-actions">
+          <button class="btn btn-ghost" id="btnIndexIntroHide" type="button">닫고 기다리기</button>
+          <button class="btn btn-primary" id="btnIndexIntroClose" type="button" disabled>잠시만 기다려 주세요…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay mode-choice-overlay" id="modeChoiceModal" style="display: none;">
     <div class="modal-dialog mode-choice-dialog">
       <div class="mode-choice-mark"><img src="assets/icon.png" alt="Dawith CI"></div>

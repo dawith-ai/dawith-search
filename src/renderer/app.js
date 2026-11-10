@@ -639,6 +639,9 @@ async function runSearch() {
     statElapsed.textContent = `${res.elapsedMs} ms`;
     statTotalIndexed.textContent = `색인 항목: ${res.totalIndexed.toLocaleString()}개`;
     if (res.indexing) {
+      // Indexing can already be running when this window opens; show the
+      // first-run guide from the search response too, not only from events.
+      showIndexIntro();
       titlebarStatus.textContent = `색인 중 · ${res.totalIndexed.toLocaleString()}개 항목 준비됨`;
     }
 
@@ -1831,8 +1834,74 @@ document.getElementById('btnMaximize').addEventListener('click', () => window.da
 document.getElementById('btnClose').addEventListener('click', () => window.dawithAPI.closeWindow());
 
 // Realtime Index Status
+// First-run guide: while the first file list is being built, explain what is
+// happening so new users are not left wondering why results are still coming
+// in. Shown once (until the first indexing run finishes), after the screen
+// mode choice is closed so two dialogs never stack.
+const INDEX_INTRO_DONE = 'dawith-index-intro-done';
+const indexIntroModal = document.getElementById('indexIntroModal');
+let indexIntroPending = false;
+let indexIntroDismissed = false;
+
+function indexIntroWanted() {
+  return indexIntroModal && !indexIntroDismissed && localStorage.getItem(INDEX_INTRO_DONE) !== '1';
+}
+
+function showIndexIntro() {
+  if (!indexIntroWanted() || indexIntroModal.style.display === 'flex') return;
+  if (modeChoiceModal && modeChoiceModal.style.display === 'flex') { indexIntroPending = true; return; }
+  indexIntroPending = false;
+  indexIntroModal.querySelector('.index-intro-dialog').classList.add('is-working');
+  indexIntroModal.style.display = 'flex';
+}
+
+function updateIndexIntro(data = {}) {
+  if (!indexIntroModal) return;
+  const stats = data.stats || data;
+  const found = Number(stats.totalFiles || 0) + Number(stats.totalFolders || 0);
+  if (data.status === 'indexing-progress') {
+    const rootIndex = Number(stats.rootIndex || 0);
+    const totalRoots = Math.max(1, Number(stats.totalRoots || 1));
+    document.getElementById('indexIntroCount').textContent = `${found.toLocaleString()}개 확인`;
+    document.getElementById('indexIntroWhere').textContent = `${getPathLabel(stats.root || '')} 읽는 중 (${rootIndex + 1}/${totalRoots})`;
+    document.getElementById('indexIntroBar').style.width = `${Math.min(95, Math.max(12, ((rootIndex + 0.5) / totalRoots) * 100))}%`;
+  }
+  if (data.status === 'idle') {
+    localStorage.setItem(INDEX_INTRO_DONE, '1');
+    indexIntroModal.querySelector('.index-intro-dialog').classList.remove('is-working');
+    document.getElementById('indexIntroKicker').textContent = '준비 완료';
+    document.getElementById('indexIntroTitle').textContent = '파일 목록 준비가 끝났습니다';
+    document.getElementById('indexIntroCount').textContent = `${found.toLocaleString()}개 확인`;
+    document.getElementById('indexIntroWhere').textContent = '이제 모든 위치를 검색할 수 있습니다.';
+    document.getElementById('indexIntroBar').style.width = '100%';
+    const startButton = document.getElementById('btnIndexIntroClose');
+    startButton.disabled = false;
+    startButton.textContent = '검색 시작하기';
+    document.getElementById('btnIndexIntroHide').hidden = true;
+  }
+}
+
+document.getElementById('btnIndexIntroHide')?.addEventListener('click', () => {
+  indexIntroDismissed = true;
+  indexIntroModal.style.display = 'none';
+});
+
+document.getElementById('btnIndexIntroClose')?.addEventListener('click', () => {
+  indexIntroDismissed = true;
+  indexIntroModal.style.display = 'none';
+  searchInput.focus();
+});
+
+if (modeChoiceModal) {
+  new MutationObserver(() => {
+    if (indexIntroPending && modeChoiceModal.style.display !== 'flex') showIndexIntro();
+  }).observe(modeChoiceModal, { attributes: true, attributeFilter: ['style'] });
+}
+
 window.dawithAPI.onIndexStatus((data) => {
   updateIndexingBanner(data);
+  if (data.status === 'indexing' || data.status === 'indexing-progress') showIndexIntro();
+  updateIndexIntro(data);
   if (data.status === 'indexing') {
     statusDot.className = 'status-dot indexing';
     titlebarStatus.textContent = '색인 작업 진행 중...';

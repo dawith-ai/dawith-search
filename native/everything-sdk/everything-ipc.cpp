@@ -72,6 +72,8 @@ int status() {
   return 0;
 }
 
+int runQuery(const std::wstring& query, DWORD limit, bool pathOnly);
+
 int search(int argc, wchar_t** argv) {
   DWORD limit = kDefaultLimit;
   bool json = false;
@@ -99,7 +101,44 @@ int search(int argc, wchar_t** argv) {
     if (index > 0) query += L" ";
     query += queryParts[index];
   }
+  return runQuery(query, limit, pathOnly);
+}
 
+std::wstring fromUtf8(const std::string& value) {
+  if (value.empty()) return {};
+  const int chars = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+  if (chars <= 0) return {};
+  std::wstring result(static_cast<size_t>(chars), L'\0');
+  MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), &result[0], chars);
+  return result;
+}
+
+// --serve keeps one process alive and answers one query per stdin line:
+//   "<limit>\t<pathOnly 0|1>\t<query>"  ->  one JSON line on stdout.
+// Starting a new helper per search cost 0.4-2.5 s on PCs where security
+// software inspects every process launch; a resident helper avoids that.
+int serve() {
+  std::vector<char> line(65536);
+  while (std::fgets(line.data(), static_cast<int>(line.size()), stdin)) {
+    std::string request(line.data());
+    while (!request.empty() && (request.back() == '\n' || request.back() == '\r')) request.pop_back();
+    const size_t first = request.find('\t');
+    const size_t second = first == std::string::npos ? std::string::npos : request.find('\t', first + 1);
+    if (second == std::string::npos) {
+      std::printf("{\"error\":\"bad request\"}\n");
+    } else {
+      const DWORD limit = std::min<DWORD>(kMaxLimit, std::max<DWORD>(1, static_cast<DWORD>(std::atoi(request.substr(0, first).c_str()))));
+      const bool pathOnly = request.substr(first + 1, second - first - 1) == "1";
+      if (runQuery(fromUtf8(request.substr(second + 1)), limit, pathOnly) != 0) {
+        std::printf("{\"error\":\"ipc\"}\n");
+      }
+    }
+    std::fflush(stdout);
+  }
+  return 0;
+}
+
+int runQuery(const std::wstring& query, DWORD limit, bool pathOnly) {
   Everything_SetSearchW(query.c_str());
   Everything_SetMax(limit);
   Everything_SetOffset(0);
@@ -163,5 +202,6 @@ int wmain(int argc, wchar_t** argv) {
     return 0;
   }
   if (argc > 1 && std::wstring(argv[1]) == L"--status") return status();
+  if (argc > 1 && std::wstring(argv[1]) == L"--serve") return serve();
   return search(argc, argv);
 }

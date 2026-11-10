@@ -389,6 +389,13 @@ fn publish_index_snapshot(
 
 fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
     let native_ready = cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false);
+    if native_ready {
+        // Start the resident helper now so the first search does not pay
+        // for launching it.
+        if let Some(helper) = helper_path(app) {
+            std::thread::spawn(move || { let _ = resident_query(&helper, "", 1, true); });
+        }
+    }
     let state = app.state::<AppState>();
     let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
     {
@@ -422,6 +429,9 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             .clamp(1, 256) as usize;
         let mut records = Vec::new();
         let mut published = 0usize;
+        // Report at least once a second as well: slow network folders can go
+        // a long time between 2000-entry batches, which looked frozen.
+        let mut last_report = std::time::Instant::now();
         let mut seen = HashSet::new();
         let mut total_files = 0usize;
         let mut total_folders = 0usize;
@@ -445,7 +455,8 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
                     }
                     records.push(record);
                 }
-                if records.len() % 2000 == 0 {
+                if records.len() % 2000 == 0 || last_report.elapsed() >= std::time::Duration::from_secs(1) {
+                    last_report = std::time::Instant::now();
                     publish_index_snapshot(
                         &worker_app,
                         &records,
@@ -857,11 +868,73 @@ fn query_needs_native_metadata(query: &str) -> bool {
     })
 }
 
+// One everything-ipc process kept alive for the whole session. Launching a
+// helper per search cost 0.4-2.5 s on PCs whose security software inspects
+// every new process; a resident helper answers in ~0.2 s.
+struct ResidentHelper {
+    child: std::process::Child,
+    stdin: std::process::ChildStdin,
+    stdout: std::io::BufReader<std::process::ChildStdout>,
+}
+
+static RESIDENT_HELPER: Mutex<Option<ResidentHelper>> = Mutex::new(None);
+
+fn start_resident_helper(helper: &Path) -> Result<ResidentHelper, String> {
+    let mut child = hidden_command(helper)
+        .arg("--serve")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    let stdin = child.stdin.take().ok_or("helper stdin unavailable")?;
+    let stdout = std::io::BufReader::new(child.stdout.take().ok_or("helper stdout unavailable")?);
+    Ok(ResidentHelper { child, stdin, stdout })
+}
+
+fn resident_query(helper: &Path, query: &str, limit: usize, path_only: bool) -> Result<Value, String> {
+    use std::io::BufRead;
+    // The protocol is one line per request, so tabs and newlines in the
+    // query itself become spaces.
+    let clean = query.replace(['\t', '\r', '\n'], " ");
+    let request = format!("{limit}\t{}\t{clean}\n", if path_only { 1 } else { 0 });
+    let mut slot = RESIDENT_HELPER.lock().map_err(|_| "helper lock poisoned")?;
+    for attempt in 0..2 {
+        let alive = slot.as_mut().map(|helper| matches!(helper.child.try_wait(), Ok(None))).unwrap_or(false);
+        if !alive {
+            *slot = Some(start_resident_helper(helper)?);
+        }
+        let resident = slot.as_mut().expect("helper just started");
+        let mut line = String::new();
+        let answered = resident.stdin.write_all(request.as_bytes()).and_then(|_| resident.stdin.flush()).is_ok()
+            && resident.stdout.read_line(&mut line).map(|read| read > 0).unwrap_or(false);
+        if answered {
+            let value = serde_json::from_str::<Value>(line.trim()).map_err(|error| error.to_string())?;
+            if let Some(error) = value.get("error").and_then(Value::as_str) {
+                return Err(format!("Everything IPC: {error}"));
+            }
+            return Ok(value);
+        }
+        if let Some(mut dead) = slot.take() {
+            let _ = dead.child.kill();
+        }
+        if attempt == 1 {
+            break;
+        }
+    }
+    Err("Everything helper did not answer".to_string())
+}
+
 fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Result<Value, String>> {
     if !cfg!(windows) {
         return None;
     }
     let helper = helper_path(app)?;
+    let path_only = !query_needs_native_metadata(query);
+    if let Ok(value) = resident_query(&helper, query, limit, path_only) {
+        return Some(Ok(value));
+    }
+    // Fall back to a one-shot helper (e.g. an older helper without --serve).
     let mut command = hidden_command(helper);
     command.arg("--json");
     if !query_needs_native_metadata(query) {

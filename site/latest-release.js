@@ -3,7 +3,7 @@
  * so a new release shows up here without editing the site.
  * The static HTML holds fallback values; on any failure nothing changes.
  *
- * Keys: version (1.2.1), tag (v1.2.1), date (2026년 11월 9일), release-url (href),
+ * Keys: version (1.3.3), tag (v1.3.3), date (2026년 11월 10일), release-url (href),
  *       win-url (href), win-name, win-size-kb, win-sha256,
  *       mac-url (href), mac-name, mac-version, mac-size-kb, mac-size-mb, mac-sha256,
  *       mac-pending (hidden when the latest release ships a DMG).

@@ -728,10 +728,16 @@ function renderResults(items, currentQuery) {
       </div>
     `;
 
+    const starButton = row.querySelector('.row-star');
+    starButton.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggleItemStar(item);
+    });
+
     // Row selection and click events
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('row-star')) {
-        toggleItemStar(item);
+      if (e.target.closest('.row-star')) {
         return;
       }
       if (e.target.classList.contains('row-btn-open')) {

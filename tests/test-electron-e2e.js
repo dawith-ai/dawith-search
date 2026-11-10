@@ -308,6 +308,8 @@ async function run() {
   const indexingDetail = await evaluate("document.querySelector('#indexingBannerDetail')?.textContent || ''");
   assert.ok(indexingDetail.includes('검색은 계속 사용할 수 있습니다'));
   await evaluate("updateIndexingBanner({ status: 'idle' })");
+  await evaluate("(() => { const modal = document.querySelector('#indexIntroModal'); const close = document.querySelector('#btnIndexIntroHide'); if (modal?.style.display === 'flex' && close) close.click(); return true; })()");
+  await waitFor('index intro dismissed', async () => (await evaluate("document.querySelector('#indexIntroModal')?.style.display")) !== 'flex');
   record('초기 색인 진행 표시', '진행 배너·발견 항목·검색 가능 안내 확인');
 
   const initialSearchTarget = await evaluate(`({

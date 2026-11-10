@@ -359,3 +359,10 @@ html { scroll-padding-top: 76px; }
 /* Trademark / non-affiliation line under the footer links. */
 .site-footer { flex-wrap: wrap; padding-bottom: 14px; }
 .footer-tm { flex-basis: 100%; order: 9; margin-top: -6px; color: #a3b0a8; font-size: 9.5px; }
+
+/* Contact page: steps that send visitors to the welfare-hub inquiry board. */
+.ct-steps { margin: 14px 0 16px; padding-left: 20px; color: #4f6358; font-size: 13px; line-height: 1.8; }
+.ct-steps b { color: #244234; }
+.ct-alt { margin: 16px 0 0; color: #7c8d83; font-size: 12px; }
+.ct-alt a { color: #2c7958; font-weight: 700; }
+.ct-panel > .ct-warn { margin: 0 0 4px; color: #b4532a; font-size: 12px; font-weight: 700; }

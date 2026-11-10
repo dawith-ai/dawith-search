@@ -1,6 +1,6 @@
 [package]
 name = "dawith-search"
-version = "1.2.1"
+version = "1.2.2"
 description = "Lightweight cross-platform file search for Dawith"
 authors = ["Dawith"]
 edition = "2021"
@@ -18,6 +18,8 @@ trash = "5"
 walkdir = "2"
 ureq = { version = "2", features = ["json"] }
 sha2 = "0.10"
+lopdf = "0.34"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp", "tiff"] }
 hwp = { git = "https://github.com/openhwp/openhwp", package = "hwp" }
 
 [features]

@@ -11,6 +11,8 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
 use walkdir::WalkDir;
 
+mod convert;
+
 struct AppState {
     config: Mutex<Value>,
     data_dir: PathBuf,
@@ -997,41 +999,41 @@ fn record_matches_content(record: &Value, query: &str) -> bool {
     terms.iter().all(|term| content.contains(term))
 }
 
-fn is_image_extension(extension: &str) -> bool {
-    matches!(extension, "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "tif" | "tiff" | "heic")
-}
-
-fn is_office_extension(extension: &str) -> bool {
-    matches!(extension, "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "odt" | "ods" | "odp" | "hwp" | "hwpx")
-}
-
 fn conversion_options(paths: &[PathBuf]) -> Value {
     if paths.is_empty() {
         return json!([]);
     }
     let extensions = paths.iter().map(|path| file_extension(path)).collect::<Vec<_>>();
     let mut options = Vec::new();
-    let can_convert_images = cfg!(target_os = "macos") || command_available("magick");
-    if extensions.iter().all(|extension| is_image_extension(extension)) && can_convert_images {
+    let all_images = extensions.iter().all(|extension| convert::RASTER_IMAGE_EXTENSIONS.contains(&extension.as_str()));
+    if all_images {
         options.push(json!({
             "id": "images-to-pdf",
-            "label": "이미지 → PDF",
-            "detail": "설치된 OS 이미지 변환 도구를 사용합니다."
+            "label": if paths.len() > 1 { "이미지를 PDF 하나로 묶기" } else { "PDF로 변환" },
+            "detail": "원본은 유지하고 같은 폴더에 새 파일을 만듭니다."
         }));
+        if paths.len() == 1 {
+            if extensions[0] != "png" {
+                options.push(json!({ "id": "image-to-png", "label": "PNG로 변환", "detail": "원본은 유지하고 같은 폴더에 PNG를 만듭니다." }));
+            }
+            if extensions[0] != "jpg" && extensions[0] != "jpeg" {
+                options.push(json!({ "id": "image-to-jpg", "label": "JPG로 변환", "detail": "투명한 부분은 흰색으로 채웁니다." }));
+            }
+        }
     }
-    if extensions.iter().all(|extension| is_office_extension(extension)) && command_available("soffice") {
-        options.push(json!({
-            "id": "office-to-pdf",
-            "label": "문서 → PDF",
-            "detail": "설치된 LibreOffice를 사용합니다. 암호화 문서는 변환하지 않습니다."
-        }));
+    if extensions.iter().all(|extension| extension == "pdf") {
+        if paths.len() > 1 {
+            options.push(json!({ "id": "merge-pdf", "label": "PDF 하나로 합치기", "detail": format!("{}개 PDF를 선택 순서대로 합칩니다.", paths.len()) }));
+        } else {
+            options.push(json!({ "id": "split-pdf", "label": "PDF 페이지별로 나누기", "detail": "페이지마다 별도 PDF를 만듭니다." }));
+        }
     }
-    if extensions.iter().all(|extension| extension == "pdf") && extensions.len() > 1 && command_available("pdfunite") {
-        options.push(json!({
-            "id": "merge-pdf",
-            "label": "PDF 병합",
-            "detail": "설치된 Poppler pdfunite를 사용합니다."
-        }));
+    if paths.len() == 1 && convert::WINDOWS_OFFICE_EXTENSIONS.contains(&extensions[0].as_str()) {
+        if cfg!(windows) {
+            options.push(json!({ "id": "office-to-pdf", "label": "PDF로 변환", "detail": "설치된 Word·Excel·PowerPoint·한글을 사용합니다. 암호·보안 문서는 제외됩니다." }));
+        } else if command_available("soffice") {
+            options.push(json!({ "id": "office-to-pdf", "label": "PDF로 변환", "detail": "설치된 LibreOffice를 사용합니다. 암호화 문서는 변환하지 않습니다." }));
+        }
     }
     Value::Array(options)
 }
@@ -1523,7 +1525,7 @@ fn get_conversion_options(file_paths: Vec<String>, state: State<'_, AppState>) -
     if paths.iter().any(|path| !is_allowed_path(path, &config)) { return Ok(json!({ "success": false, "error": "허용된 검색 경로의 파일만 변환할 수 있습니다." })); }
     if paths.iter().any(|path| path.is_dir()) { return Ok(json!({ "success": false, "error": "폴더 자체는 변환할 수 없습니다." })); }
     let options = conversion_options(&paths);
-    let notice = if options.as_array().map(|items| items.is_empty()).unwrap_or(true) { "이 환경에서 사용할 수 있는 변환 도구가 없습니다. LibreOffice, Poppler 또는 ImageMagick을 설치해 주세요." } else { "" };
+    let notice = if options.as_array().map(|items| items.is_empty()).unwrap_or(true) { "이 형식은 변환할 수 없습니다. PNG·JPG·BMP·GIF·WEBP·TIFF 이미지, PDF, Word·Excel·PowerPoint·한글 문서를 선택하세요." } else { "" };
     Ok(json!({ "success": true, "options": options, "notice": notice }))
 }
 
@@ -1532,48 +1534,39 @@ fn encrypted_pdf(path: &Path) -> bool {
 }
 
 #[tauri::command]
-fn convert_files(file_paths: Vec<String>, operation: String, destination_dir: Option<String>, state: State<'_, AppState>) -> Result<Value, String> {
+async fn convert_files(file_paths: Vec<String>, operation: String, destination_dir: Option<String>, state: State<'_, AppState>) -> Result<Value, String> {
     let paths = file_paths.into_iter().map(PathBuf::from).collect::<Vec<_>>();
     if paths.is_empty() { return Ok(json!({ "success": false, "error": "변환할 파일을 선택하세요." })); }
-    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?;
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
     if paths.iter().any(|path| !is_allowed_path(path, &config)) { return Ok(json!({ "success": false, "error": "허용된 검색 경로의 파일만 변환할 수 있습니다." })); }
     let destination = destination_dir.map(PathBuf::from).unwrap_or_else(|| paths[0].parent().unwrap_or_else(|| Path::new(".")).to_path_buf());
     if !is_allowed_path(&destination, &config) || !destination.is_dir() { return Ok(json!({ "success": false, "error": "변환 대상 폴더가 허용된 검색 경로가 아닙니다." })); }
     if paths.iter().any(|path| path.extension().map(|value| value.to_string_lossy().eq_ignore_ascii_case("pdf")).unwrap_or(false) && encrypted_pdf(path)) {
         return Ok(json!({ "success": false, "error": "암호화되었거나 비밀번호가 필요한 PDF는 변환할 수 없습니다." }));
     }
-    let mut outputs = Vec::new();
-    match operation.as_str() {
-        "images-to-pdf" => {
-            for path in &paths {
-                let output = destination.join(format!("{}.pdf", path.file_stem().unwrap_or_default().to_string_lossy()));
-                let status = if cfg!(target_os = "macos") {
-                    hidden_command("sips").args(["-s", "format", "pdf"]).arg(path).arg("--out").arg(&output).status()
-                } else {
-                    hidden_command("magick").arg(path).arg(&output).status()
-                }.map_err(|error| error.to_string())?;
-                if !status.success() { return Ok(json!({ "success": false, "error": "이미지를 PDF로 변환하지 못했습니다." })); }
-                outputs.push(output.to_string_lossy().into_owned());
+    // Office exports can take a while; keep them off the UI thread.
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<PathBuf>, String> {
+        match operation.as_str() {
+            "images-to-pdf" => convert::images_to_pdf(&paths, &destination),
+            "image-to-png" => convert::convert_image(&paths[0], "png", &destination),
+            "image-to-jpg" => convert::convert_image(&paths[0], "jpg", &destination),
+            "merge-pdf" => convert::merge_pdfs(&paths, &destination),
+            "split-pdf" => convert::split_pdf(&paths[0], &destination),
+            "office-to-pdf" if cfg!(windows) => convert::office_to_pdf(&paths[0], &destination, |program| hidden_command(program)),
+            "office-to-pdf" => {
+                let status = hidden_command("soffice").args(["--headless", "--convert-to", "pdf", "--outdir"]).arg(&destination).arg(&paths[0]).status().map_err(|error| error.to_string())?;
+                if !status.success() { return Err("Office 문서를 PDF로 변환하지 못했습니다. 암호화 문서인지 확인하세요.".to_string()); }
+                Ok(vec![destination.join(format!("{}.pdf", paths[0].file_stem().unwrap_or_default().to_string_lossy()))])
             }
+            _ => Err("지원하지 않는 변환입니다.".to_string()),
         }
-        "office-to-pdf" => {
-            for path in &paths {
-                let status = hidden_command("soffice").args(["--headless", "--convert-to", "pdf", "--outdir"]).arg(&destination).arg(path).status().map_err(|error| error.to_string())?;
-                if !status.success() { return Ok(json!({ "success": false, "error": "Office 문서를 PDF로 변환하지 못했습니다. 암호화 문서인지 확인하세요." })); }
-                outputs.push(destination.join(format!("{}.pdf", path.file_stem().unwrap_or_default().to_string_lossy())).to_string_lossy().into_owned());
-            }
-        }
-        "merge-pdf" => {
-            let output = destination.join(format!("dawith-merged-{}.pdf", now_millis()));
-            let mut command = hidden_command("pdfunite");
-            for path in &paths { command.arg(path); }
-            let status = command.arg(&output).status().map_err(|error| error.to_string())?;
-            if !status.success() { return Ok(json!({ "success": false, "error": "PDF를 병합하지 못했습니다." })); }
-            outputs.push(output.to_string_lossy().into_owned());
-        }
-        _ => return Ok(json!({ "success": false, "error": "현재 Tauri 경량 버전에서 지원하지 않는 변환입니다." })),
-    }
-    Ok(json!({ "success": true, "outputs": outputs }))
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(match result {
+        Ok(outputs) => json!({ "success": true, "outputs": outputs.iter().map(|path| path.to_string_lossy().into_owned()).collect::<Vec<_>>() }),
+        Err(error) => json!({ "success": false, "error": error }),
+    })
 }
 
 #[tauri::command]

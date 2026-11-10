@@ -5,6 +5,27 @@
   var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var canObserve = 'IntersectionObserver' in window;
 
+  // Keep the long guide legible: a tiny progress line gives the reader a sense of place.
+  var progressBar = document.querySelector('.scroll-progress');
+  if (progressBar && !reduceMotion) {
+    var progressQueued = false;
+    var updateProgress = function () {
+      if (progressQueued) return;
+      progressQueued = true;
+      window.requestAnimationFrame(function () {
+        var root = document.documentElement;
+        var range = root.scrollHeight - root.clientHeight;
+        var scrollTop = window.scrollY || root.scrollTop || document.body.scrollTop || 0;
+        var percent = range > 0 ? (scrollTop / range) * 100 : 0;
+        root.style.setProperty('--scroll-progress', Math.max(0, Math.min(100, percent)) + '%');
+        progressQueued = false;
+      });
+    };
+    window.addEventListener('scroll', updateProgress, { passive: true });
+    window.addEventListener('resize', updateProgress, { passive: true });
+    updateProgress();
+  }
+
   var REVEAL = [
     '.content-section', '.support-section', '.workspace-panel', '.operation-panel',
     '.search-preview-panel', '.quick-start', '.kpi-card', '.download-card',

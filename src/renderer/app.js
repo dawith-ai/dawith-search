@@ -662,8 +662,8 @@ function renderResults(items, currentQuery) {
         <span class="file-name-text">${highlightMatch(item.name, currentQuery)}</span>
       </div>
       <div class="td col-path" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</div>
-      <div class="td col-size">${item.isDir ? '&lt;DIR&gt;' : formatBytes(item.size)}</div>
-      <div class="td col-mtime">${formatDate(item.mtime)}</div>
+      <div class="td col-size">${item.isDir ? '&lt;DIR&gt;' : item.metaUnknown ? '—' : formatBytes(item.size)}</div>
+      <div class="td col-mtime">${item.metaUnknown ? '—' : formatDate(item.mtime)}</div>
       <div class="td col-ext">${item.isDir ? '폴더' : (item.ext ? item.ext.toUpperCase() : '파일')}</div>
       <div class="td col-actions">
         <button class="btn btn-sm btn-ghost row-btn-convert" data-idx="${idx}" title="파일 변환">변환</button>

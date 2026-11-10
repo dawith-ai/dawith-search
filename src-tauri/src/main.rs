@@ -26,6 +26,20 @@ struct LocalIndex {
     total_folders: usize,
 }
 
+// The release build uses the Windows GUI subsystem, so every console child
+// (everything-ipc, goz, powershell, cmd) would otherwise open its own window.
+fn hidden_command<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
+    #[allow(unused_mut)]
+    let mut command = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+}
+
 fn home_dir() -> PathBuf {
     if cfg!(windows) {
         std::env::var_os("USERPROFILE")
@@ -45,7 +59,7 @@ fn data_dir() -> PathBuf {
 fn default_local_roots() -> Vec<String> {
     if cfg!(windows) {
         let mut roots = Vec::new();
-        if let Ok(output) = Command::new("powershell.exe")
+        if let Ok(output) = hidden_command("powershell.exe")
             .args([
                 "-NoProfile",
                 "-NonInteractive",
@@ -470,14 +484,31 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
     Ok(true)
 }
 
-fn native_record(item: &Value) -> Option<Value> {
+fn local_roots(config: &Value) -> Vec<PathBuf> {
+    config
+        .get("localRoots")
+        .and_then(Value::as_array)
+        .map(|roots| roots.iter().filter_map(Value::as_str).map(PathBuf::from).collect())
+        .unwrap_or_default()
+}
+
+// Builds a result row from a native backend item. Metadata the backend already
+// returned is used as is; when it was not requested (--path-only), only paths
+// on local disks are stat'ed so network shares never add per-result round trips.
+fn native_record(item: &Value, local_roots: &[PathBuf]) -> Option<Value> {
     let full_path = item
         .get("path")
         .or_else(|| item.get("filename"))?
         .as_str()?;
     let path = PathBuf::from(full_path);
-    if let Some(record) = path_record(&path) {
-        return Some(record);
+    let metadata_missing = item.get("size").map_or(true, Value::is_null);
+    if metadata_missing {
+        let is_local = !full_path.starts_with("\\\\") && local_roots.iter().any(|root| is_path_within(&path, root));
+        if is_local {
+            if let Some(record) = path_record(&path) {
+                return Some(record);
+            }
+        }
     }
     let is_dir = item.get("is_dir").and_then(Value::as_bool).unwrap_or(false);
     let name = path.file_name()?.to_string_lossy().into_owned();
@@ -499,7 +530,8 @@ fn native_record(item: &Value) -> Option<Value> {
         "isDir": is_dir,
         "ext": ext,
         "tags": [],
-        "starred": false
+        "starred": false,
+        "metaUnknown": metadata_missing
     }))
 }
 
@@ -728,7 +760,7 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
         if records.len() >= limit {
             break;
         }
-        let output = Command::new("mdfind")
+        let output = hidden_command("mdfind")
             .arg("-onlyin")
             .arg(root)
             .arg(&expression)
@@ -796,7 +828,7 @@ fn gozd_path(app: &AppHandle) -> Option<PathBuf> {
 
 fn goz_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
     let client = goz_path(app)?;
-    let ready = Command::new(&client)
+    let ready = hidden_command(&client)
         .arg("--server-version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -806,13 +838,26 @@ fn goz_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
     Some((client, ready))
 }
 
+// Size/date filters need Everything to return metadata; everything else asks
+// for paths only, which stays fast for network folder indexes.
+fn query_needs_native_metadata(query: &str) -> bool {
+    query.split_whitespace().any(|token| {
+        let lower = token.trim_start_matches(['!', '-', '(']).to_ascii_lowercase();
+        ["size:", "dm:", "dc:", "da:", "datemodified:", "datecreated:", "dateaccessed:"].iter().any(|prefix| lower.starts_with(prefix))
+    })
+}
+
 fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Result<Value, String>> {
     if !cfg!(windows) {
         return None;
     }
     let helper = helper_path(app)?;
-    let output = Command::new(helper)
-        .arg("--json")
+    let mut command = hidden_command(helper);
+    command.arg("--json");
+    if !query_needs_native_metadata(query) {
+        command.arg("--path-only");
+    }
+    let output = command
         .arg("-n")
         .arg(limit.to_string())
         .arg(query)
@@ -828,7 +873,7 @@ fn search_everything(app: &AppHandle, query: &str, limit: usize) -> Option<Resul
 
 fn search_goz(app: &AppHandle, query: &str, limit: usize) -> Option<Result<Value, String>> {
     let client = goz_path(app)?;
-    let output = Command::new(client)
+    let output = hidden_command(client)
         .arg("-argv")
         .arg("--json")
         .arg("-n")
@@ -873,7 +918,7 @@ fn merge_records(primary: Vec<Value>, supplemental: Vec<Value>, limit: usize) ->
 
 fn everything_ipc_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
     let helper = helper_path(app)?;
-    let ready = Command::new(&helper)
+    let ready = hidden_command(&helper)
         .arg("--status")
         .output()
         .map(|output| output.status.success())
@@ -882,7 +927,7 @@ fn everything_ipc_ready(app: &AppHandle) -> Option<(PathBuf, bool)> {
 }
 
 fn command_available(command: &str) -> bool {
-    Command::new(command)
+    hidden_command(command)
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -1131,13 +1176,14 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
             payload = search_goz(&app, &native_query, limit).and_then(Result::ok);
         }
         if let Some(payload) = payload {
+            let local_roots = local_roots(&config);
             let items = payload
                 .get("items")
                 .and_then(Value::as_array)
                 .map(|items| {
                     items
                         .iter()
-                        .filter_map(native_record)
+                        .filter_map(|item| native_record(item, &local_roots))
                         .filter(|item| {
                             let in_configured_root = item
                                 .get("fullPath")
@@ -1486,9 +1532,9 @@ fn convert_files(file_paths: Vec<String>, operation: String, destination_dir: Op
             for path in &paths {
                 let output = destination.join(format!("{}.pdf", path.file_stem().unwrap_or_default().to_string_lossy()));
                 let status = if cfg!(target_os = "macos") {
-                    Command::new("sips").args(["-s", "format", "pdf"]).arg(path).arg("--out").arg(&output).status()
+                    hidden_command("sips").args(["-s", "format", "pdf"]).arg(path).arg("--out").arg(&output).status()
                 } else {
-                    Command::new("magick").arg(path).arg(&output).status()
+                    hidden_command("magick").arg(path).arg(&output).status()
                 }.map_err(|error| error.to_string())?;
                 if !status.success() { return Ok(json!({ "success": false, "error": "이미지를 PDF로 변환하지 못했습니다." })); }
                 outputs.push(output.to_string_lossy().into_owned());
@@ -1496,14 +1542,14 @@ fn convert_files(file_paths: Vec<String>, operation: String, destination_dir: Op
         }
         "office-to-pdf" => {
             for path in &paths {
-                let status = Command::new("soffice").args(["--headless", "--convert-to", "pdf", "--outdir"]).arg(&destination).arg(path).status().map_err(|error| error.to_string())?;
+                let status = hidden_command("soffice").args(["--headless", "--convert-to", "pdf", "--outdir"]).arg(&destination).arg(path).status().map_err(|error| error.to_string())?;
                 if !status.success() { return Ok(json!({ "success": false, "error": "Office 문서를 PDF로 변환하지 못했습니다. 암호화 문서인지 확인하세요." })); }
                 outputs.push(destination.join(format!("{}.pdf", path.file_stem().unwrap_or_default().to_string_lossy())).to_string_lossy().into_owned());
             }
         }
         "merge-pdf" => {
             let output = destination.join(format!("dawith-merged-{}.pdf", now_millis()));
-            let mut command = Command::new("pdfunite");
+            let mut command = hidden_command("pdfunite");
             for path in &paths { command.arg(path); }
             let status = command.arg(&output).status().map_err(|error| error.to_string())?;
             if !status.success() { return Ok(json!({ "success": false, "error": "PDF를 병합하지 못했습니다." })); }
@@ -1572,7 +1618,7 @@ fn install_goz_backend(app: AppHandle) -> Value {
     };
     let escaped = daemon.to_string_lossy().replace('\'', "''");
     let command = format!("Start-Process -FilePath '{}' -ArgumentList 'install' -Verb RunAs -Wait", escaped);
-    match Command::new("powershell.exe")
+    match hidden_command("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command"])
         .arg(&command)
         .output()
@@ -1596,11 +1642,11 @@ fn get_file_stats(file_path: String, state: State<'_, AppState>) -> Option<Value
 fn run_open(path: &Path) -> Result<(), String> {
     let path_text = path.to_string_lossy().into_owned();
     let result = if cfg!(target_os = "macos") {
-        Command::new("open").arg(path).status()
+        hidden_command("open").arg(path).status()
     } else if cfg!(windows) {
-        Command::new("cmd").args(["/C", "start", "", &path_text]).status()
+        hidden_command("cmd").args(["/C", "start", "", &path_text]).status()
     } else {
-        Command::new("xdg-open").arg(path).status()
+        hidden_command("xdg-open").arg(path).status()
     };
     result.map_err(|error| error.to_string()).and_then(|status| {
         status.success().then_some(()).ok_or_else(|| "파일을 열지 못했습니다.".to_string())
@@ -1633,9 +1679,9 @@ fn open_folder(file_path: String, state: State<'_, AppState>) -> Result<Value, S
 #[tauri::command]
 fn copy_path(file_path: String) -> Result<Value, String> {
     let mut child = if cfg!(target_os = "macos") {
-        Command::new("pbcopy").stdin(Stdio::piped()).spawn().map_err(|error| error.to_string())?
+        hidden_command("pbcopy").stdin(Stdio::piped()).spawn().map_err(|error| error.to_string())?
     } else if cfg!(windows) {
-        Command::new("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard"]).stdin(Stdio::piped()).spawn().map_err(|error| error.to_string())?
+        hidden_command("powershell.exe").args(["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard"]).stdin(Stdio::piped()).spawn().map_err(|error| error.to_string())?
     } else {
         return Ok(json!({ "success": false, "error": "이 운영체제에서는 클립보드 연동을 지원하지 않습니다." }));
     };
@@ -1806,6 +1852,29 @@ mod tests {
         assert_eq!(bundled_native_path(&base, "everything-ipc.exe"), Some(mapped.join("everything-ipc.exe")));
         assert_eq!(bundled_native_path(&base, "goz.exe"), None);
         let _ = fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn path_only_native_items_skip_network_metadata() {
+        let unc = json!({ "path": "\\\\server\\share\\대응 안내.hwp", "size": null, "date_modified": null, "is_dir": false });
+        let record = native_record(&unc, &[PathBuf::from("C:\\")]).unwrap();
+        assert_eq!(record["metaUnknown"], json!(true));
+        assert_eq!(record["ext"], json!("hwp"));
+        assert!(query_matches(&record, "대응", false));
+
+        let full = json!({ "path": "\\\\server\\share\\폴더", "size": 0, "date_modified": 1700000000000u64, "is_dir": true });
+        let record = native_record(&full, &[]).unwrap();
+        assert_eq!(record["metaUnknown"], json!(false));
+        assert_eq!(record["isDir"], json!(true));
+        assert_eq!(record["mtime"], json!(1700000000000u64));
+    }
+
+    #[test]
+    fn size_and_date_filters_request_native_metadata() {
+        assert!(!query_needs_native_metadata("대응"));
+        assert!(!query_needs_native_metadata("ext:hwp;hwpx 대응"));
+        assert!(query_needs_native_metadata("대응 size:>1mb"));
+        assert!(query_needs_native_metadata("dm:today"));
     }
 
     #[test]

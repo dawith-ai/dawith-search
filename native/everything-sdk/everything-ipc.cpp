@@ -75,11 +75,14 @@ int status() {
 int search(int argc, wchar_t** argv) {
   DWORD limit = kDefaultLimit;
   bool json = false;
+  bool pathOnly = false;
   std::vector<std::wstring> queryParts;
   for (int index = 1; index < argc; ++index) {
     const std::wstring argument = argv[index];
     if (argument == L"--json" || argument == L"-json") {
       json = true;
+    } else if (argument == L"--path-only") {
+      pathOnly = true;
     } else if ((argument == L"-n" || argument == L"--max") && index + 1 < argc) {
       limit = std::min<DWORD>(kMaxLimit, std::max<DWORD>(1, _wtoi(argv[++index])));
     } else if (argument != L"-no-header") {
@@ -101,13 +104,18 @@ int search(int argc, wchar_t** argv) {
   Everything_SetMax(limit);
   Everything_SetOffset(0);
   Everything_SetSort(EVERYTHING_SORT_NAME_ASCENDING);
-  Everything_SetRequestFlags(
-    EVERYTHING_REQUEST_FILE_NAME |
-    EVERYTHING_REQUEST_PATH |
-    EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME |
-    EVERYTHING_REQUEST_SIZE |
-    EVERYTHING_REQUEST_DATE_MODIFIED |
-    EVERYTHING_REQUEST_ATTRIBUTES
+  // Size, date and attributes are not always in Everything's database (for
+  // example network folder indexes), so requesting them makes Everything stat
+  // each result over the network. --path-only skips that; the caller fills in
+  // metadata for local results itself.
+  Everything_SetRequestFlags(pathOnly
+    ? EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME
+    : EVERYTHING_REQUEST_FILE_NAME |
+      EVERYTHING_REQUEST_PATH |
+      EVERYTHING_REQUEST_FULL_PATH_AND_FILE_NAME |
+      EVERYTHING_REQUEST_SIZE |
+      EVERYTHING_REQUEST_DATE_MODIFIED |
+      EVERYTHING_REQUEST_ATTRIBUTES
   );
 
   if (!Everything_QueryW(TRUE)) {
@@ -124,6 +132,13 @@ int search(int argc, wchar_t** argv) {
     if (index > 0) std::printf(",");
     const DWORD length = Everything_GetResultFullPathNameW(index, pathBuffer.data(), static_cast<DWORD>(pathBuffer.size()));
     const std::wstring fullPath(pathBuffer.data(), length);
+    const bool isDir = Everything_IsFolderResult(index) == TRUE;
+    if (pathOnly) {
+      std::printf("{\"path\":%s,\"size\":null,\"date_modified\":null,\"is_dir\":%s}",
+        jsonString(toUtf8(fullPath)).c_str(),
+        isDir ? "true" : "false");
+      continue;
+    }
     LARGE_INTEGER size{};
     FILETIME modified{};
     const bool hasSize = Everything_GetResultSize(index, &size) == TRUE;
@@ -133,7 +148,7 @@ int search(int argc, wchar_t** argv) {
       jsonString(toUtf8(fullPath)).c_str(),
       hasSize ? size.QuadPart : 0LL,
       hasModified ? fileTimeToJson(modified).c_str() : "0",
-      (attributes & FILE_ATTRIBUTE_DIRECTORY) ? "true" : "false");
+      (isDir || (attributes & FILE_ATTRIBUTE_DIRECTORY)) ? "true" : "false");
   }
   std::printf("],\"more\":%s,\"volumes_incomplete\":false}\n", count < total ? "true" : "false");
   Everything_CleanUp();

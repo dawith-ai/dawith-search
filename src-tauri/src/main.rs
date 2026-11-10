@@ -9,9 +9,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
-use walkdir::WalkDir;
 
 mod convert;
+mod fastindex;
 
 struct AppState {
     config: Mutex<Value>,
@@ -21,10 +21,7 @@ struct AppState {
 
 #[derive(Default)]
 struct LocalIndex {
-    records: Vec<Value>,
-    // Lowercased file names, same order as `records`, so a search can
-    // reject non-matching entries without allocating per record.
-    lower_names: Vec<String>,
+    index: fastindex::FastIndex,
     indexing: bool,
     ready: bool,
     total_files: usize,
@@ -109,6 +106,7 @@ fn default_config() -> Value {
         "maxDepth": 64,
         "autoStartWatcher": false,
         "searchBackend": "auto",
+        "useEverything": false,
         "uiMode": null
     })
 }
@@ -305,193 +303,193 @@ fn excluded_names(config: &Value) -> Vec<String> {
         .unwrap_or_default()
 }
 
-fn should_skip_entry(entry: &walkdir::DirEntry, config: &Value, excluded: &[String]) -> bool {
-    let name = entry.file_name().to_string_lossy();
-    if config.get("excludeHidden").and_then(Value::as_bool).unwrap_or(true) && name.starts_with('.') {
-        return true;
-    }
-    excluded.iter().any(|item| item == &name.to_ascii_lowercase())
+fn use_everything(config: &Value) -> bool {
+    // Dawith Search runs on its own index. Everything is used only when the
+    // user explicitly turns it on in the config.
+    config.get("useEverything").and_then(Value::as_bool).unwrap_or(false)
 }
 
-fn local_index_roots(config: &Value, native_ready: bool) -> Vec<PathBuf> {
-    let configured = config_roots(config);
-    let mut roots = Vec::new();
-    let mut seen = HashSet::new();
-
-    // Even when Everything is available, keep a small local supplement for
-    // user-owned folders. Everything may omit a redirected Desktop, an
-    // excluded folder, or a path that was created after its last update.
-    // Avoid scanning the whole drive twice in that mode.
-    if cfg!(windows) && native_ready {
-        let home = home_dir();
-        if is_allowed_path(&home, config) {
-            let key = normalize_path(&home);
-            seen.insert(key);
-            roots.push(home);
-        }
-    }
-    let local_roots = config
-        .get("localRoots")
-        .and_then(Value::as_array)
-        .map(|roots| {
-            roots
-                .iter()
-                .filter_map(Value::as_str)
-                .map(|root| normalize_path(Path::new(root)))
-                .collect::<HashSet<_>>()
-        })
-        .unwrap_or_default();
-    for root in configured {
-        let key = normalize_path(&root);
-        if native_ready && cfg!(windows) && local_roots.contains(&key) {
-            continue;
-        }
-        if seen.insert(key) {
-            roots.push(root);
-        }
-    }
-    roots
+fn index_cache_path(state: &AppState) -> PathBuf {
+    state.data_dir.join("index-v2.bin")
 }
 
-fn publish_index_snapshot(
-    app: &AppHandle,
-    records: &[Value],
-    published: &mut usize,
-    total_files: usize,
-    total_folders: usize,
-    root: &Path,
-    root_index: usize,
-    total_roots: usize,
-    started_at: u128,
-) {
-    if let Ok(mut index) = app.state::<AppState>().local_index.lock() {
-        // Append only what was found since the last snapshot. Copying the
-        // whole list every 2000 entries held the lock long enough to stall
-        // searches typed during indexing.
-        index.lower_names.extend(records[*published..].iter().map(lower_record_name));
-        index.records.extend_from_slice(&records[*published..]);
-        *published = records.len();
-        index.ready = !records.is_empty();
-        index.total_files = total_files;
-        index.total_folders = total_folders;
-    }
+fn emit_index_progress(app: &AppHandle, index: &fastindex::FastIndex, root: &Path, root_index: usize, total_roots: usize, started_at: u64) {
+    let folders = index.entries.iter().filter(|entry| entry.is_dir).count();
     let _ = app.emit(
         "index-status",
         json!({
             "status": "indexing-progress",
             "stats": {
-                "totalFiles": total_files,
-                "totalFolders": total_folders,
+                "totalFiles": index.entries.len() - folders,
+                "totalFolders": folders,
                 "root": root.to_string_lossy(),
                 "rootIndex": root_index,
                 "totalRoots": total_roots,
-                "elapsedMs": now_millis().saturating_sub(started_at as u64)
+                "elapsedMs": now_millis().saturating_sub(started_at)
             }
         }),
     );
 }
 
+type DirBatch = (PathBuf, usize, Vec<(String, u64, u64, bool)>);
+
+/// Reads one directory and recurses into its subfolders on all cores. On
+/// Windows the size and modified time come from the directory listing, so
+/// there is no extra system call per file.
+fn walk_dir_parallel(dir: &Path, depth: usize, max_depth: usize, root_index: usize, excluded: &[String], skip_hidden: bool, sender: &std::sync::mpsc::Sender<DirBatch>) {
+    use rayon::prelude::*;
+    let Ok(read) = fs::read_dir(dir) else { return };
+    let mut children = Vec::new();
+    let mut subdirs = Vec::new();
+    for entry in read.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if skip_hidden && name.starts_with('.') { continue; }
+        if excluded.iter().any(|item| item.eq_ignore_ascii_case(&name)) { continue; }
+        let Ok(meta) = entry.metadata() else { continue };
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::MetadataExt;
+            const HIDDEN: u32 = 0x2;
+            const SYSTEM: u32 = 0x4;
+            if skip_hidden && meta.file_attributes() & (HIDDEN | SYSTEM) != 0 { continue; }
+        }
+        let is_dir = meta.is_dir();
+        let mtime = meta.modified().ok().and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok()).map(|value| value.as_millis() as u64).unwrap_or(0);
+        if is_dir && !meta.file_type().is_symlink() && depth < max_depth {
+            subdirs.push(entry.path());
+        }
+        children.push((name, if is_dir { 0 } else { meta.len() }, mtime, is_dir));
+    }
+    let _ = sender.send((dir.to_path_buf(), root_index, children));
+    subdirs.par_iter().for_each(|sub| walk_dir_parallel(sub, depth + 1, max_depth, root_index, excluded, skip_hidden, sender));
+}
+
 fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
-    let native_ready = cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false);
-    if native_ready {
+    let state = app.state::<AppState>();
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    if use_everything(&config) && cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false) {
         // Start the resident helper now so the first search does not pay
         // for launching it.
         if let Some(helper) = helper_path(app) {
             std::thread::spawn(move || { let _ = resident_query(&helper, "", 1, true); });
         }
     }
-    let state = app.state::<AppState>();
-    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    let cache_path = index_cache_path(&state);
+    let live_build;
     {
         let mut index = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
         if index.indexing {
             return Ok(false);
         }
         index.indexing = true;
-        index.ready = false;
-        index.records.clear();
-        index.lower_names.clear();
-        index.total_files = 0;
-        index.total_folders = 0;
+        // The saved index from the last run makes search available right
+        // away; a fresh scan replaces it in the background when it finishes.
+        if index.index.entries.is_empty() {
+            if let Ok(cached) = fastindex::FastIndex::load(&cache_path) {
+                index.total_folders = cached.entries.iter().filter(|entry| entry.is_dir).count();
+                index.total_files = cached.entries.len() - index.total_folders;
+                index.index = cached;
+            }
+        }
+        index.ready = !index.index.entries.is_empty();
+        // With nothing saved yet, results are shown as the first scan finds them.
+        live_build = !index.ready;
     }
     let started_at = now_millis();
-    let _ = app.emit(
-        "index-status",
-        json!({ "status": "indexing", "stats": { "totalFiles": 0, "totalFolders": 0 } }),
-    );
+    let _ = app.emit("index-status", json!({ "status": "indexing", "stats": { "totalFiles": 0, "totalFolders": 0 } }));
 
     let worker_app = app.clone();
     std::thread::spawn(move || {
-        let roots = local_index_roots(&config, native_ready)
-            .into_iter()
-            .filter(|root| root.exists())
-            .collect::<Vec<_>>();
-        let excluded = excluded_names(&config);
-        let max_depth = config
-            .get("maxDepth")
-            .and_then(Value::as_u64)
-            .unwrap_or(64)
-            .clamp(1, 256) as usize;
-        let mut records = Vec::new();
-        let mut published = 0usize;
-        // Report at least once a second as well: slow network folders can go
-        // a long time between 2000-entry batches, which looked frozen.
-        let mut last_report = std::time::Instant::now();
-        let mut seen = HashSet::new();
-        let mut total_files = 0usize;
-        let mut total_folders = 0usize;
-
-        for (root_index, root) in roots.iter().enumerate() {
-            let walker = WalkDir::new(root)
-                .follow_links(false)
-                .max_depth(max_depth + 1)
-                .into_iter()
-                .filter_entry(|entry| !should_skip_entry(entry, &config, &excluded));
-            for entry in walker.filter_map(Result::ok) {
-                let path = entry.path();
-                if !is_allowed_path(path, &config) || !seen.insert(normalize_path(path)) {
-                    continue;
-                }
-                if let Some(record) = path_record(path) {
-                    if record.get("isDir").and_then(Value::as_bool).unwrap_or(false) {
-                        total_folders += 1;
-                    } else {
-                        total_files += 1;
-                    }
-                    records.push(record);
-                }
-                if records.len() % 2000 == 0 || last_report.elapsed() >= std::time::Duration::from_secs(1) {
-                    last_report = std::time::Instant::now();
-                    publish_index_snapshot(
-                        &worker_app,
-                        &records,
-                        &mut published,
-                        total_files,
-                        total_folders,
-                        root,
-                        root_index,
-                        roots.len(),
-                        started_at as u128,
-                    );
-                }
-            }
-            publish_index_snapshot(
-                &worker_app,
-                &records,
-                &mut published,
-                total_files,
-                total_folders,
-                root,
-                root_index,
-                roots.len(),
-                started_at as u128,
-            );
+        let mut roots: Vec<PathBuf> = Vec::new();
+        for root in config_roots(&config).into_iter().filter(|root| root.exists()) {
+            // Skip a root that sits inside one already listed.
+            if roots.iter().any(|known| is_path_within(&root, known)) { continue; }
+            roots.retain(|known| !is_path_within(known, &root));
+            roots.push(root);
         }
+        let excluded = excluded_names(&config);
+        let skip_hidden = config.get("excludeHidden").and_then(Value::as_bool).unwrap_or(true);
+        let max_depth = config.get("maxDepth").and_then(Value::as_u64).unwrap_or(64).clamp(1, 256) as usize;
+        let total_roots = roots.len();
 
-        let lower_names = records.iter().map(lower_record_name).collect::<Vec<_>>();
-        if let Ok(mut index) = worker_app.state::<AppState>().local_index.lock() {
-            index.records = records;
-            index.lower_names = lower_names;
+        let (sender, receiver) = std::sync::mpsc::channel::<DirBatch>();
+        let walk_roots = roots.clone();
+        let walker = std::thread::spawn(move || {
+            // The walk blocks on disk and network I/O, so it gets its own
+            // threads; searches keep the global pool to themselves and stay
+            // fast while indexing runs.
+            let pool = rayon::ThreadPoolBuilder::new()
+                .num_threads(6)
+                .thread_name(|n| format!("dawith-index-{n}"))
+                .build();
+            let walk = || {
+                for (root_index, root) in walk_roots.iter().enumerate() {
+                    walk_dir_parallel(root, 1, max_depth, root_index, &excluded, skip_hidden, &sender);
+                }
+            };
+            match pool {
+                Ok(pool) => pool.install(walk),
+                Err(_) => walk(),
+            }
+        });
+
+        let mut built = fastindex::FastIndex::default();
+        let mut published_dirs = 0usize;
+        let mut published_entries = 0usize;
+        let mut current_root = 0usize;
+        let mut last_report = std::time::Instant::now();
+        let mut publish = |built: &fastindex::FastIndex, current_root: usize| {
+            if live_build {
+                if let Ok(mut index) = worker_app.state::<AppState>().local_index.lock() {
+                    index.index.dirs.extend(built.dirs[published_dirs..].iter().cloned());
+                    index.index.entries.extend(built.entries[published_entries..].iter().map(|entry| fastindex::Entry {
+                        name: entry.name.clone(),
+                        lower: entry.lower.clone(),
+                        dir: entry.dir,
+                        size: entry.size,
+                        mtime: entry.mtime,
+                        is_dir: entry.is_dir,
+                    }));
+                    index.ready = !index.index.entries.is_empty();
+                }
+                published_dirs = built.dirs.len();
+                published_entries = built.entries.len();
+            }
+            if let Some(root) = roots.get(current_root) {
+                emit_index_progress(&worker_app, built, root, current_root, total_roots, started_at);
+            }
+        };
+        loop {
+            match receiver.recv_timeout(std::time::Duration::from_millis(500)) {
+                Ok((dir, root_index, children)) => {
+                    // On the first build, save each finished location right away
+                    // so closing the app mid-scan does not lose the work.
+                    if live_build && root_index > current_root {
+                        let _ = built.save(&cache_path);
+                    }
+                    current_root = root_index;
+                    let dir_id = built.add_dir(&dir.to_string_lossy());
+                    for (name, size, mtime, is_dir) in children {
+                        built.push(dir_id, &name, size, mtime, is_dir);
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if last_report.elapsed() >= std::time::Duration::from_secs(1) {
+                last_report = std::time::Instant::now();
+                publish(&built, current_root);
+            }
+        }
+        let _ = walker.join();
+        publish(&built, current_root);
+
+        let total_folders = built.entries.iter().filter(|entry| entry.is_dir).count();
+        let total_files = built.entries.len() - total_folders;
+        let state = worker_app.state::<AppState>();
+        let _ = built.save(&index_cache_path(&state));
+        if let Ok(mut index) = state.local_index.lock() {
+            index.index = built;
             index.ready = true;
             index.indexing = false;
             index.total_files = total_files;
@@ -501,11 +499,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             "index-status",
             json!({
                 "status": "idle",
-                "stats": {
-                    "totalFiles": total_files,
-                    "totalFolders": total_folders,
-                    "elapsedMs": now_millis().saturating_sub(started_at)
-                }
+                "stats": { "totalFiles": total_files, "totalFolders": total_folders, "elapsedMs": now_millis().saturating_sub(started_at) }
             }),
         );
     });
@@ -1118,22 +1112,59 @@ fn conversion_options(paths: &[PathBuf]) -> Value {
     Value::Array(options)
 }
 
-fn lower_record_name(record: &Value) -> String {
-    record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
+fn entry_record(index: &fastindex::FastIndex, entry: &fastindex::Entry) -> Value {
+    let ext = if entry.is_dir {
+        String::new()
+    } else {
+        Path::new(entry.name.as_ref()).extension().map(|value| value.to_string_lossy().to_ascii_lowercase()).unwrap_or_default()
+    };
+    json!({
+        "name": entry.name.as_ref(),
+        "path": index.dir_of(entry),
+        "fullPath": index.full_path(entry),
+        "size": entry.size,
+        "mtime": entry.mtime,
+        "ctime": entry.mtime,
+        "isDir": entry.is_dir,
+        "ext": ext,
+        "tags": [],
+        "starred": false
+    })
 }
 
-/// Plain words that every match must contain in its file name, or None when
-/// the query uses operators (path:, OR, NOT, wildcards, regex, ...) that the
-/// full matcher has to handle.
-fn plain_name_terms(query: &str) -> Option<Vec<String>> {
+/// Splits a query into plain name words plus the filters the index can
+/// apply directly (extension, file/folder). Returns None when the query
+/// needs the full matcher (size:, dm:, path:, OR, NOT, wildcards, tags, ...).
+fn fast_query(query: &str) -> Option<(Vec<String>, Vec<String>, Option<bool>)> {
     let mut terms = Vec::new();
+    let mut extensions = Vec::new();
+    let mut want_dir = None;
     for token in query.split_whitespace() {
         let clean = token.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')');
         if clean.is_empty() { continue; }
-        if clean.contains([':', '|', '*', '?']) || clean.starts_with(['!', '-']) { return None; }
-        terms.push(clean.to_ascii_lowercase());
+        let lower = clean.to_lowercase();
+        if let Some(category) = lower.strip_suffix(':') {
+            match category {
+                "folder" | "directory" => { want_dir = Some(true); continue; }
+                "file" => { want_dir = Some(false); continue; }
+                _ => {
+                    let list = category_extensions(category);
+                    if list.is_empty() { return None; }
+                    extensions.extend(list.iter().map(|value| (*value).to_string()));
+                    want_dir = Some(false);
+                    continue;
+                }
+            }
+        }
+        if let Some(value) = lower.strip_prefix("ext:") {
+            extensions.extend(value.split([',', ';']).filter(|item| !item.is_empty()).map(|item| item.trim_start_matches('.').to_string()));
+            want_dir = Some(false);
+            continue;
+        }
+        if lower.contains([':', '|', '*', '?']) || lower.starts_with(['!', '-']) { return None; }
+        terms.push(lower);
     }
-    Some(terms)
+    Some((terms, extensions, want_dir))
 }
 
 fn search_local_index(
@@ -1144,122 +1175,75 @@ fn search_local_index(
     metadata: &Value,
     limit: usize,
 ) -> Result<(Vec<Value>, usize, usize, bool), String> {
+    use rayon::prelude::*;
+    let _ = config;
     let scope = options.get("scopeRoot").and_then(Value::as_str).map(PathBuf::from);
     let use_natural_language = options.get("useAI").and_then(Value::as_bool).unwrap_or(false);
-    let index = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
-    let total_indexed = index.records.len();
-    let duplicate_by_size = query.to_ascii_lowercase().contains("dupe:size");
-    let duplicate_by_name = query.to_ascii_lowercase().contains("dupe:name") || query.to_ascii_lowercase().contains("dupe:");
-    let mut duplicate_counts = HashMap::<String, usize>::new();
-    if duplicate_by_size || duplicate_by_name {
-        for record in &index.records {
-            let key = if duplicate_by_size {
-                record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
-            } else {
-                record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
-            };
-            if !key.is_empty() && key != "0" { *duplicate_counts.entry(key).or_insert(0) += 1; }
-        }
-    }
-    let lower_query = query.to_ascii_lowercase();
-    let needs_metadata = lower_query.contains("tag:") || lower_query.contains("starred:") || lower_query.contains("star:");
-    let mut total_matches = 0usize;
-    let mut results = Vec::new();
-    // Prepared once per search instead of once per record.
-    let name_terms = if use_natural_language { None } else { plain_name_terms(query) };
-    let allowed_roots = config_roots(config)
-        .iter()
-        .map(|root| {
-            let scope = normalize_path(root);
-            if scope.len() > 1 { scope.trim_end_matches('/').to_string() } else { scope }
-        })
-        .collect::<Vec<_>>();
-    let scope_key = scope.as_ref().map(|root| {
-        let key = normalize_path(root);
-        if key.len() > 1 { key.trim_end_matches('/').to_string() } else { key }
-    });
-    let within = |candidate: &str, root: &str| candidate == root || (candidate.starts_with(root) && candidate[root.len()..].starts_with('/'));
-    for (position, record) in index.records.iter().enumerate() {
-        if let (Some(terms), Some(name)) = (&name_terms, index.lower_names.get(position)) {
-            if !terms.iter().all(|term| name.contains(term.as_str())) { continue; }
-        }
-        let full_path = record.get("fullPath").and_then(Value::as_str).unwrap_or("");
-        let candidate = normalize_path(Path::new(full_path));
-        if let Some(scope) = &scope_key {
-            if !within(&candidate, scope) { continue; }
-        } else if !allowed_roots.iter().any(|root| within(&candidate, root)) {
-            continue;
-        }
-        if duplicate_by_size || duplicate_by_name {
-            let duplicate_key = if duplicate_by_size {
-                record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
-            } else {
-                lower_record_name(record)
-            };
-            if duplicate_counts.get(&duplicate_key).copied().unwrap_or(0) < 2 { continue; }
-        }
-        // Tags and stars live in metadata, so only those queries need each
-        // record hydrated before matching; others clone just the matches.
-        let matched = if needs_metadata {
-            let mut hydrated = record.clone();
-            hydrate_records(std::slice::from_mut(&mut hydrated), metadata);
-            query_matches(&hydrated, query, use_natural_language)
-        } else {
-            query_matches(record, query, use_natural_language)
-        };
-        if !matched || !record_matches_content(record, query) { continue; }
-        total_matches += 1;
-        if results.len() < limit { results.push(record.clone()); }
-    }
-    hydrate_records(&mut results, metadata);
-    Ok((results, total_matches, total_indexed, index.indexing))
-}
+    let guard = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
+    let index = &guard.index;
+    let total_indexed = index.entries.len();
+    // Folder scope is checked per folder (tens of thousands) instead of per file.
+    let dir_in_scope: Option<Vec<bool>> = scope.as_ref().map(|root| index.dirs.par_iter().map(|dir| is_path_within(Path::new(dir.as_ref()), root)).collect());
+    let in_scope = |entry: &fastindex::Entry| dir_in_scope.as_ref().map(|dirs| dirs.get(entry.dir as usize).copied().unwrap_or(false)).unwrap_or(true);
 
-fn fallback_walk(query: &str, roots: &[PathBuf], config: &Value, limit: usize) -> Vec<Value> {
-    let terms = query_terms(query)
-        .iter()
-        .map(|value| value.to_lowercase())
-        .collect::<Vec<_>>();
-    let excluded = config
-        .get("excludeFolders")
-        .and_then(Value::as_array)
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(Value::as_str)
-                .map(|value| value.to_lowercase())
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let mut results = Vec::new();
-    for root in roots {
-        for entry in WalkDir::new(root)
-            .follow_links(false)
-            .into_iter()
-            .filter_map(Result::ok)
-        {
-            if results.len() >= limit {
-                return results;
+    let lower_query = query.to_lowercase();
+    let duplicate_by_size = lower_query.contains("dupe:size");
+    let duplicate_by_name = !duplicate_by_size && lower_query.contains("dupe:");
+
+    let (results, total_matches) = if let (false, Some((terms, extensions, want_dir))) = (duplicate_by_size || duplicate_by_name || lower_query.contains("content:"), fast_query(query)) {
+        // Fast path: plain words plus extension/type filters, entirely on the index.
+        let (hits, total) = index.search(&terms, limit, |_, entry| {
+            if let Some(dir) = want_dir { if entry.is_dir != dir { return false; } }
+            if !extensions.is_empty() {
+                let Some(dot) = entry.lower.rfind('.') else { return false };
+                if !extensions.iter().any(|ext| entry.lower[dot + 1..] == *ext) { return false; }
             }
-            let path = entry.path();
-            if !is_allowed_path(path, config) {
-                continue;
+            in_scope(entry)
+        });
+        (hits.iter().map(|position| entry_record(index, &index.entries[*position as usize])).collect::<Vec<_>>(), total)
+    } else {
+        // Full matcher for operators: narrow by any plain words first, then
+        // check each candidate in parallel.
+        let positive = query
+            .split_whitespace()
+            .map(|token| token.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')').to_lowercase())
+            .filter(|token| !token.is_empty() && !token.contains([':', '|', '*', '?']) && !token.starts_with(['!', '-']))
+            .collect::<Vec<_>>();
+        let duplicate_counts: HashMap<String, usize> = if duplicate_by_size || duplicate_by_name {
+            let mut counts = HashMap::new();
+            for entry in index.entries.iter().filter(|entry| !entry.is_dir) {
+                let key = if duplicate_by_size { entry.size.to_string() } else { entry.lower.to_string() };
+                if key != "0" { *counts.entry(key).or_insert(0) += 1; }
             }
-            if path
-                .components()
-                .any(|component| excluded.iter().any(|name| name == &component.as_os_str().to_string_lossy().to_lowercase()))
-            {
-                continue;
-            }
-            let name = path.file_name().map(|value| value.to_string_lossy().to_lowercase()).unwrap_or_default();
-            if terms.iter().all(|term| name.contains(term)) {
-                if let Some(record) = path_record(path) {
-                    results.push(record);
-                }
-            }
-        }
-    }
-    results
+            counts
+        } else {
+            HashMap::new()
+        };
+        let needs_metadata = lower_query.contains("tag:") || lower_query.contains("starred:") || lower_query.contains("star:");
+        let mut matched: Vec<(u32, Value)> = index
+            .entries
+            .par_iter()
+            .enumerate()
+            .filter(|(_, entry)| positive.iter().all(|term| entry.lower.contains(term.as_str())) && in_scope(entry))
+            .filter(|(_, entry)| {
+                if !(duplicate_by_size || duplicate_by_name) { return true; }
+                if entry.is_dir { return false; }
+                let key = if duplicate_by_size { entry.size.to_string() } else { entry.lower.to_string() };
+                duplicate_counts.get(&key).copied().unwrap_or(0) >= 2
+            })
+            .filter_map(|(position, entry)| {
+                let mut record = entry_record(index, entry);
+                if needs_metadata { hydrate_records(std::slice::from_mut(&mut record), metadata); }
+                (query_matches(&record, query, use_natural_language) && record_matches_content(&record, query)).then_some((position as u32, record))
+            })
+            .collect();
+        let total = matched.len();
+        matched.sort_by(|a, b| index.entries[a.0 as usize].lower.cmp(&index.entries[b.0 as usize].lower));
+        (matched.into_iter().take(limit).map(|(_, record)| record).collect::<Vec<_>>(), total)
+    };
+    let mut results = results;
+    hydrate_records(&mut results, metadata);
+    Ok((results, total_matches, total_indexed, guard.indexing))
 }
 
 fn effective_roots(config: &Value, options: &Value) -> Result<Vec<PathBuf>, String> {
@@ -1304,7 +1288,7 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
     let native_can_handle_query = !normalized_query.to_ascii_lowercase().split_whitespace().any(|token| {
         token.starts_with("content:") || token.starts_with("tag:") || token == "starred:" || token == "star:" || token.starts_with("dupe:")
     });
-    if native_can_handle_query {
+    if native_can_handle_query && use_everything(&config) {
         // Search the supplemental local index on another thread while the
         // native engine answers; running them one after the other added the
         // local scan time to every keystroke.
@@ -1388,7 +1372,7 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
         "totalMatches": total_matches,
         "totalIndexed": total_indexed,
         "elapsedMs": started.elapsed().as_millis(),
-        "backend": if indexing { "local-indexing" } else { "local-index" },
+        "backend": "dawith-index",
         "indexing": indexing,
         "warning": if indexing { Value::String("첫 색인이 진행 중이라 현재까지 발견된 파일만 표시합니다.".to_string()) } else { Value::Null }
     }))
@@ -1719,26 +1703,27 @@ fn inspect_root(root_path: String) -> Value {
 
 #[tauri::command]
 fn get_backend_status(app: AppHandle) -> Value {
+    let everything_enabled = app.state::<AppState>().config.lock().map(|config| use_everything(&config)).unwrap_or(false);
     if cfg!(windows) {
-        if let Some((_helper, true)) = everything_ipc_ready(&app) {
+        if let Some((_helper, true)) = everything_enabled.then(|| everything_ipc_ready(&app)).flatten() {
             return json!({ "backend": "everything-ipc", "label": "Everything 연동", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
         }
-        if let Some((client, true)) = goz_ready(&app) {
+        if let Some((client, true)) = everything_enabled.then(|| goz_ready(&app)).flatten() {
             return json!({ "backend": "goz", "label": "goz NTFS 엔진 연결됨", "available": true, "detail": format!("{} · MIT 오픈소스 MFT/USN Journal 엔진", client.to_string_lossy()) });
         }
         if let Ok(index) = app.state::<AppState>().local_index.lock() {
             if index.indexing {
-                return json!({ "backend": "local-indexing", "label": "내장 로컬 색인 중", "available": true, "detail": format!("{}개 파일을 읽는 중입니다. Desktop을 포함한 로컬 전체를 순서대로 색인합니다.", index.total_files) });
+                return json!({ "backend": "dawith-index", "label": "Dawith 색인", "available": true, "detail": format!("파일 목록을 새로 읽는 중입니다. 지금까지 {}개를 찾았고, 그동안 저장된 목록으로 검색합니다.", index.total_files) });
             }
             if index.ready {
-                return json!({ "backend": "local-index", "label": "내장 로컬 색인 준비됨", "available": true, "detail": format!("{}개 파일을 읽었습니다. Everything 없이도 즉시 검색합니다.", index.total_files) });
+                return json!({ "backend": "dawith-index", "label": "Dawith 색인", "available": true, "detail": format!("{}개 파일을 Dawith 자체 색인으로 검색합니다.", index.total_files) });
             }
         }
         return json!({
             "backend": "local-native",
-            "label": "내장 로컬 색인 준비 중",
+            "label": "Dawith 색인 준비 중",
             "available": true,
-            "detail": "Everything이 실행 중이 아니어서 내장 로컬 색인을 준비합니다."
+            "detail": "처음 한 번 파일 목록을 만들고 있습니다."
         });
     }
     if cfg!(target_os = "macos") {

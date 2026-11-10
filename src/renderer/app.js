@@ -631,7 +631,8 @@ async function runSearch() {
         : res.backend === 'everything'
         ? 'Everything'
         : res.backend === 'spotlight' ? 'Spotlight'
-        : res.backend === 'local-indexing' ? '내장 로컬 색인 중'
+        : res.backend === 'dawith-index' ? 'Dawith 색인'
+        : res.backend === 'local-indexing' ? 'Dawith 색인'
         : '내장 로컬 색인';
     }
 

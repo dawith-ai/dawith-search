@@ -1,5 +1,9 @@
 # Third-party notices
 
+> 본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한글은 한글과컴퓨터의 상표이며, Dawith Search는 한글과컴퓨터와 관계없는 별도 프로젝트입니다.
+> (HWP reading is based on Hancom's published HWP file format documents via
+> the MIT-licensed OpenHWP project. "Hangul"/"한글" is a trademark of Hancom Inc.)
+
 > Everything is a product and trademark of voidtools. Dawith Search is an
 > independent project and is not affiliated with, endorsed by, or sponsored by
 > voidtools. Dawith Search does not include or redistribute Everything; it only

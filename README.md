@@ -133,4 +133,6 @@ MIT License. 자세한 내용은 [LICENSE](LICENSE)를 참조하세요.
 
 ## 상표와 라이선스 고지
 
+본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한글은 한글과컴퓨터의 상표이며, Dawith Search는 한글과컴퓨터와 관계없는 별도 프로젝트입니다.
+
 Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다. Dawith Search는 Everything을 포함하거나 재배포하지 않고, 사용자가 따로 설치한 Everything과 공식 SDK(MIT)로만 통신합니다. 설치본에는 `licenses` 폴더에 Dawith Search, Everything SDK, goz, Rust 라이브러리의 라이선스 전문이 함께 들어 있습니다. 전체 목록은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.

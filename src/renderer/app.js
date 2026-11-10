@@ -603,7 +603,9 @@ async function runSearch() {
       // Keep the result table responsive. The backend still reports the
       // total match count while returning a compact first page for rendering.
       limit: 200,
-      scopeRoot: scopeRoot || undefined
+      scopeRoot: scopeRoot || undefined,
+      // Lets the index treat an unfinished last syllable as a prefix (직이 → 직인).
+      composing: inputComposing
     });
 
     // Index-status events and debounced input can overlap. Never let an older
@@ -611,6 +613,11 @@ async function runSearch() {
     if (requestId !== searchRequestId) return;
 
     const nextResults = res.results || [];
+    // While a syllable is half typed, an empty result is usually just a
+    // transient state; keep the current rows instead of flashing "no results".
+    if (!nextResults.length && inputComposing && searchResults.length && rawInput) {
+      return;
+    }
     // Rebuilding identical rows resets scroll and selection and makes the
     // table flicker; keep the current rows when nothing changed.
     const signature = rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
@@ -657,8 +664,12 @@ async function runSearch() {
   }
 }
 
-function triggerSearch() {
+// True while the Korean IME is still building the last syllable (ㅈ → 지 → 직).
+let inputComposing = false;
+
+function triggerSearch(event) {
   lastInputAt = Date.now();
+  inputComposing = Boolean(event && event.isComposing);
   clearTimeout(searchDebounceTimer);
   // Wait for a short typing pause so each keystroke (and each Hangul
   // composition step) does not start its own native search.
@@ -1276,6 +1287,9 @@ document.getElementById('ctxDelete').addEventListener('click', () => {
 
 // UI Event Listeners
 searchInput.addEventListener('input', triggerSearch);
+// Some browsers send no input event after the syllable is finished; search
+// again with the final text so it is matched exactly.
+searchInput.addEventListener('compositionend', () => triggerSearch({ isComposing: false }));
 
 clearBtn.addEventListener('click', () => {
   searchInput.value = '';

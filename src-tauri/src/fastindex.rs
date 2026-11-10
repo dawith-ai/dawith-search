@@ -121,17 +121,60 @@ impl FastIndex {
     where
         F: Fn(&FastIndex, &Entry) -> bool + Sync,
     {
+        self.search_typed(terms, false, limit, keep)
+    }
+
+    /// 0 = the name starts with the first word, 1 = the word starts after a
+    /// space or punctuation, 2 = anywhere else.
+    fn rank(lower: &str, term: &str, pattern: Option<&Vec<QChar>>) -> u8 {
+        let start = match pattern {
+            Some(pattern) => pattern_position(lower, pattern),
+            None => lower.find(term).map(|byte| lower[..byte].chars().count()),
+        };
+        match start {
+            Some(0) => 0,
+            Some(position) => match lower.chars().nth(position - 1) {
+                Some(c) if !c.is_alphanumeric() => 1,
+                _ => 2,
+            },
+            None => 2,
+        }
+    }
+
+    /// Like `search`, with Korean initial-consonant matching and, when
+    /// `composing`, a still-being-typed last syllable.
+    pub fn search_typed<F>(&self, terms: &[String], composing: bool, limit: usize, keep: F) -> (Vec<u32>, usize)
+    where
+        F: Fn(&FastIndex, &Entry) -> bool + Sync,
+    {
+        let last = terms.len().saturating_sub(1);
+        let patterns: Vec<Option<Vec<QChar>>> = terms.iter().enumerate().map(|(position, term)| compile_term(term, composing && position == last)).collect();
+        let matches_name = |lower: &str| {
+            terms.iter().zip(&patterns).all(|(term, pattern)| match pattern {
+                Some(pattern) => pattern_in(lower, pattern),
+                None => lower.contains(term.as_str()),
+            })
+        };
         let mut hits: Vec<u32> = self
             .entries
             .par_iter()
             .enumerate()
-            .filter(|(_, entry)| entry.alive && terms.iter().all(|term| entry.lower.contains(term.as_str())) && keep(self, entry))
+            .filter(|(_, entry)| entry.alive && matches_name(&entry.lower) && keep(self, entry))
             .map(|(index, _)| index as u32)
             .collect();
         let total = hits.len();
+        // Better matches first, then by name (Everything sorts by name only).
+        let first_term = terms.first().map(String::as_str).unwrap_or("");
+        let first_pattern = patterns.first().and_then(Option::as_ref);
+        let ranks: HashMap<u32, u8> = if first_term.is_empty() {
+            HashMap::new()
+        } else {
+            hits.par_iter().map(|hit| (*hit, Self::rank(&self.entries[*hit as usize].lower, first_term, first_pattern))).collect()
+        };
         let by_name = |a: &u32, b: &u32| -> Ordering {
-            let (a, b) = (&self.entries[*a as usize], &self.entries[*b as usize]);
-            a.lower.cmp(&b.lower).then_with(|| a.dir.cmp(&b.dir))
+            let rank = |hit: &u32| ranks.get(hit).copied().unwrap_or(2);
+            let (ea, eb) = (&self.entries[*a as usize], &self.entries[*b as usize]);
+            rank(a).cmp(&rank(b)).then_with(|| ea.lower.cmp(&eb.lower)).then_with(|| ea.dir.cmp(&eb.dir))
         };
         if hits.len() > limit && limit > 0 {
             hits.select_nth_unstable_by(limit - 1, by_name);
@@ -199,6 +242,100 @@ impl FastIndex {
     }
 }
 
+
+// Korean typing goes through partial states (ㅈ → 지 → 직 → 직ㅇ → 직이 →
+// 직인). Plain substring search finds nothing for most of them, so the result
+// list flickered empty on almost every key. A search word can therefore
+// contain:
+//   - a bare initial consonant (ㅈ): matches any syllable starting with it,
+//     so "ㅈㅇ" finds 직인, 주인, 저장 ... (초성 검색)
+//   - while the IME is still composing, a last syllable without a final
+//     consonant (이): matches any syllable with the same start (인, 일, 있 ...)
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub enum QChar {
+    Exact(char),
+    Initial(u32),
+    Prefix(u32, u32),
+}
+
+const SYLLABLE_BASE: u32 = 0xAC00;
+const SYLLABLE_LAST: u32 = 0xD7A3;
+// Compatibility jamo (what a keyboard types) for the 19 initial consonants.
+const INITIALS: [char; 19] = ['ㄱ', 'ㄲ', 'ㄴ', 'ㄷ', 'ㄸ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅃ', 'ㅅ', 'ㅆ', 'ㅇ', 'ㅈ', 'ㅉ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ'];
+
+fn syllable_parts(c: char) -> Option<(u32, u32, u32)> {
+    let code = c as u32;
+    if !(SYLLABLE_BASE..=SYLLABLE_LAST).contains(&code) {
+        return None;
+    }
+    let offset = code - SYLLABLE_BASE;
+    Some((offset / 588, (offset % 588) / 28, offset % 28))
+}
+
+/// Turns a search word into a pattern, or None when plain substring search
+/// is enough. `composing` means the last character is still being typed.
+pub fn compile_term(term: &str, composing: bool) -> Option<Vec<QChar>> {
+    let chars: Vec<char> = term.chars().collect();
+    let mut special = false;
+    let pattern = chars
+        .iter()
+        .enumerate()
+        .map(|(position, c)| {
+            if let Some(initial) = INITIALS.iter().position(|jamo| jamo == c) {
+                special = true;
+                return QChar::Initial(initial as u32);
+            }
+            if composing && position + 1 == chars.len() {
+                if let Some((initial, medial, 0)) = syllable_parts(*c) {
+                    special = true;
+                    return QChar::Prefix(initial, medial);
+                }
+            }
+            QChar::Exact(*c)
+        })
+        .collect();
+    special.then_some(pattern)
+}
+
+fn char_matches(query: QChar, c: char) -> bool {
+    match query {
+        QChar::Exact(expected) => c == expected,
+        QChar::Initial(initial) => c == INITIALS[initial as usize] || syllable_parts(c).is_some_and(|(i, _, _)| i == initial),
+        QChar::Prefix(initial, medial) => syllable_parts(c).is_some_and(|(i, m, _)| i == initial && m == medial),
+    }
+}
+
+/// Character position of the first match of `pattern` in `name`.
+pub fn pattern_position(name: &str, pattern: &[QChar]) -> Option<usize> {
+    let mut rest = name.chars();
+    let mut position = 0;
+    loop {
+        let mut probe = rest.clone();
+        if pattern.iter().all(|query| probe.next().is_some_and(|c| char_matches(*query, c))) {
+            return Some(position);
+        }
+        rest.next()?;
+        position += 1;
+    }
+}
+
+/// True when `pattern` occurs anywhere in `name` (no allocation).
+pub fn pattern_in(name: &str, pattern: &[QChar]) -> bool {
+    if pattern.is_empty() {
+        return true;
+    }
+    let mut rest = name.chars();
+    loop {
+        let mut probe = rest.clone();
+        if pattern.iter().all(|query| probe.next().is_some_and(|c| char_matches(*query, c))) {
+            return true;
+        }
+        if rest.next().is_none() {
+            return false;
+        }
+    }
+}
+
 fn write_u32(out: &mut impl Write, value: u32) -> std::io::Result<()> {
     out.write_all(&value.to_le_bytes())
 }
@@ -224,6 +361,31 @@ fn read_str(input: &mut impl Read) -> std::io::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn korean_initials_and_composing_syllables() {
+        let mut index = FastIndex::default();
+        let dir = index.add_dir(r"C:Docs");
+        for name in ["직인 날인 대장.hwp", "주민 명단.xlsx", "저장소.txt", "직원 교육.pdf", "report.pdf"] {
+            index.push(dir, name, 1, 1, false);
+        }
+        let names = |terms: &[&str], composing: bool| -> Vec<String> {
+            let terms: Vec<String> = terms.iter().map(|t| t.to_string()).collect();
+            let (hits, _) = index.search_typed(&terms, composing, 10, |_, _| true);
+            hits.iter().map(|i| index.entries[*i as usize].name.to_string()).collect()
+        };
+        // 초성 only
+        assert_eq!(names(&["ㅈㅇ"], false), vec!["직원 교육.pdf", "직인 날인 대장.hwp"]);
+        assert_eq!(names(&["ㅈ"], false).len(), 4);
+        // mixed syllable + initial while typing 직ㅇ
+        assert_eq!(names(&["직ㅇ"], true), vec!["직원 교육.pdf", "직인 날인 대장.hwp"]);
+        // composing last syllable 이 matches 인, finished 직이 matches nothing
+        assert_eq!(names(&["직이"], true), vec!["직인 날인 대장.hwp"]);
+        assert!(names(&["직이"], false).is_empty());
+        // plain words unchanged
+        assert_eq!(names(&["주민"], false), vec!["주민 명단.xlsx"]);
+        assert_eq!(names(&["pdf"], false).len(), 2);
+    }
 
     #[test]
     fn live_updates_add_refresh_and_remove() {
@@ -264,7 +426,8 @@ mod tests {
         let (hits, total) = index.search(&["보고서".to_string()], 10, |_, _| true);
         assert_eq!(total, 2);
         let names: Vec<&str> = hits.iter().map(|i| index.entries[*i as usize].name.as_ref()).collect();
-        assert_eq!(names, vec!["2026 보고서.hwp", "보고서 모음"]);
+        // A name that starts with the word ranks above one that has it later.
+        assert_eq!(names, vec!["보고서 모음", "2026 보고서.hwp"]);
 
         // Case-insensitive, with a caller filter.
         let (hits, _) = index.search(&["hwp".to_string()], 10, |_, entry| !entry.is_dir);

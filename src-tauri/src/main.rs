@@ -1271,7 +1271,9 @@ fn search_local_index(
 
     let (results, total_matches) = if let (false, Some((terms, extensions, want_dir))) = (duplicate_by_size || duplicate_by_name || lower_query.contains("content:"), fast_query(query)) {
         // Fast path: plain words plus extension/type filters, entirely on the index.
-        let (hits, total) = index.search(&terms, limit, |_, entry| {
+        // The window says whether the last word is still being typed (IME composing).
+        let composing = options.get("composing").and_then(Value::as_bool).unwrap_or(false);
+        let (hits, total) = index.search_typed(&terms, composing, limit, |_, entry| {
             if let Some(dir) = want_dir { if entry.is_dir != dir { return false; } }
             if !extensions.is_empty() {
                 let Some(dot) = entry.lower.rfind('.') else { return false };

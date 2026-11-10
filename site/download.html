@@ -4,13 +4,14 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7f4" />
-    <meta name="description" content="Dawith Search 1.2.0 Windows 설치파일과 macOS DMG, 휴대용 EXE를 내려받고 SHA256 값을 확인하세요." />
-    <meta property="og:title" content="Dawith Search 1.2.0 다운로드" />
+    <meta name="description" content="Dawith Search 최신 Windows 설치파일과 macOS DMG, 휴대용 EXE를 내려받고 SHA256 값을 확인하세요." />
+    <meta property="og:title" content="Dawith Search 다운로드" />
     <meta property="og:description" content="Windows 64비트 설치파일, macOS Universal DMG, 휴대용 EXE 다운로드." />
     <meta property="og:type" content="website" />
     <title>Dawith Search 다운로드</title>
     <link rel="icon" href="./ci.png" type="image/png" />
     <link rel="stylesheet" href="./styles.css" />
+    <script src="./latest-release.js" defer></script>
   </head>
   <body class="dl-page">
     <header class="dl-header">
@@ -28,29 +29,29 @@
 
     <main class="dl-main">
       <section class="dl-hero">
-        <p class="eyebrow">DOWNLOAD / v1.2.0</p>
-        <h1>Dawith Search 1.2.0 다운로드</h1>
-        <p class="dl-lead">2026년 11월 9일 배포. Windows 10·11(64비트)용 경량 설치파일입니다. macOS는 1.1.8 Universal 버전을 받으세요.</p>
+        <p class="eyebrow">DOWNLOAD / <span data-latest="tag">v1.2.0</span></p>
+        <h1>Dawith Search <span data-latest="version">1.2.0</span> 다운로드</h1>
+        <p class="dl-lead"><span data-latest="date">2026년 11월 9일</span> 배포. Windows 10·11(64비트)용 경량 설치파일입니다. macOS는 <span data-latest="mac-version">1.1.8</span> Universal 버전을 받으세요.</p>
 
         <div class="dl-blocks">
           <article class="dl-block" data-os="windows">
-            <div class="card-topline"><span class="platform-icon windows">⊞</span><span class="version-chip">V1.2.0 · X64</span></div>
+            <div class="card-topline"><span class="platform-icon windows">⊞</span><span class="version-chip">V<span data-latest="version">1.2.0</span> · X64</span></div>
             <h2>Windows</h2>
-            <a class="card-button dl-primary" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.2.0/Dawith-Search_1.2.0_x64-setup.exe" rel="noreferrer">Windows 64비트 설치파일 <span>↓</span></a>
+            <a class="card-button dl-primary" data-latest="win-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.2.0/Dawith-Search_1.2.0_x64-setup.exe" rel="noreferrer">Windows 64비트 설치파일 <span>↓</span></a>
             <a class="card-button drive-button" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/DawithSearch-1.1.8-portable.exe" rel="noreferrer">휴대용 EXE (1.1.8, 설치 없이 실행) <span>↓</span></a>
-            <small>Dawith-Search_1.2.0_x64-setup.exe · 3,765 KB · Windows 10/11 x64</small>
+            <small><span data-latest="win-name">Dawith-Search_1.2.0_x64-setup.exe</span> · <span data-latest="win-size-kb">3,765 KB</span> · Windows 10/11 x64</small>
           </article>
           <article class="dl-block" data-os="mac">
-            <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip">V1.1.8 · UNIVERSAL</span></div>
+            <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip">V<span data-latest="mac-version">1.1.8</span> · UNIVERSAL</span></div>
             <h2>macOS</h2>
-            <a class="card-button dl-primary" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/Dawith.Search-1.1.8-universal.dmg" rel="noreferrer">macOS 설치파일 (1.1.8, Universal) <span>↓</span></a>
-            <p class="dl-pending"><span class="dl-pending-chip">준비 중</span> macOS용 1.2.0은 아직 준비 중입니다. 지금은 1.1.8을 사용해 주세요.</p>
-            <small>Dawith.Search-1.1.8-universal.dmg · 193.9 MB · Apple Silicon·Intel 공용</small>
+            <a class="card-button dl-primary" data-latest="mac-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/Dawith.Search-1.1.8-universal.dmg" rel="noreferrer">macOS 설치파일 (<span data-latest="mac-version">1.1.8</span>, Universal) <span>↓</span></a>
+            <p class="dl-pending" data-latest="mac-pending"><span class="dl-pending-chip">준비 중</span> macOS용 최신 버전은 아직 준비 중입니다. 지금은 1.1.8을 사용해 주세요.</p>
+            <small><span data-latest="mac-name">Dawith.Search-1.1.8-universal.dmg</span> · <span data-latest="mac-size-mb">193.9 MB</span> · Apple Silicon·Intel 공용</small>
           </article>
         </div>
 
         <nav class="dl-links" aria-label="관련 링크">
-          <a href="https://github.com/dawith-ai/dawith-search/releases/tag/v1.2.0" target="_blank" rel="noreferrer">새 기능</a><i>·</i>
+          <a data-latest="release-url" href="https://github.com/dawith-ai/dawith-search/releases/tag/v1.2.0" target="_blank" rel="noreferrer">새 기능</a><i>·</i>
           <a href="https://github.com/dawith-ai/dawith-search/releases" target="_blank" rel="noreferrer">변경 이력</a><i>·</i>
           <a href="https://github.com/dawith-ai/dawith-search/releases" target="_blank" rel="noreferrer">구버전</a><i>·</i>
           <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">라이선스</a><i>·</i>
@@ -81,18 +82,18 @@
             </thead>
             <tbody>
               <tr data-os="windows">
-                <td data-label="파일 이름"><a href="https://github.com/dawith-ai/dawith-search/releases/download/v1.2.0/Dawith-Search_1.2.0_x64-setup.exe" rel="noreferrer">Dawith-Search_1.2.0_x64-setup.exe</a></td>
-                <td data-label="버전">1.2.0</td>
+                <td data-label="파일 이름"><a data-latest="win-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.2.0/Dawith-Search_1.2.0_x64-setup.exe" rel="noreferrer"><span data-latest="win-name">Dawith-Search_1.2.0_x64-setup.exe</span></a></td>
+                <td data-label="버전"><span data-latest="version">1.2.0</span></td>
                 <td data-label="종류">설치파일</td>
                 <td data-label="운영체제">Windows x64</td>
-                <td data-label="크기" class="num">3,765 KB</td>
+                <td data-label="크기" class="num"><span data-latest="win-size-kb">3,765 KB</span></td>
               </tr>
               <tr data-os="mac">
-                <td data-label="파일 이름"><a href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/Dawith.Search-1.1.8-universal.dmg" rel="noreferrer">Dawith.Search-1.1.8-universal.dmg</a></td>
-                <td data-label="버전">1.1.8</td>
+                <td data-label="파일 이름"><a data-latest="mac-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/Dawith.Search-1.1.8-universal.dmg" rel="noreferrer"><span data-latest="mac-name">Dawith.Search-1.1.8-universal.dmg</span></a></td>
+                <td data-label="버전"><span data-latest="mac-version">1.1.8</span></td>
                 <td data-label="종류">DMG</td>
                 <td data-label="운영체제">macOS Universal (Apple Silicon·Intel)</td>
-                <td data-label="크기" class="num"><span>198,566 KB <small>(193.9 MB)</small></span></td>
+                <td data-label="크기" class="num"><span><span data-latest="mac-size-kb">198,566 KB</span> <small>(<span data-latest="mac-size-mb">193.9 MB</span>)</small></span></td>
               </tr>
               <tr data-os="windows">
                 <td data-label="파일 이름"><a href="https://github.com/dawith-ai/dawith-search/releases/download/v1.1.8/DawithSearch-1.1.8-portable.exe" rel="noreferrer">DawithSearch-1.1.8-portable.exe</a></td>
@@ -127,11 +128,11 @@
       <section class="dl-section" id="sha256">
         <h2>SHA256</h2>
         <p class="dl-table-note">받은 파일이 손상되거나 바뀌지 않았는지 확인할 때 쓰세요. Windows에서는 PowerShell에서 <code>Get-FileHash 파일이름</code>, macOS에서는 터미널에서 <code>shasum -a 256 파일이름</code>으로 값을 볼 수 있습니다.</p>
-        <pre class="dl-hashes"><span>Dawith-Search_1.2.0_x64-setup.exe</span>
-5c57cdf6c04acce69cdfa7e735eafaa0b433442ced7979f554547e42448b5788
+        <pre class="dl-hashes"><span data-latest="win-name">Dawith-Search_1.2.0_x64-setup.exe</span>
+<span data-latest="win-sha256">5c57cdf6c04acce69cdfa7e735eafaa0b433442ced7979f554547e42448b5788</span>
 
-<span>Dawith.Search-1.1.8-universal.dmg</span>
-64956aa316250655e72114d8f14a3ec6ea86d570cf2b735e128f8cb4d652a2c4
+<span data-latest="mac-name">Dawith.Search-1.1.8-universal.dmg</span>
+<span data-latest="mac-sha256">64956aa316250655e72114d8f14a3ec6ea86d570cf2b735e128f8cb4d652a2c4</span>
 
 <span>DawithSearch-1.1.8-portable.exe</span>
 a4da9964d6ffc2cacc17bb4dab2391b232b59be4b2212cc2f8522ed358563a39

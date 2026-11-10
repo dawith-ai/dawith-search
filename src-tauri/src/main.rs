@@ -1740,6 +1740,157 @@ fn open_guide() -> Value {
     json!({ "success": true })
 }
 
+const LATEST_RELEASE_API: &str = "https://api.github.com/repos/dawith-ai/dawith-search/releases/latest";
+
+// DAWITH_UPDATE_CURRENT_VERSION and DAWITH_UPDATE_RELEASE_API let a test
+// install pretend to be older or target a pre-release, so the full
+// download → verify → install → relaunch path can be exercised before release.
+fn current_app_version() -> String {
+    std::env::var("DAWITH_UPDATE_CURRENT_VERSION").unwrap_or_else(|_| env!("CARGO_PKG_VERSION").to_string())
+}
+
+fn version_parts(version: &str) -> Vec<u64> {
+    version
+        .trim_start_matches(['v', 'V'])
+        .split('.')
+        .map(|part| part.chars().take_while(char::is_ascii_digit).collect::<String>().parse().unwrap_or(0))
+        .collect()
+}
+
+fn is_newer_version(candidate: &str, current: &str) -> bool {
+    let (mut a, mut b) = (version_parts(candidate), version_parts(current));
+    let len = a.len().max(b.len());
+    a.resize(len, 0);
+    b.resize(len, 0);
+    a > b
+}
+
+fn windows_setup_asset_name(version: &str) -> String {
+    format!("Dawith-Search_{version}_x64-setup.exe")
+}
+
+fn fetch_update_info() -> Result<Value, String> {
+    let current = current_app_version();
+    if !cfg!(windows) {
+        return Ok(json!({ "supported": false, "available": false, "currentVersion": current, "reason": "platform-unsupported" }));
+    }
+    let api = std::env::var("DAWITH_UPDATE_RELEASE_API").unwrap_or_else(|_| LATEST_RELEASE_API.to_string());
+    let release: Value = ureq::get(&api)
+        .set("User-Agent", "dawith-search-updater")
+        .set("Accept", "application/vnd.github+json")
+        .timeout(std::time::Duration::from_secs(15))
+        .call()
+        .map_err(|error| format!("최신 버전 정보를 가져오지 못했습니다: {error}"))?
+        .into_json()
+        .map_err(|error| format!("최신 버전 정보를 읽지 못했습니다: {error}"))?;
+    let latest = release.get("tag_name").and_then(Value::as_str).unwrap_or("").trim_start_matches(['v', 'V']).to_string();
+    let asset_name = windows_setup_asset_name(&latest);
+    let asset = release
+        .get("assets")
+        .and_then(Value::as_array)
+        .and_then(|assets| assets.iter().find(|asset| asset.get("name").and_then(Value::as_str) == Some(asset_name.as_str())));
+    let Some(asset) = asset else {
+        return Ok(json!({ "supported": false, "available": false, "currentVersion": current, "latestVersion": latest, "reason": "platform-asset-unavailable" }));
+    };
+    Ok(json!({
+        "supported": true,
+        "available": is_newer_version(&latest, &current),
+        "currentVersion": current,
+        "latestVersion": latest,
+        "releaseUrl": release.get("html_url"),
+        "asset": {
+            "name": asset_name,
+            "url": asset.get("browser_download_url"),
+            "digest": asset.get("digest"),
+            "size": asset.get("size")
+        }
+    }))
+}
+
+#[tauri::command]
+async fn check_for_updates() -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(fetch_update_info)
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+// Downloads the installer, checks its size and the SHA-256 digest GitHub
+// publishes for the asset, then runs it in passive update mode (progress
+// window only, no prompts). `/R` makes the installer start the app again.
+fn download_and_verify_update(info: &Value) -> Result<PathBuf, String> {
+    use sha2::{Digest, Sha256};
+    let asset = info.get("asset").ok_or("설치 파일 정보가 없습니다.")?;
+    let name = asset.get("name").and_then(Value::as_str).ok_or("설치 파일 이름이 없습니다.")?;
+    let url = asset.get("url").and_then(Value::as_str).ok_or("설치 파일 주소가 없습니다.")?;
+    let expected_size = asset.get("size").and_then(Value::as_u64);
+    let expected_digest = asset
+        .get("digest")
+        .and_then(Value::as_str)
+        .and_then(|digest| digest.strip_prefix("sha256:"))
+        .map(str::to_ascii_lowercase)
+        .ok_or("릴리스에 SHA-256 값이 없어 안전하게 설치할 수 없습니다.")?;
+
+    let dir = std::env::temp_dir().join("dawith-search-update");
+    fs::create_dir_all(&dir).map_err(|error| error.to_string())?;
+    let target = dir.join(name);
+    let partial = dir.join(format!("{name}.part"));
+    let response = ureq::get(url)
+        .set("User-Agent", "dawith-search-updater")
+        .timeout(std::time::Duration::from_secs(600))
+        .call()
+        .map_err(|error| format!("설치 파일을 내려받지 못했습니다: {error}"))?;
+    let mut reader = response.into_reader();
+    let mut file = fs::File::create(&partial).map_err(|error| error.to_string())?;
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut written = 0u64;
+    loop {
+        let read = reader.read(&mut buffer).map_err(|error| format!("다운로드가 중단되었습니다: {error}"))?;
+        if read == 0 { break; }
+        hasher.update(&buffer[..read]);
+        file.write_all(&buffer[..read]).map_err(|error| error.to_string())?;
+        written += read as u64;
+    }
+    file.flush().map_err(|error| error.to_string())?;
+    drop(file);
+    let actual_digest = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+    if expected_size.is_some_and(|size| size != written) || actual_digest != expected_digest {
+        let _ = fs::remove_file(&partial);
+        return Err("내려받은 설치 파일이 릴리스 정보와 일치하지 않아 설치하지 않았습니다.".to_string());
+    }
+    let _ = fs::remove_file(&target);
+    fs::rename(&partial, &target).map_err(|error| error.to_string())?;
+    Ok(target)
+}
+
+#[tauri::command]
+async fn download_update(app: AppHandle) -> Result<Value, String> {
+    let result = tauri::async_runtime::spawn_blocking(|| -> Result<PathBuf, String> {
+        let info = fetch_update_info()?;
+        if !info.get("available").and_then(Value::as_bool).unwrap_or(false) {
+            return Err("이미 최신 버전입니다.".to_string());
+        }
+        download_and_verify_update(&info)
+    })
+    .await
+    .map_err(|error| error.to_string())?;
+    let installer = match result {
+        Ok(path) => path,
+        Err(error) => return Ok(json!({ "success": false, "error": error })),
+    };
+    // The installer is a GUI program: start it normally so its progress
+    // window is visible, then quit so it can replace the running files.
+    if let Err(error) = Command::new(&installer).args(["/P", "/UPDATE", "/R"]).spawn() {
+        return Ok(json!({ "success": false, "error": format!("설치 파일을 실행하지 못했습니다: {error}") }));
+    }
+    let exit_app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        exit_app.exit(0);
+    });
+    Ok(json!({ "success": true, "action": "relaunch" }))
+}
+
 #[tauri::command]
 fn stub_success() -> Value {
     json!({ "success": false, "supported": false, "error": "이 기능은 경량 Tauri 핵심 버전에서 준비 중입니다." })
@@ -1788,6 +1939,8 @@ fn main() {
             window_maximize,
             window_close,
             open_guide,
+            check_for_updates,
+            download_update,
             stub_success
         ])
         .run(tauri::generate_context!())
@@ -1891,6 +2044,16 @@ mod tests {
         assert!(!query_needs_native_metadata("ext:hwp;hwpx 대응"));
         assert!(query_needs_native_metadata("대응 size:>1mb"));
         assert!(query_needs_native_metadata("dm:today"));
+    }
+
+    #[test]
+    fn update_versions_compare_numerically() {
+        assert!(is_newer_version("1.2.1", "1.2.0"));
+        assert!(is_newer_version("v1.10.0", "1.9.9"));
+        assert!(is_newer_version("1.3", "1.2.9"));
+        assert!(!is_newer_version("1.2.0", "1.2.0"));
+        assert!(!is_newer_version("1.1.8", "1.2.0"));
+        assert_eq!(windows_setup_asset_name("1.2.1"), "Dawith-Search_1.2.1_x64-setup.exe");
     }
 
     #[test]

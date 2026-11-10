@@ -625,7 +625,7 @@ async function runSearch() {
 
     if (backendStatus) {
       backendStatus.textContent = res.backend === 'everything-ipc'
-        ? 'Everything SDK IPC'
+        ? 'Everything 연동'
         : res.backend === 'goz'
         ? 'goz NTFS'
         : res.backend === 'everything'
@@ -642,7 +642,6 @@ async function runSearch() {
       // Indexing can already be running when this window opens; show the
       // first-run guide from the search response too, not only from events.
       showIndexIntro();
-      titlebarStatus.textContent = `색인 중 · ${res.totalIndexed.toLocaleString()}개 항목 준비됨`;
     }
 
     if (query.trim()) {
@@ -662,7 +661,7 @@ function triggerSearch() {
   clearTimeout(searchDebounceTimer);
   // Wait for a short typing pause so each keystroke (and each Hangul
   // composition step) does not start its own native search.
-  searchDebounceTimer = setTimeout(executeSearch, 120);
+  searchDebounceTimer = setTimeout(executeSearch, 70);
 }
 
 // Background indexing reports progress every few thousand entries. Refresh
@@ -1898,8 +1897,53 @@ if (modeChoiceModal) {
   }).observe(modeChoiceModal, { attributes: true, attributeFilter: ['style'] });
 }
 
+// Title-bar progress bar. The total is unknown while walking the disk, so
+// the bar measures against the file count of the last finished run; on the
+// very first run it estimates from which location is being read.
+const LAST_INDEX_TOTAL = 'dawith-last-index-total';
+const titleProgress = document.getElementById('titleProgress');
+const titleProgressFill = document.getElementById('titleProgressFill');
+const titleProgressPct = document.getElementById('titleProgressPct');
+let titleProgressHideTimer = null;
+
+function setTitleProgress(percent) {
+  if (!titleProgress) return;
+  clearTimeout(titleProgressHideTimer);
+  titleProgress.hidden = false;
+  titleProgressPct.hidden = false;
+  const value = Math.max(2, Math.min(100, Math.round(percent)));
+  titleProgressFill.style.width = `${value}%`;
+  titleProgressPct.textContent = `${value}%`;
+}
+
+function updateTitleProgress(data = {}) {
+  const stats = data.stats || data;
+  const found = Number(stats.totalFiles || 0) + Number(stats.totalFolders || 0);
+  if (data.status === 'indexing') setTitleProgress(2);
+  if (data.status === 'indexing-progress') {
+    const lastTotal = Number(localStorage.getItem(LAST_INDEX_TOTAL) || 0);
+    if (lastTotal > 0) {
+      setTitleProgress(Math.min(97, (found / lastTotal) * 100));
+    } else {
+      const rootIndex = Number(stats.rootIndex || 0);
+      const totalRoots = Math.max(1, Number(stats.totalRoots || 1));
+      const withinRoot = found / (found + 60000);
+      setTitleProgress(Math.min(95, ((rootIndex + withinRoot) / totalRoots) * 100));
+    }
+  }
+  if (data.status === 'idle') {
+    if (found > 0) localStorage.setItem(LAST_INDEX_TOTAL, String(found));
+    setTitleProgress(100);
+    titleProgressHideTimer = setTimeout(() => {
+      titleProgress.hidden = true;
+      titleProgressPct.hidden = true;
+    }, 2500);
+  }
+}
+
 window.dawithAPI.onIndexStatus((data) => {
   updateIndexingBanner(data);
+  updateTitleProgress(data);
   if (data.status === 'indexing' || data.status === 'indexing-progress') showIndexIntro();
   updateIndexIntro(data);
   if (data.status === 'indexing') {
@@ -1912,7 +1956,7 @@ window.dawithAPI.onIndexStatus((data) => {
   } else if (data.status === 'updated') {
     executeSearch();
   } else if (data.status === 'indexing-progress') {
-    titlebarStatus.textContent = `색인 중 · ${Number(data.stats?.totalFiles || 0).toLocaleString()}개 파일 발견`;
+    titlebarStatus.textContent = `색인 중 · ${Number((data.stats?.totalFiles || 0) + (data.stats?.totalFolders || 0)).toLocaleString()}개`;
     statTotalIndexed.textContent = `색인 항목: ${Number((data.stats?.totalFiles || 0) + (data.stats?.totalFolders || 0)).toLocaleString()}개`;
     refreshResultsForIndexing();
   } else if (data.status === 'error') {

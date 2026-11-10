@@ -22,6 +22,9 @@ struct AppState {
 #[derive(Default)]
 struct LocalIndex {
     records: Vec<Value>,
+    // Lowercased file names, same order as `records`, so a search can
+    // reject non-matching entries without allocating per record.
+    lower_names: Vec<String>,
     indexing: bool,
     ready: bool,
     total_files: usize,
@@ -365,6 +368,7 @@ fn publish_index_snapshot(
         // Append only what was found since the last snapshot. Copying the
         // whole list every 2000 entries held the lock long enough to stall
         // searches typed during indexing.
+        index.lower_names.extend(records[*published..].iter().map(lower_record_name));
         index.records.extend_from_slice(&records[*published..]);
         *published = records.len();
         index.ready = !records.is_empty();
@@ -406,6 +410,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
         index.indexing = true;
         index.ready = false;
         index.records.clear();
+        index.lower_names.clear();
         index.total_files = 0;
         index.total_folders = 0;
     }
@@ -483,8 +488,10 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             );
         }
 
+        let lower_names = records.iter().map(lower_record_name).collect::<Vec<_>>();
         if let Ok(mut index) = worker_app.state::<AppState>().local_index.lock() {
             index.records = records;
+            index.lower_names = lower_names;
             index.ready = true;
             index.indexing = false;
             index.total_files = total_files;
@@ -1111,6 +1118,24 @@ fn conversion_options(paths: &[PathBuf]) -> Value {
     Value::Array(options)
 }
 
+fn lower_record_name(record: &Value) -> String {
+    record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
+}
+
+/// Plain words that every match must contain in its file name, or None when
+/// the query uses operators (path:, OR, NOT, wildcards, regex, ...) that the
+/// full matcher has to handle.
+fn plain_name_terms(query: &str) -> Option<Vec<String>> {
+    let mut terms = Vec::new();
+    for token in query.split_whitespace() {
+        let clean = token.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')');
+        if clean.is_empty() { continue; }
+        if clean.contains([':', '|', '*', '?']) || clean.starts_with(['!', '-']) { return None; }
+        terms.push(clean.to_ascii_lowercase());
+    }
+    Some(terms)
+}
+
 fn search_local_index(
     state: &AppState,
     config: &Value,
@@ -1140,19 +1165,39 @@ fn search_local_index(
     let needs_metadata = lower_query.contains("tag:") || lower_query.contains("starred:") || lower_query.contains("star:");
     let mut total_matches = 0usize;
     let mut results = Vec::new();
-    for record in &index.records {
+    // Prepared once per search instead of once per record.
+    let name_terms = if use_natural_language { None } else { plain_name_terms(query) };
+    let allowed_roots = config_roots(config)
+        .iter()
+        .map(|root| {
+            let scope = normalize_path(root);
+            if scope.len() > 1 { scope.trim_end_matches('/').to_string() } else { scope }
+        })
+        .collect::<Vec<_>>();
+    let scope_key = scope.as_ref().map(|root| {
+        let key = normalize_path(root);
+        if key.len() > 1 { key.trim_end_matches('/').to_string() } else { key }
+    });
+    let within = |candidate: &str, root: &str| candidate == root || (candidate.starts_with(root) && candidate[root.len()..].starts_with('/'));
+    for (position, record) in index.records.iter().enumerate() {
+        if let (Some(terms), Some(name)) = (&name_terms, index.lower_names.get(position)) {
+            if !terms.iter().all(|term| name.contains(term.as_str())) { continue; }
+        }
         let full_path = record.get("fullPath").and_then(Value::as_str).unwrap_or("");
-        if let Some(scope) = &scope {
-            if !is_path_within(Path::new(full_path), scope) { continue; }
-        } else if !is_allowed_path(Path::new(full_path), config) {
+        let candidate = normalize_path(Path::new(full_path));
+        if let Some(scope) = &scope_key {
+            if !within(&candidate, scope) { continue; }
+        } else if !allowed_roots.iter().any(|root| within(&candidate, root)) {
             continue;
         }
-        let duplicate_key = if duplicate_by_size {
-            record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
-        } else {
-            record.get("name").and_then(Value::as_str).unwrap_or("").to_ascii_lowercase()
-        };
-        if (duplicate_by_size || duplicate_by_name) && duplicate_counts.get(&duplicate_key).copied().unwrap_or(0) < 2 { continue; }
+        if duplicate_by_size || duplicate_by_name {
+            let duplicate_key = if duplicate_by_size {
+                record.get("size").and_then(Value::as_u64).unwrap_or(0).to_string()
+            } else {
+                lower_record_name(record)
+            };
+            if duplicate_counts.get(&duplicate_key).copied().unwrap_or(0) < 2 { continue; }
+        }
         // Tags and stars live in metadata, so only those queries need each
         // record hydrated before matching; others clone just the matches.
         let matched = if needs_metadata {
@@ -1260,6 +1305,16 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
         token.starts_with("content:") || token.starts_with("tag:") || token == "starred:" || token == "star:" || token.starts_with("dupe:")
     });
     if native_can_handle_query {
+        // Search the supplemental local index on another thread while the
+        // native engine answers; running them one after the other added the
+        // local scan time to every keystroke.
+        let local_search = {
+            let (app, config, query, options, metadata) = (app.clone(), config.clone(), normalized_query.clone(), options.clone(), metadata.clone());
+            std::thread::spawn(move || {
+                let state = app.state::<AppState>();
+                search_local_index(&state, &config, &query, &options, &metadata, limit)
+            })
+        };
         let mut native_backend = "everything-ipc";
         let mut payload = search_everything(&app, &native_query, limit).and_then(Result::ok);
         if payload.is_none() && goz_ready(&app).map(|(_, ready)| ready).unwrap_or(false) {
@@ -1286,7 +1341,9 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            let (local_results, _local_total, local_indexed, indexing) = search_local_index(&state, &config, &normalized_query, &options, &metadata, limit)?;
+            let (local_results, _local_total, local_indexed, indexing) = local_search
+                .join()
+                .map_err(|_| "로컬 색인 검색에 실패했습니다.".to_string())??;
             let (mut items, local_added) = merge_records(items, local_results, limit);
             let native_total = payload.get("total").and_then(Value::as_u64).unwrap_or(items.len() as u64);
             let total = if options.get("scopeRoot").is_some() {
@@ -1664,7 +1721,7 @@ fn inspect_root(root_path: String) -> Value {
 fn get_backend_status(app: AppHandle) -> Value {
     if cfg!(windows) {
         if let Some((_helper, true)) = everything_ipc_ready(&app) {
-            return json!({ "backend": "everything-ipc", "label": "Everything IPC 연결됨", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
+            return json!({ "backend": "everything-ipc", "label": "Everything 연동", "available": true, "detail": "실행 중인 Everything DB에 공식 SDK IPC로 연결했습니다." });
         }
         if let Some((client, true)) = goz_ready(&app) {
             return json!({ "backend": "goz", "label": "goz NTFS 엔진 연결됨", "available": true, "detail": format!("{} · MIT 오픈소스 MFT/USN Journal 엔진", client.to_string_lossy()) });

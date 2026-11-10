@@ -1,16 +1,19 @@
 # Dawith Search
 
-macOS와 Windows에서 Everything 스타일의 빠른 파일 검색을 제공하는 Dawith 데스크톱 앱입니다. 기본 경량 런타임은 Tauri/Rust이며, Electron 런타임은 기능 비교·롤백용으로 보존합니다. 검색 문법, 실시간 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
+macOS와 Windows에서 빠른 파일 검색을 제공하는 Dawith 데스크톱 앱입니다. 기본 경량 런타임은 Tauri/Rust이며, Electron 런타임은 기능 비교·롤백용으로 보존합니다. 검색 문법, 로컬 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
 
 사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 기본값은 내 PC 로컬 전체 자동 검색이며, 공유폴더·외부 경로만 직접 추가합니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
 
 ## 검색 백엔드
 
-- Windows: 실행 중인 Voidtools Everything이 있으면 MIT 고지가 보존된 SDK IPC bridge를 사용하고, 결과가 빠진 사용자 폴더는 내장 보완 색인으로 합칩니다. Everything IPC가 없으면 MIT 오픈소스 `goz` 클라이언트와 `gozd` NTFS MFT/USN Journal 엔진, 설치된 `es.exe`, Dawith 자체 색인 순으로 자동 fallback합니다. 앱은 사용자의 `Everything.exe`를 복사하거나 재배포하지 않습니다. `DAWITH_EVERYTHING_IPC_PATH`/`DAWITH_GOZ_PATH`/`DAWITH_ES_PATH`로 경로를 직접 지정할 수 있습니다.
+- Windows (1.3.0부터): Dawith 자체 색인("Dawith 색인")으로 검색합니다. 파일 이름·폴더·크기·날짜를 담은 압축된 목록을 메모리에 두고 `rayon`으로 모든 CPU 코어에서 검색하며, 파일 약 46만 개인 PC에서 검색 1회에 0.01–0.05초 정도 걸립니다.
+  - 첫 실행: 파일 목록을 만드는 데 C 드라이브 기준 1분 정도 걸리고(네트워크 공유폴더가 있으면 더 오래), 찾은 파일부터 바로 검색됩니다. 첫 실행 안내 창과 제목 표시줄 진행 막대(%)로 진행 상황을 보여 줍니다.
+  - 다음 실행: 목록을 `~/.dawith-search/index-v2.bin`에 저장해 두므로 켜자마자 검색할 수 있고, 백그라운드에서 폴더를 다시 읽어 새 목록으로 교체합니다. 앱을 켜 둔 동안에는 파일 생성·삭제·이름 변경을 운영체제 알림으로 받아 1초 안팎에 색인에 반영합니다(`notify`).
+  - Everything 연결(선택): 기본으로 사용하지 않습니다. 고급 사용자는 `~/.dawith-search/config.json`에 `"useEverything": true`를 넣어 실행 중인 Voidtools Everything(SDK IPC bridge)과 `goz`/`gozd` NTFS 엔진을 켤 수 있습니다(설정 화면은 아직 없음). 두 도우미는 설치본에 선택 구성 요소로 들어 있으며, 앱은 사용자의 `Everything.exe`를 복사하거나 재배포하지 않습니다. `DAWITH_EVERYTHING_IPC_PATH`/`DAWITH_GOZ_PATH`로 경로를 직접 지정할 수 있습니다.
 - macOS: 단순 파일명 검색은 Spotlight `mdfind`를 사용하고, `ext:`, `size:`, `dm:`, `content:`, 태그 같은 복합 검색은 앱의 로컬 인덱서로 처리합니다.
 - 기타 플랫폼: Node.js 파일시스템 기반 초기 색인과 `chokidar` 기반 변경 감시를 사용합니다. 접근할 수 없는 폴더는 건너뛰고 검색 가능한 파일은 계속 색인합니다.
 
-네이티브 백엔드가 없거나 해당 쿼리를 지원하지 않으면 자동으로 로컬 색인으로 폴백합니다. Windows Tauri 패키지는 `build:tauri` 단계에서 IPC bridge와 `goz/gozd`를 함께 빌드하며, `gozd` 서비스 설치는 설정 화면에서 사용자가 명시적으로 승인할 때만 UAC를 요청합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
+`useEverything`을 켰더라도 Everything·goz가 준비되지 않았거나 해당 쿼리를 지원하지 않으면 Dawith 색인으로 검색합니다. Windows Tauri 패키지는 `build:tauri` 단계에서 IPC bridge와 `goz/gozd`를 함께 빌드하며, `gozd` 서비스 설치는 설정 화면에서 사용자가 명시적으로 승인할 때만 UAC를 요청합니다. 검색 속도는 OS 인덱스 상태, 지정한 루트, 파일 수에 따라 달라집니다.
 
 ### 속도 벤치마크
 
@@ -20,7 +23,7 @@ Windows에서 `gozd` 서비스를 설치한 뒤 실제 사무실 PC의 검색 �
 npm run benchmark:search -- 보고서
 ```
 
-이 명령은 2회 워밍업 후 20회 검색의 최소값·p50·p95·최대값과 사용 백엔드를 출력합니다. `goz`/Everything이 연결되지 않은 경우에는 fallback 측정임을 명시하며, 그 숫자를 native 엔진 성능으로 오인하지 않습니다. 앱 입력은 120ms debounce와 최신 요청 우선 처리를 사용해 타이핑 중 중복 IPC와 오래된 결과 렌더링을 줄입니다.
+이 명령은 Electron 런타임의 네이티브 어댑터(`src/engine/native-search.js`)를 대상으로 2회 워밍업 후 20회 검색의 최소값·p50·p95·최대값과 사용 백엔드를 출력합니다. `goz`/Everything이 연결되지 않은 경우에는 fallback 측정임을 명시하며, 그 숫자를 native 엔진 성능으로 오인하지 않습니다. 앱 입력은 120ms debounce와 최신 요청 우선 처리를 사용해 타이핑 중 중복 IPC와 오래된 결과 렌더링을 줄입니다.
 
 ### 기본 로컬 검색과 외부 폴더
 
@@ -32,7 +35,7 @@ npm run benchmark:search -- 보고서
 
 ### Windows 공유 폴더
 
-설정 → 색인할 폴더 → 검색 폴더 추가에서 `\\서버\공유폴더` 같은 UNC 경로를 선택하면 접근 가능한 Windows 네트워크 공유도 색인·검색할 수 있습니다. 공유 폴더가 Everything 색인에 없더라도 Dawith Search의 로컬 색인이 결과를 보완합니다. 공유 권한이 있는 동일한 Windows 사용자로 앱을 실행해야 하며, 연결이 끊긴 공유는 다시 연결한 뒤 설정에서 전체 재색인을 실행하세요. 매핑 드라이브는 관리자 권한 앱과 일반 앱의 드라이브 매핑이 다를 수 있으므로 UNC 경로 사용을 권장합니다.
+설정 → 색인할 폴더 → 검색 폴더 추가에서 `\\서버\공유폴더` 같은 UNC 경로를 선택하면 접근 가능한 Windows 네트워크 공유도 색인·검색할 수 있습니다. 추가한 공유 폴더는 Dawith 색인에 함께 담겨 로컬 파일과 같이 검색됩니다. 공유 권한이 있는 동일한 Windows 사용자로 앱을 실행해야 하며, 연결이 끊긴 공유는 다시 연결한 뒤 설정에서 전체 재색인을 실행하세요. 매핑 드라이브는 관리자 권한 앱과 일반 앱의 드라이브 매핑이 다를 수 있으므로 UNC 경로 사용을 권장합니다.
 
 ## 지원 기능
 
@@ -72,13 +75,12 @@ npm start
 - [REA 기반 구조·증거 분석](docs/REA-INTEGRATION.md)
 - [오픈소스 기능 조사·업그레이드 로드맵](docs/OPEN-SOURCE-ROADMAP.md)
 
-릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서 Everything이 설치되어 실행 중이면 공식 SDK IPC 백엔드를 사용하고, 준비되지 않았으면 `goz`/`es.exe`/Dawith Search 로컬 색인 순으로 동작합니다. SDK IPC는 Everything 본체가 백그라운드에서 실행 중이어야 하며, IPC를 제공하지 않는 설치 형태에서는 사용할 수 없습니다.
+릴리스 페이지에서 운영체제에 맞는 파일을 선택하세요. macOS universal은 Apple Silicon과 Intel Mac을 하나의 앱으로 지원합니다. Windows에서는 Everything을 따로 설치할 필요가 없으며, 1.3.0부터 Dawith 자체 색인으로 검색합니다. Everything 연결은 `useEverything` 설정을 켠 경우에만 쓰며, 이때도 Everything 본체가 백그라운드에서 실행 중이어야 하고 IPC를 제공하지 않는 설치 형태에서는 사용할 수 없습니다.
 
 ## 공식 참고 주소
 
 - [Voidtools 공식 홈페이지](https://www.voidtools.com/ko-kr/)
 - [goz 소스와 라이선스](https://github.com/mustafaahci/goz)
-- [Everything 다운로드](https://www.voidtools.com/ko-kr/downloads/)
 - [Everything 공식 SDK](https://www.voidtools.com/en-us/support/everything/sdk/)
 - [Everything SDK IPC API](https://www.voidtools.com/support/everything/sdk/ipc/)
 - [Everything 공식 도움말](https://www.voidtools.com/support/everything/)
@@ -125,7 +127,7 @@ dawith-cli "*.png|*.jpg" -s size -r
 
 각 프로젝트의 라이선스와 원문은 링크에서 확인할 수 있습니다. 앱에 실제로 포함한 라이브러리는 위의 `chokidar`, Electron 계열이며, Sift/File-Find/FilesMate는 설계 비교 자료입니다.
 
-Everything/ES는 Voidtools의 별도 소프트웨어이며, 공식 CLI 사용 조건은 [Voidtools 문서](https://www.voidtools.com/en-us/support/everything/command_line_interface/)를 따릅니다. Dawith Search의 독립 Windows 엔진 소스는 `native/goz`에 MIT 고지와 함께 포함되어 있습니다. `gozd.exe install`은 관리자 권한이 필요한 명시적 작업이라 앱이 몰래 실행하지 않습니다.
+Everything/ES는 Voidtools의 별도 소프트웨어이며(Dawith Search 1.3.0은 기본으로 사용하지 않음), 공식 CLI 사용 조건은 [Voidtools 문서](https://www.voidtools.com/en-us/support/everything/command_line_interface/)를 따릅니다. Dawith Search의 독립 Windows 엔진 소스는 `native/goz`에 MIT 고지와 함께 포함되어 있습니다. `gozd.exe install`은 관리자 권한이 필요한 명시적 작업이라 앱이 몰래 실행하지 않습니다.
 
 ## 라이선스
 
@@ -135,4 +137,4 @@ MIT License. 자세한 내용은 [LICENSE](LICENSE)를 참조하세요.
 
 본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한글은 한글과컴퓨터의 상표이며, Dawith Search는 한글과컴퓨터와 관계없는 별도 프로젝트입니다.
 
-Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다. Dawith Search는 Everything을 포함하거나 재배포하지 않고, 사용자가 따로 설치한 Everything과 공식 SDK(MIT)로만 통신합니다. 설치본에는 `licenses` 폴더에 Dawith Search, Everything SDK, goz, Rust 라이브러리의 라이선스 전문이 함께 들어 있습니다. 전체 목록은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.
+Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다. Dawith Search는 Everything을 포함하거나 재배포하지 않고, `useEverything`을 켠 경우에만 사용자가 따로 설치한 Everything과 공식 SDK(MIT)로 통신합니다. 설치본에는 `licenses` 폴더에 Dawith Search, Everything SDK, goz, Rust 라이브러리의 라이선스 전문이 함께 들어 있습니다. 전체 목록은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.

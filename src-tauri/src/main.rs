@@ -414,6 +414,12 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
 
         let (sender, receiver) = std::sync::mpsc::channel::<DirBatch>();
         let walk_roots = roots.clone();
+        let watch_excluded = excluded.clone();
+        if !live_build {
+            // A saved index is already being searched; keep it current while
+            // the background rescan runs.
+            start_index_watcher(worker_app.clone(), roots.clone(), watch_excluded.clone(), skip_hidden);
+        }
         let walker = std::thread::spawn(move || {
             // The walk blocks on disk and network I/O, so it gets its own
             // threads; searches keep the global pool to themselves and stay
@@ -442,14 +448,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
             if live_build {
                 if let Ok(mut index) = worker_app.state::<AppState>().local_index.lock() {
                     index.index.dirs.extend(built.dirs[published_dirs..].iter().cloned());
-                    index.index.entries.extend(built.entries[published_entries..].iter().map(|entry| fastindex::Entry {
-                        name: entry.name.clone(),
-                        lower: entry.lower.clone(),
-                        dir: entry.dir,
-                        size: entry.size,
-                        mtime: entry.mtime,
-                        is_dir: entry.is_dir,
-                    }));
+                    index.index.entries.extend(built.entries[published_entries..].iter().cloned());
                     index.ready = !index.index.entries.is_empty();
                 }
                 published_dirs = built.dirs.len();
@@ -502,8 +501,88 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
                 "stats": { "totalFiles": total_files, "totalFolders": total_folders, "elapsedMs": now_millis().saturating_sub(started_at) }
             }),
         );
+        start_index_watcher(worker_app.clone(), roots, watch_excluded, skip_hidden);
     });
     Ok(true)
+}
+
+static INDEX_WATCHER: Mutex<Option<notify::RecommendedWatcher>> = Mutex::new(None);
+
+/// Keeps the index current like Everything does: the OS reports created,
+/// deleted and renamed files, and the index is updated in place. Changes are
+/// applied in small batches and the window is told to refresh its results.
+fn start_index_watcher(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<String>, skip_hidden: bool) {
+    use notify::Watcher;
+    let Ok(mut slot) = INDEX_WATCHER.lock() else { return };
+    if slot.is_some() {
+        return;
+    }
+    let (sender, receiver) = std::sync::mpsc::channel::<notify::Result<notify::Event>>();
+    let Ok(mut watcher) = notify::recommended_watcher(move |event| { let _ = sender.send(event); }) else { return };
+    for root in &roots {
+        let _ = watcher.watch(root, notify::RecursiveMode::Recursive);
+    }
+    *slot = Some(watcher);
+    drop(slot);
+
+    std::thread::spawn(move || {
+        let skip = |path: &Path| {
+            path.components().any(|part| {
+                let name = part.as_os_str().to_string_lossy();
+                (skip_hidden && name.starts_with('.')) || excluded.iter().any(|item| item.eq_ignore_ascii_case(&name))
+            })
+        };
+        let mut last_notice = std::time::Instant::now() - std::time::Duration::from_secs(10);
+        let mut pending_notice = false;
+        loop {
+            // Wait for the first change, then gather whatever follows within 300 ms.
+            let first = match receiver.recv_timeout(std::time::Duration::from_secs(2)) {
+                Ok(event) => Some(event),
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => None,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+            };
+            let mut paths: Vec<PathBuf> = Vec::new();
+            if let Some(event) = first {
+                let deadline = std::time::Instant::now() + std::time::Duration::from_millis(300);
+                let mut push = |event: notify::Result<notify::Event>| {
+                    if let Ok(event) = event { paths.extend(event.paths); }
+                };
+                push(event);
+                while let Some(wait) = deadline.checked_duration_since(std::time::Instant::now()) {
+                    match receiver.recv_timeout(wait) {
+                        Ok(event) => push(event),
+                        Err(_) => break,
+                    }
+                }
+            }
+            paths.sort();
+            paths.dedup();
+            paths.retain(|path| !skip(path));
+            if !paths.is_empty() {
+                if let Ok(mut index) = app.state::<AppState>().local_index.lock() {
+                    for path in &paths {
+                        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else { continue };
+                        let folder = parent.to_string_lossy();
+                        let name = name.to_string_lossy();
+                        match fs::symlink_metadata(path) {
+                            Ok(meta) => {
+                                let mtime = meta.modified().ok().and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok()).map(|value| value.as_millis() as u64).unwrap_or(0);
+                                index.index.upsert(&folder, &name, if meta.is_dir() { 0 } else { meta.len() }, mtime, meta.is_dir());
+                            }
+                            Err(_) => index.index.remove(&folder, &name),
+                        }
+                    }
+                }
+                pending_notice = true;
+            }
+            // Tell the window at most every 1.5 s so busy folders don't flood it.
+            if pending_notice && last_notice.elapsed() >= std::time::Duration::from_millis(1500) {
+                let _ = app.emit("index-status", json!({ "status": "updated" }));
+                last_notice = std::time::Instant::now();
+                pending_notice = false;
+            }
+        }
+    });
 }
 
 fn local_roots(config: &Value) -> Vec<PathBuf> {

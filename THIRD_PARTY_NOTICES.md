@@ -29,8 +29,9 @@ project. The SDK source notice is preserved in
 [native/everything-sdk/LICENSE](native/everything-sdk/LICENSE).
 
 The application must not copy or redistribute the user's installed
-`Everything.exe`. If the SDK helper is unavailable, the app uses `goz` or its
-own local fallback index.
+`Everything.exe`. Since 1.3.0 the app searches its own index by default; the
+SDK helper and `goz` are optional components used only when the user sets
+`"useEverything": true` in `~/.dawith-search/config.json`.
 
 ## Libraries bundled in the Windows/macOS Tauri app
 
@@ -42,7 +43,8 @@ text ships with its source on crates.io or in the linked repository.
 | Tauri | 2.12.5 | MIT OR Apache-2.0 | https://github.com/tauri-apps/tauri |
 | serde | 1.0.229 | MIT OR Apache-2.0 | https://github.com/serde-rs/serde |
 | serde_json | 1.0.154 | MIT OR Apache-2.0 | https://github.com/serde-rs/json |
-| walkdir | 2.5.0 | Unlicense OR MIT | https://github.com/BurntSushi/walkdir |
+| notify | 6.1.1 | CC0-1.0 | https://github.com/notify-rs/notify |
+| rayon | 1.12.0 | MIT OR Apache-2.0 | https://github.com/rayon-rs/rayon |
 | OpenHWP `hwp` | git c605402 | MIT | https://github.com/openhwp/openhwp |
 | lopdf | 0.34.0 | MIT | https://github.com/J-F-Liu/lopdf |
 | image | 0.25.10 | MIT OR Apache-2.0 | https://github.com/image-rs/image |

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7f4" />
-    <meta name="description" content="Dawith Search 자주 묻는 질문: 설치 경고, Everything 연동, 공유폴더(NAS) 검색, HWP 본문·DRM 문서, 개인정보, 문제 해결." />
+    <meta name="description" content="Dawith Search 자주 묻는 질문: 설치 경고, 첫 실행 색인, 공유폴더(NAS) 검색, HWP 본문·DRM 문서, 개인정보, 문제 해결." />
     <meta property="og:title" content="Dawith Search 자주 묻는 질문" />
     <meta property="og:description" content="설치, 검색, 공유폴더, 한글(HWP) 문서, 개인정보에 대한 질문과 답." />
     <meta property="og:type" content="website" />
@@ -40,9 +40,10 @@
             <ol>
               <li><a href="#smartscreen">설치할 때 ‘Windows의 PC 보호’ 경고가 떠요</a></li>
               <li><a href="#gatekeeper">macOS에서 앱이 열리지 않아요</a></li>
-              <li><a href="#everything">Everything을 꼭 설치해야 하나요?</a></li>
+              <li><a href="#everything">Everything을 따로 설치해야 하나요?</a></li>
+              <li><a href="#first-run">처음 실행하면 왜 기다려야 하나요?</a></li>
               <li><a href="#update">새 버전은 어떻게 받나요?</a></li>
-              <li><a href="#mac-version">macOS도 1.2.0을 쓸 수 있나요?</a></li>
+              <li><a href="#mac-version">macOS도 최신 버전을 쓸 수 있나요?</a></li>
             </ol>
           </nav>
           <nav class="doc-index-group" aria-label="검색 질문">
@@ -50,7 +51,7 @@
             <ol>
               <li><a href="#not-found">검색 결과에 파일이 안 나와요</a></li>
               <li><a href="#slow">검색이 느려요</a></li>
-              <li><a href="#everything-not-used">Everything을 설치했는데 빨라지지 않아요</a></li>
+              <li><a href="#new-files">새로 만든 파일이 바로 안 나와요</a></li>
               <li><a href="#syntax">여러 조건을 한 번에 걸 수 있나요?</a></li>
               <li><a href="#natural">문장으로 검색할 수 있나요?</a></li>
             </ol>
@@ -110,9 +111,15 @@
         </article>
 
         <article class="doc-qa" id="everything">
-          <h3>Everything을 꼭 설치해야 하나요?</h3>
-          <p>아니요. 없어도 Dawith Search 자체 색인으로 검색됩니다. 다만 Windows에서는 Voidtools <b><a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything</a>이 실행 중</b>이면 그 색인을 바로 쓰기 때문에 훨씬 빠릅니다. 큰 공유폴더가 섞여 있어도 1초 안팎으로 결과가 나옵니다.</p>
-          <p>속도가 중요하다면 <a href="https://www.voidtools.com/ko-kr/downloads/" target="_blank" rel="noreferrer">Everything 공식 다운로드</a>에서 설치해 두기를 권합니다. Dawith Search는 Everything을 함께 배포하지 않으니 따로 설치해야 합니다. Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다.</p>
+          <h3>Everything을 따로 설치해야 하나요?</h3>
+          <p>아니요. Dawith Search는 자체 색인(<b>Dawith 색인</b>)으로 검색합니다. 파일 이름·폴더·크기·날짜를 담은 목록을 메모리에 올려 두고 CPU 코어를 모두 써서 찾기 때문에, 파일이 46만 개쯤 있는 PC에서도 한 번 검색하는 데 0.01~0.05초 정도 걸립니다.</p>
+          <p>1.3.0부터는 Everything을 기본으로 쓰지 않으므로, 설치 여부와 관계없이 같은 방식으로 검색합니다. 꼭 Everything과 연결해 쓰고 싶다면 <code>~/.dawith-search/config.json</code>에 <code>"useEverything": true</code>를 넣으면 됩니다. 아직 설정 화면에는 이 항목이 없습니다.</p>
+        </article>
+
+        <article class="doc-qa" id="first-run">
+          <h3>처음 실행하면 왜 기다려야 하나요?</h3>
+          <p>처음 실행할 때 이 PC의 파일 목록을 만들기 때문입니다. C 드라이브 기준으로 1분 정도 걸리고, 네트워크 공유폴더를 추가했다면 더 걸립니다. 목록을 만드는 동안에도 이미 찾은 파일부터 검색됩니다. 진행 상황은 첫 실행 안내 창과 제목 표시줄의 진행 막대(%)로 볼 수 있습니다.</p>
+          <p>만든 목록은 이 PC에 저장해 두므로, 다음부터는 앱을 켜자마자 검색할 수 있습니다.</p>
         </article>
 
         <article class="doc-qa" id="update">
@@ -121,7 +128,7 @@
         </article>
 
         <article class="doc-qa" id="mac-version">
-          <h3>macOS도 1.2.0을 쓸 수 있나요?</h3>
+          <h3>macOS도 최신 버전을 쓸 수 있나요?</h3>
           <p>아직은 아닙니다. macOS용 최신 버전은 준비 중이며, 지금은 1.1.8 Universal DMG(Apple Silicon·Intel 공용)를 사용해 주세요.</p>
         </article>
         <a class="doc-top" href="#top">↑ 질문 목록</a>
@@ -144,13 +151,14 @@
 
         <article class="doc-qa" id="slow">
           <h3>검색이 느려요</h3>
-          <p>Windows에서는 <a href="#everything">Everything을 설치해 실행해 두는 것</a>이 가장 효과가 큽니다. Dawith Search는 실행 중인 Everything → goz 엔진 → es.exe → 자체 색인 순으로 쓸 수 있는 엔진을 고릅니다.</p>
+          <p>처음 실행한 직후라면 파일 목록을 만드는 중일 수 있습니다. 제목 표시줄의 진행 막대가 사라질 때까지 기다려 주세요. (<a href="#first-run">처음 실행할 때 기다리는 이유</a>)</p>
           <p>공유폴더에 <code>size:</code>나 <code>dm:</code> 조건을 걸면 파일 정보를 네트워크로 읽어야 해서 몇 초 걸릴 수 있습니다.</p>
         </article>
 
-        <article class="doc-qa" id="everything-not-used">
-          <h3>Everything을 설치했는데 빨라지지 않아요</h3>
-          <p>Everything이 <b>실행 중</b>이어야 연동됩니다. 작업 표시줄 알림 영역에 Everything 아이콘이 있는지 확인하세요. 1.2.0에서 Everything 연동이 동작하지 않던 문제를 고쳤으니, 이전 버전이라면 <a href="./download.html">1.2.0으로 업데이트</a>해 주세요.</p>
+        <article class="doc-qa" id="new-files">
+          <h3>새로 만든 파일이 바로 안 나와요</h3>
+          <p>1.3.1부터는 파일을 만들거나 지우거나 이름을 바꾸면 1초 안팎으로 검색 결과에 반영됩니다. 그래도 안 보이면 그 파일이 검색 위치 밖에 있거나 제외 폴더(예: AppData, node_modules) 안에 있는지 확인하세요.</p>
+          <p>공유폴더에 생긴 파일은 설정 → 검색 위치에서 <b>추가한 위치 다시 읽기</b>를 눌러도 됩니다.</p>
         </article>
 
         <article class="doc-qa" id="syntax">

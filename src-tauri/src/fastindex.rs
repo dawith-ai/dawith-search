@@ -6,10 +6,12 @@
 // is nothing but substring checks over a flat array.
 use rayon::prelude::*;
 use std::cmp::Ordering;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::Path;
 
+#[derive(Clone)]
 pub struct Entry {
     pub name: Box<str>,
     pub lower: Box<str>,
@@ -17,12 +19,16 @@ pub struct Entry {
     pub size: u64,
     pub mtime: u64,
     pub is_dir: bool,
+    // False once the file was deleted; skipped by search and not saved.
+    pub alive: bool,
 }
 
 #[derive(Default)]
 pub struct FastIndex {
     pub dirs: Vec<Box<str>>,
     pub entries: Vec<Entry>,
+    // Lowercased folder path -> folder id, built on first use by live updates.
+    dir_map: HashMap<String, u32>,
 }
 
 const MAGIC: &[u8; 8] = b"DWSIDX01";
@@ -34,7 +40,64 @@ impl FastIndex {
     }
 
     pub fn push(&mut self, dir: u32, name: &str, size: u64, mtime: u64, is_dir: bool) {
-        self.entries.push(Entry { name: name.into(), lower: name.to_lowercase().into(), dir, size, mtime, is_dir });
+        self.entries.push(Entry { name: name.into(), lower: name.to_lowercase().into(), dir, size, mtime, is_dir, alive: true });
+    }
+
+    fn folder_id(&mut self, path: &str) -> u32 {
+        if self.dir_map.len() != self.dirs.len() {
+            self.dir_map = self.dirs.iter().enumerate().map(|(id, dir)| (dir.to_lowercase(), id as u32)).collect();
+        }
+        let key = path.to_lowercase();
+        if let Some(id) = self.dir_map.get(&key) {
+            return *id;
+        }
+        let id = self.add_dir(path);
+        self.dir_map.insert(key, id);
+        id
+    }
+
+    fn find(&self, dir: u32, lower: &str) -> Option<usize> {
+        self.entries.par_iter().position_any(|entry| entry.alive && entry.dir == dir && entry.lower.as_ref() == lower)
+    }
+
+    /// Adds a new file or folder, or refreshes size and time of a known one.
+    pub fn upsert(&mut self, folder: &str, name: &str, size: u64, mtime: u64, is_dir: bool) {
+        let dir = self.folder_id(folder);
+        let lower = name.to_lowercase();
+        match self.find(dir, &lower) {
+            Some(position) => {
+                let entry = &mut self.entries[position];
+                entry.size = size;
+                entry.mtime = mtime;
+                entry.is_dir = is_dir;
+            }
+            None => self.push(dir, name, size, mtime, is_dir),
+        }
+    }
+
+    /// Marks a deleted file, or a deleted folder with everything inside it.
+    pub fn remove(&mut self, folder: &str, name: &str) {
+        let dir = self.folder_id(folder);
+        let lower = name.to_lowercase();
+        let Some(position) = self.find(dir, &lower) else { return };
+        let was_dir = self.entries[position].is_dir;
+        self.entries[position].alive = false;
+        if was_dir {
+            let full = self.full_path(&self.entries[position].clone()).to_lowercase();
+            let inside: HashSet<u32> = self
+                .dirs
+                .iter()
+                .enumerate()
+                .filter(|(_, dir)| {
+                    let dir = dir.to_lowercase();
+                    dir == full || dir.starts_with(&format!("{full}\\"))
+                })
+                .map(|(id, _)| id as u32)
+                .collect();
+            for entry in self.entries.iter_mut().filter(|entry| inside.contains(&entry.dir)) {
+                entry.alive = false;
+            }
+        }
     }
 
     pub fn dir_of(&self, entry: &Entry) -> &str {
@@ -62,7 +125,7 @@ impl FastIndex {
             .entries
             .par_iter()
             .enumerate()
-            .filter(|(_, entry)| terms.iter().all(|term| entry.lower.contains(term.as_str())) && keep(self, entry))
+            .filter(|(_, entry)| entry.alive && terms.iter().all(|term| entry.lower.contains(term.as_str())) && keep(self, entry))
             .map(|(index, _)| index as u32)
             .collect();
         let total = hits.len();
@@ -87,8 +150,9 @@ impl FastIndex {
             for dir in &self.dirs {
                 write_str(&mut out, dir)?;
             }
-            write_u32(&mut out, self.entries.len() as u32)?;
-            for entry in &self.entries {
+            let alive = self.entries.iter().filter(|entry| entry.alive).count();
+            write_u32(&mut out, alive as u32)?;
+            for entry in self.entries.iter().filter(|entry| entry.alive) {
                 write_str(&mut out, &entry.name)?;
                 write_u32(&mut out, entry.dir)?;
                 out.write_all(&entry.size.to_le_bytes())?;
@@ -129,9 +193,9 @@ impl FastIndex {
         // Lowercasing millions of names is the slow part of loading; do it on all cores.
         let entries = raw
             .into_par_iter()
-            .map(|(name, dir, size, mtime, is_dir)| Entry { lower: name.to_lowercase().into(), name: name.into(), dir, size, mtime, is_dir })
+            .map(|(name, dir, size, mtime, is_dir)| Entry { lower: name.to_lowercase().into(), name: name.into(), dir, size, mtime, is_dir, alive: true })
             .collect();
-        Ok(FastIndex { dirs, entries })
+        Ok(FastIndex { dirs, entries, dir_map: HashMap::new() })
     }
 }
 
@@ -160,6 +224,32 @@ fn read_str(input: &mut impl Read) -> std::io::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn live_updates_add_refresh_and_remove() {
+        let mut index = FastIndex::default();
+        let docs = index.add_dir(r"C:\Docs");
+        index.push(docs, "Project", 0, 1, true);
+        let project = index.add_dir(r"C:\Docs\Project");
+        index.push(project, "plan.txt", 5, 1, false);
+
+        index.upsert(r"C:\Docs", "새 보고서.hwp", 10, 2, false);
+        assert_eq!(index.search(&["보고서".to_string()], 10, |_, _| true).1, 1);
+        index.upsert(r"c:\docs", "새 보고서.HWP", 99, 3, false);
+        let (hits, total) = index.search(&["보고서".to_string()], 10, |_, _| true);
+        assert_eq!((total, index.entries[hits[0] as usize].size), (1, 99));
+
+        index.remove(r"C:\Docs", "새 보고서.hwp");
+        assert_eq!(index.search(&["보고서".to_string()], 10, |_, _| true).1, 0);
+        // Removing a folder hides what was inside it, and saving drops them.
+        index.remove(r"C:\Docs", "Project");
+        assert_eq!(index.search(&["plan".to_string()], 10, |_, _| true).1, 0);
+        let file = std::env::temp_dir().join(format!("dawith-live-{}.bin", std::process::id()));
+        index.save(&file).unwrap();
+        let loaded = FastIndex::load(&file).unwrap();
+        let _ = fs::remove_file(&file);
+        assert_eq!(loaded.entries.len(), 0);
+    }
 
     #[test]
     fn search_sorts_filters_and_survives_save_load() {

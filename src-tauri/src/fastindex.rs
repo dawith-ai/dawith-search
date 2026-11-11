@@ -23,6 +23,40 @@ pub struct Entry {
     pub alive: bool,
 }
 
+/// Column the result list is sorted by; Relevance is the default ranking.
+#[derive(Clone, Copy, PartialEq, Debug, Default)]
+pub enum SortKey {
+    #[default]
+    Relevance,
+    Name,
+    Path,
+    Size,
+    Modified,
+    Extension,
+}
+
+impl SortKey {
+    pub fn from_option(value: Option<&str>) -> SortKey {
+        match value {
+            Some("name") => SortKey::Name,
+            Some("path") => SortKey::Path,
+            Some("size") => SortKey::Size,
+            Some("mtime") | Some("modified") => SortKey::Modified,
+            Some("ext") | Some("extension") => SortKey::Extension,
+            _ => SortKey::Relevance,
+        }
+    }
+}
+
+fn extension_of(lower: &str) -> &str {
+    lower.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("")
+}
+
+/// Extension used for sorting; folders have none even if their name has a dot.
+pub fn entry_extension(entry: &Entry) -> &str {
+    if entry.is_dir { "" } else { extension_of(&entry.lower) }
+}
+
 #[derive(Default)]
 pub struct FastIndex {
     pub dirs: Vec<Box<str>>,
@@ -124,6 +158,13 @@ impl FastIndex {
         self.search_typed(terms, false, limit, keep)
     }
 
+    pub fn search_typed<F>(&self, terms: &[String], composing: bool, limit: usize, keep: F) -> (Vec<u32>, usize)
+    where
+        F: Fn(&FastIndex, &Entry) -> bool + Sync,
+    {
+        self.search_sorted(terms, composing, SortKey::Relevance, false, limit, keep)
+    }
+
     /// 0 = the name starts with the first word, 1 = the word starts after a
     /// space or punctuation, 2 = anywhere else.
     fn rank(lower: &str, term: &str, pattern: Option<&Vec<QChar>>) -> u8 {
@@ -143,7 +184,9 @@ impl FastIndex {
 
     /// Like `search`, with Korean initial-consonant matching and, when
     /// `composing`, a still-being-typed last syllable.
-    pub fn search_typed<F>(&self, terms: &[String], composing: bool, limit: usize, keep: F) -> (Vec<u32>, usize)
+    /// Search sorted by a result-list column (or by relevance), ascending
+    /// unless `descending`.
+    pub fn search_sorted<F>(&self, terms: &[String], composing: bool, sort: SortKey, descending: bool, limit: usize, keep: F) -> (Vec<u32>, usize)
     where
         F: Fn(&FastIndex, &Entry) -> bool + Sync,
     {
@@ -166,15 +209,27 @@ impl FastIndex {
         // Better matches first, then by name (Everything sorts by name only).
         let first_term = terms.first().map(String::as_str).unwrap_or("");
         let first_pattern = patterns.first().and_then(Option::as_ref);
-        let ranks: HashMap<u32, u8> = if first_term.is_empty() {
+        let ranks: HashMap<u32, u8> = if first_term.is_empty() || sort != SortKey::Relevance {
             HashMap::new()
         } else {
             hits.par_iter().map(|hit| (*hit, Self::rank(&self.entries[*hit as usize].lower, first_term, first_pattern))).collect()
         };
         let by_name = |a: &u32, b: &u32| -> Ordering {
-            let rank = |hit: &u32| ranks.get(hit).copied().unwrap_or(2);
             let (ea, eb) = (&self.entries[*a as usize], &self.entries[*b as usize]);
-            rank(a).cmp(&rank(b)).then_with(|| ea.lower.cmp(&eb.lower)).then_with(|| ea.dir.cmp(&eb.dir))
+            let ordering = match sort {
+                SortKey::Relevance => {
+                    let rank = |hit: &u32| ranks.get(hit).copied().unwrap_or(2);
+                    rank(a).cmp(&rank(b)).then_with(|| ea.lower.cmp(&eb.lower))
+                }
+                SortKey::Name => ea.lower.cmp(&eb.lower),
+                SortKey::Path => self.dir_of(ea).cmp(self.dir_of(eb)).then_with(|| ea.lower.cmp(&eb.lower)),
+                SortKey::Size => ea.size.cmp(&eb.size).then_with(|| ea.lower.cmp(&eb.lower)),
+                SortKey::Modified => ea.mtime.cmp(&eb.mtime).then_with(|| ea.lower.cmp(&eb.lower)),
+                // Folders have no extension even if their name has a dot.
+                SortKey::Extension => entry_extension(ea).cmp(entry_extension(eb)).then_with(|| ea.lower.cmp(&eb.lower)),
+            }
+            .then_with(|| ea.dir.cmp(&eb.dir));
+            if descending && sort != SortKey::Relevance { ordering.reverse() } else { ordering }
         };
         if hits.len() > limit && limit > 0 {
             hits.select_nth_unstable_by(limit - 1, by_name);
@@ -361,6 +416,29 @@ fn read_str(input: &mut impl Read) -> std::io::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sorts_by_each_column_both_ways() {
+        let mut index = FastIndex::default();
+        let a = index.add_dir(r"C:A");
+        let b = index.add_dir(r"C:B");
+        index.push(b, "보고서 가.pdf", 300, 10, false);
+        index.push(a, "보고서 나.hwp", 100, 30, false);
+        index.push(a, "보고서 다.xlsx", 200, 20, false);
+        let order = |sort: SortKey, desc: bool| -> Vec<String> {
+            let (hits, _) = index.search_sorted(&["보고서".to_string()], false, sort, desc, 10, |_, _| true);
+            hits.iter().map(|i| index.entries[*i as usize].name.to_string()).collect()
+        };
+        assert_eq!(order(SortKey::Size, false), vec!["보고서 나.hwp", "보고서 다.xlsx", "보고서 가.pdf"]);
+        assert_eq!(order(SortKey::Size, true), vec!["보고서 가.pdf", "보고서 다.xlsx", "보고서 나.hwp"]);
+        assert_eq!(order(SortKey::Modified, true)[0], "보고서 나.hwp");
+        assert_eq!(order(SortKey::Path, false)[2], "보고서 가.pdf");
+        assert_eq!(order(SortKey::Extension, false), vec!["보고서 나.hwp", "보고서 가.pdf", "보고서 다.xlsx"]);
+        assert_eq!(order(SortKey::Name, true)[0], "보고서 다.xlsx");
+        // Only the top `limit` come back, still in the requested order.
+        let (hits, total) = index.search_sorted(&["보고서".to_string()], false, SortKey::Size, true, 1, |_, _| true);
+        assert_eq!((total, index.entries[hits[0] as usize].size), (3, 300));
+    }
 
     #[test]
     fn korean_initials_and_composing_syllables() {

@@ -9,7 +9,7 @@ let selectedIndex = -1;
 let selectedIndexes = new Set();
 let currentFilter = '';
 let isAiMode = false;
-let currentSortBy = 'name';
+let currentSortBy = '';
 let currentSortOrder = 'asc';
 let searchDebounceTimer = null;
 let lastInputAt = 0;
@@ -1447,18 +1447,23 @@ document.querySelectorAll('.table-header .th').forEach(th => {
   th.addEventListener('click', () => {
     const col = th.dataset.col;
     if (!col) return;
-    if (currentSortBy === col) {
-      currentSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
-    } else {
+    // Clicking a column cycles ascending → descending → default (relevance).
+    if (currentSortBy !== col) {
       currentSortBy = col;
       currentSortOrder = 'asc';
+    } else if (currentSortOrder === 'asc') {
+      currentSortOrder = 'desc';
+    } else {
+      currentSortBy = '';
+      currentSortOrder = 'asc';
     }
-    // Update sort indicator
     document.querySelectorAll('.sort-indicator').forEach(el => el.remove());
-    const indicator = document.createElement('span');
-    indicator.className = 'sort-indicator';
-    indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
-    th.appendChild(indicator);
+    if (currentSortBy) {
+      const indicator = document.createElement('span');
+      indicator.className = 'sort-indicator';
+      indicator.textContent = currentSortOrder === 'asc' ? '▲' : '▼';
+      th.appendChild(indicator);
+    }
 
     executeSearch();
   });
@@ -1851,7 +1856,14 @@ document.getElementById('btnCloseSyntax').addEventListener('click', () => {
 // Titlebar Controls
 document.getElementById('btnMinimize').addEventListener('click', () => window.dawithAPI.minimizeWindow());
 document.getElementById('btnMaximize').addEventListener('click', () => window.dawithAPI.maximizeWindow());
-document.getElementById('btnClose').addEventListener('click', () => window.dawithAPI.closeWindow());
+document.getElementById('btnClose').addEventListener('click', () => {
+  // The window goes to the tray and indexing keeps running; say so once.
+  if (localStorage.getItem('dawith-tray-hint') !== '1') {
+    localStorage.setItem('dawith-tray-hint', '1');
+    alert('창을 닫아도 Dawith Search는 화면 오른쪽 아래 알림 영역(트레이)에서 파일 목록을 계속 준비하고 최신으로 유지합니다.\n\n다시 열려면 트레이 아이콘을 누르고, 완전히 끄려면 트레이 아이콘을 오른쪽 클릭해 [종료]를 누르세요.');
+  }
+  window.dawithAPI.closeWindow();
+});
 
 // Realtime Index Status
 // First-run guide: while the first file list is being built, explain what is

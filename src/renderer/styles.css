@@ -1025,7 +1025,7 @@ body.dark-theme .search-target-summary.is-scoped {
 .col-size { width: 90px; text-align: right; justify-content: flex-end; }
 .col-mtime { width: 140px; }
 .col-ext { width: 70px; }
-.col-actions { width: 80px; text-align: center; justify-content: center; }
+.col-actions { width: 128px; gap: 6px; text-align: center; justify-content: center; overflow: visible; text-overflow: clip; }
 
 .table-body {
   flex: 1;
@@ -2142,3 +2142,6 @@ body.ui-simple .table-row .col-ext { display: none; }
 .title-progress-pct { min-width: 32px; color: var(--accent); font-weight: 800; font-variant-numeric: tabular-nums; }
 @keyframes title-progress-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .title-progress span { animation: none; transition: none; } }
+
+/* Action buttons (변환, 열기) sit side by side without being cut to "…". */
+.td.col-actions { display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow: visible; text-overflow: clip; }

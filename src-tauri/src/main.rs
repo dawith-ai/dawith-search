@@ -1273,7 +1273,10 @@ fn search_local_index(
         // Fast path: plain words plus extension/type filters, entirely on the index.
         // The window says whether the last word is still being typed (IME composing).
         let composing = options.get("composing").and_then(Value::as_bool).unwrap_or(false);
-        let (hits, total) = index.search_typed(&terms, composing, limit, |_, entry| {
+        // Column the user clicked in the result header (default: relevance).
+        let sort = fastindex::SortKey::from_option(options.get("sortBy").and_then(Value::as_str));
+        let descending = options.get("sortOrder").and_then(Value::as_str) == Some("desc");
+        let (hits, total) = index.search_sorted(&terms, composing, sort, descending, limit, |_, entry| {
             if let Some(dir) = want_dir { if entry.is_dir != dir { return false; } }
             if !extensions.is_empty() {
                 let Some(dot) = entry.lower.rfind('.') else { return false };
@@ -1319,7 +1322,20 @@ fn search_local_index(
             })
             .collect();
         let total = matched.len();
-        matched.sort_by(|a, b| index.entries[a.0 as usize].lower.cmp(&index.entries[b.0 as usize].lower));
+        let sort = fastindex::SortKey::from_option(options.get("sortBy").and_then(Value::as_str));
+        let descending = options.get("sortOrder").and_then(Value::as_str) == Some("desc");
+        matched.sort_by(|a, b| {
+            let (ea, eb) = (&index.entries[a.0 as usize], &index.entries[b.0 as usize]);
+            let ordering = match sort {
+                fastindex::SortKey::Size => ea.size.cmp(&eb.size),
+                fastindex::SortKey::Modified => ea.mtime.cmp(&eb.mtime),
+                fastindex::SortKey::Path => index.dir_of(ea).cmp(index.dir_of(eb)),
+                fastindex::SortKey::Extension => fastindex::entry_extension(ea).cmp(fastindex::entry_extension(eb)),
+                _ => std::cmp::Ordering::Equal,
+            }
+            .then_with(|| ea.lower.cmp(&eb.lower));
+            if descending && sort != fastindex::SortKey::Relevance { ordering.reverse() } else { ordering }
+        });
         (matched.into_iter().take(limit).map(|(_, record)| record).collect::<Vec<_>>(), total)
     };
     let mut results = results;
@@ -1920,7 +1936,44 @@ fn window_maximize(window: Window) -> Result<Value, String> {
 
 #[tauri::command]
 fn window_close(window: Window) -> Result<(), String> {
-    window.close().map_err(|error| error.to_string())
+    // Closing the window keeps Dawith running in the tray so indexing and
+    // change tracking continue; "종료" in the tray menu really quits.
+    window.hide().map_err(|error| error.to_string())
+}
+
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
+
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+    let open = MenuItem::with_id(app, "open", "Dawith Search 열기", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "종료", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let mut tray = TrayIconBuilder::with_id("main")
+        .tooltip("Dawith Search · 색인을 계속합니다")
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                show_main_window(tray.app_handle());
+            }
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -2089,10 +2142,21 @@ fn main() {
     let data_dir = data_dir();
     let config = read_config(&data_dir);
     tauri::Builder::default()
+        // Opening the app again while it runs in the tray shows the existing
+        // window instead of starting a second copy (and a second indexer).
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main_window(app)))
         .manage(AppState { config: Mutex::new(config), data_dir, local_index: Mutex::new(LocalIndex::default()) })
         .setup(|app| {
+            build_tray(app)?;
             start_local_indexing(&app.handle()).map_err(std::io::Error::other)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Alt+F4 and the taskbar's close also keep the app in the tray.
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             search,

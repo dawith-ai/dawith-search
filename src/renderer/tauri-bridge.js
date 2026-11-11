@@ -57,6 +57,10 @@
     installGozBackend: () => invoke('install_goz_backend'),
     checkForUpdates: () => invoke('check_for_updates'),
     downloadUpdate: () => invoke('download_update'),
+    onUpdateProgress: (callback) => {
+      if (!tauri.event?.listen) return;
+      tauri.event.listen('update-progress', event => callback(event.payload));
+    },
     onIndexStatus: (callback) => {
       if (!tauri.event?.listen) return;
       tauri.event.listen('index-status', event => callback(event.payload));

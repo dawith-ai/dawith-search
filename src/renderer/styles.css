@@ -2132,6 +2132,17 @@ body.ui-simple .table-row .col-ext { display: none; }
 .index-intro-meta span { min-width: 0; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
 .index-intro-tips { margin: 0 0 16px; padding-left: 18px; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
 .index-intro-actions { display: flex; justify-content: flex-end; }
+.update-dialog .index-intro-actions { gap: 8px; }
+.update-dialog .btn[hidden], .update-dialog [hidden] { display: none !important; }
+.btn-update, #btnTools, #btnCheckUpdates { position: relative; }
+.update-dot { position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: #e5484d; box-shadow: 0 0 0 2px var(--bg-panel, #fff); }
+.update-dot[hidden] { display: none; }
+#btnCheckUpdates .update-dot { top: 12px; right: 12px; }
+.update-notes { margin: 0 0 16px; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); font-size: 13px; }
+.update-notes strong { display: block; margin-bottom: 6px; }
+.update-notes ul { margin: 0; padding-left: 18px; line-height: 1.7; }
+.update-dialog .modal-desc { white-space: pre-line; }
+.update-dialog.is-error .index-intro-track span { background: #d33; }
 @keyframes index-intro-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .index-intro-dialog.is-working .index-intro-track span { animation: none; } }
 

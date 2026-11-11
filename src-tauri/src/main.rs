@@ -2048,6 +2048,19 @@ fn is_newer_version(candidate: &str, current: &str) -> bool {
     a > b
 }
 
+// Turns the GitHub release body into plain lines for the update window:
+// keeps the bullet points, drops headings, the macOS note and the footer.
+fn release_notes_text(body: &str) -> String {
+    body.lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with("- ") || line.starts_with("* "))
+        .map(|line| line[2..].trim())
+        .filter(|line| !line.starts_with("macOS"))
+        .take(8)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 fn windows_setup_asset_name(version: &str) -> String {
     format!("Dawith-Search_{version}_x64-setup.exe")
 }
@@ -2081,6 +2094,7 @@ fn fetch_update_info() -> Result<Value, String> {
         "currentVersion": current,
         "latestVersion": latest,
         "releaseUrl": release.get("html_url"),
+        "notes": release.get("body").and_then(Value::as_str).map(release_notes_text).unwrap_or_default(),
         "asset": {
             "name": asset_name,
             "url": asset.get("browser_download_url"),
@@ -2100,7 +2114,7 @@ async fn check_for_updates() -> Result<Value, String> {
 // Downloads the installer, checks its size and the SHA-256 digest GitHub
 // publishes for the asset, then runs it in passive update mode (progress
 // window only, no prompts). `/R` makes the installer start the app again.
-fn download_and_verify_update(info: &Value) -> Result<PathBuf, String> {
+fn download_and_verify_update(info: &Value, progress: &dyn Fn(Value)) -> Result<PathBuf, String> {
     use sha2::{Digest, Sha256};
     let asset = info.get("asset").ok_or("설치 파일 정보가 없습니다.")?;
     let name = asset.get("name").and_then(Value::as_str).ok_or("설치 파일 이름이 없습니다.")?;
@@ -2127,13 +2141,20 @@ fn download_and_verify_update(info: &Value) -> Result<PathBuf, String> {
     let mut hasher = Sha256::new();
     let mut buffer = vec![0u8; 64 * 1024];
     let mut written = 0u64;
+    let mut last_report = std::time::Instant::now();
+    progress(json!({ "stage": "downloading", "received": 0, "total": expected_size }));
     loop {
         let read = reader.read(&mut buffer).map_err(|error| format!("다운로드가 중단되었습니다: {error}"))?;
         if read == 0 { break; }
         hasher.update(&buffer[..read]);
         file.write_all(&buffer[..read]).map_err(|error| error.to_string())?;
         written += read as u64;
+        if last_report.elapsed() >= std::time::Duration::from_millis(120) {
+            last_report = std::time::Instant::now();
+            progress(json!({ "stage": "downloading", "received": written, "total": expected_size }));
+        }
     }
+    progress(json!({ "stage": "verifying", "received": written, "total": expected_size }));
     file.flush().map_err(|error| error.to_string())?;
     drop(file);
     let actual_digest = hasher.finalize().iter().map(|byte| format!("{byte:02x}")).collect::<String>();
@@ -2148,12 +2169,15 @@ fn download_and_verify_update(info: &Value) -> Result<PathBuf, String> {
 
 #[tauri::command]
 async fn download_update(app: AppHandle) -> Result<Value, String> {
-    let result = tauri::async_runtime::spawn_blocking(|| -> Result<PathBuf, String> {
+    let progress_app = app.clone();
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<PathBuf, String> {
+        let progress = |payload: Value| { let _ = progress_app.emit("update-progress", payload); };
+        progress(json!({ "stage": "checking" }));
         let info = fetch_update_info()?;
         if !info.get("available").and_then(Value::as_bool).unwrap_or(false) {
             return Err("이미 최신 버전입니다.".to_string());
         }
-        download_and_verify_update(&info)
+        download_and_verify_update(&info, &progress)
     })
     .await
     .map_err(|error| error.to_string())?;
@@ -2166,9 +2190,12 @@ async fn download_update(app: AppHandle) -> Result<Value, String> {
     if let Err(error) = Command::new(&installer).args(["/P", "/UPDATE", "/R"]).spawn() {
         return Ok(json!({ "success": false, "error": format!("설치 파일을 실행하지 못했습니다: {error}") }));
     }
+    let _ = app.emit("update-progress", json!({ "stage": "installing" }));
+    // Leave the "installing, restarting soon" message up briefly before the
+    // installer's own progress window takes over.
     let exit_app = app.clone();
     std::thread::spawn(move || {
-        std::thread::sleep(std::time::Duration::from_millis(700));
+        std::thread::sleep(std::time::Duration::from_millis(1500));
         exit_app.exit(0);
     });
     Ok(json!({ "success": true, "action": "relaunch" }))
@@ -2338,6 +2365,12 @@ mod tests {
         assert!(!query_needs_native_metadata("ext:hwp;hwpx 대응"));
         assert!(query_needs_native_metadata("대응 size:>1mb"));
         assert!(query_needs_native_metadata("dm:today"));
+    }
+
+    #[test]
+    fn release_notes_keep_only_bullets() {
+        let body = "## Dawith Search 1.3.6\r\n\r\n- 업데이트 창을 띄웁니다.\r\n- 빨간 점으로 알립니다.\r\n- macOS는 1.3.3 그대로\r\n\r\n🤖 Generated";
+        assert_eq!(release_notes_text(body), "업데이트 창을 띄웁니다.\n빨간 점으로 알립니다.");
     }
 
     #[test]

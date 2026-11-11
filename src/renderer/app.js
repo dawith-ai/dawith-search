@@ -261,6 +261,12 @@ let availableUpdate = null;
 
 function renderUpdateButton(update) {
   availableUpdate = update && update.available ? update : null;
+  for (const id of ['toolsUpdateDot', 'menuUpdateDot']) {
+    const dot = document.getElementById(id);
+    if (dot) dot.hidden = !availableUpdate;
+  }
+  const hint = document.getElementById('checkUpdatesHint');
+  if (hint) hint.textContent = availableUpdate ? `v${availableUpdate.latestVersion} 새 버전이 있습니다` : '새 패치가 있으면 바로 적용';
   if (!updateButton || !updateButtonLabel) return;
   if (!availableUpdate) {
     updateButton.hidden = true;
@@ -271,39 +277,136 @@ function renderUpdateButton(update) {
   updateButton.title = `${availableUpdate.latestVersion} 패치를 내려받아 적용합니다.`;
 }
 
+// Update window: shows each step (checking, downloading with a percentage,
+// verifying, installing) so the user knows something is happening before the
+// app closes for the installer.
+const updateModal = document.getElementById('updateModal');
+const updateDialog = document.getElementById('updateDialog');
+const updateLaterButton = document.getElementById('btnUpdateLater');
+const updateConfirmButton = document.getElementById('btnUpdateConfirm');
+let updateConfirmAction = null;
+let updateBusy = false;
+
+function showUpdateWindow({ title, body = '', notes = '', percent = null, working = false, count = '', where = '', confirm = '', later = '', error = false, onConfirm = null }) {
+  if (!updateModal) return;
+  const noteLines = String(notes || '').split('\n').map(line => line.trim()).filter(Boolean);
+  const list = document.getElementById('updateNotesList');
+  list.replaceChildren(...noteLines.map(line => Object.assign(document.createElement('li'), { textContent: line })));
+  document.getElementById('updateNotes').hidden = noteLines.length === 0;
+  document.getElementById('updateTitle').textContent = title;
+  document.getElementById('updateBody').textContent = body;
+  document.getElementById('updateProgress').hidden = percent === null && !working;
+  document.getElementById('updateBar').style.width = `${percent === null ? 100 : Math.max(3, Math.min(100, percent))}%`;
+  document.getElementById('updateCount').textContent = count;
+  document.getElementById('updateWhere').textContent = where;
+  updateDialog.classList.toggle('is-working', working);
+  updateDialog.classList.toggle('is-error', error);
+  updateConfirmButton.hidden = !confirm;
+  updateConfirmButton.textContent = confirm;
+  updateLaterButton.hidden = !later;
+  updateLaterButton.textContent = later;
+  updateConfirmAction = onConfirm;
+  updateModal.style.display = 'flex';
+  if (confirm) updateConfirmButton.focus();
+}
+
+function hideUpdateWindow() {
+  if (updateModal) updateModal.style.display = 'none';
+}
+
+updateConfirmButton?.addEventListener('click', () => {
+  const action = updateConfirmAction;
+  if (action) action(); else hideUpdateWindow();
+});
+updateLaterButton?.addEventListener('click', hideUpdateWindow);
+
+function formatMB(bytes) {
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+function updatingTitle() {
+  return `v${availableUpdate ? availableUpdate.latestVersion : ''}으로 업데이트하는 중`;
+}
+
+window.dawithAPI.onUpdateProgress?.((data = {}) => {
+  if (!updateBusy) return;
+  if (data.stage === 'checking') {
+    showUpdateWindow({ title: updatingTitle(), body: '최신 버전 정보를 확인하고 있습니다.', working: true, where: '1/3 확인' });
+  } else if (data.stage === 'downloading') {
+    const percent = data.total ? Math.floor((data.received / data.total) * 100) : null;
+    showUpdateWindow({
+      title: updatingTitle(),
+      body: '설치 파일을 내려받고 있습니다. 잠시만 기다려 주세요.',
+      percent, working: percent === null,
+      count: percent === null ? formatMB(data.received || 0) : `${percent}%`,
+      where: data.total ? `2/3 다운로드 · ${formatMB(data.received || 0)} / ${formatMB(data.total)}` : '2/3 다운로드'
+    });
+  } else if (data.stage === 'verifying') {
+    showUpdateWindow({ title: updatingTitle(), body: '내려받은 파일이 정상인지 확인하고 있습니다.', percent: 100, working: true, count: '100%', where: '3/3 파일 확인' });
+  } else if (data.stage === 'installing') {
+    showUpdateWindow({
+      title: '설치를 시작합니다',
+      body: '곧 이 창이 닫히고 설치 진행 창이 나타납니다. 설치가 끝나면 Dawith Search가 자동으로 다시 열립니다.',
+      percent: 100, count: '설치 중', where: '잠시 뒤 자동으로 다시 열림'
+    });
+  }
+});
+
+let lastAutoUpdateCheck = 0;
+
 async function checkForUpdates(showMessage = false) {
-  if (!window.dawithAPI.checkForUpdates) return;
+  if (!window.dawithAPI.checkForUpdates || updateBusy) return;
+  // Background checks are spaced out so focusing the window often does not
+  // use up GitHub's hourly request allowance.
+  if (!showMessage) {
+    if (Date.now() - lastAutoUpdateCheck < 5 * 60 * 1000) return;
+    lastAutoUpdateCheck = Date.now();
+  }
+  if (showMessage) showUpdateWindow({ title: '새 버전을 확인하고 있습니다', body: '잠시만 기다려 주세요.', working: true });
   try {
     const update = await window.dawithAPI.checkForUpdates();
     renderUpdateButton(update);
-    if (showMessage && (!update || !update.available)) alert('현재 최신 버전입니다.');
+    if (!showMessage) return;
+    if (update && update.available) {
+      askToUpdate();
+    } else if (update && update.supported === false) {
+      showUpdateWindow({ title: '자동 업데이트를 쓸 수 없습니다', body: '이 운영체제용 설치 파일은 다운로드 페이지에서 받아 주세요.', confirm: '확인' });
+    } else {
+      showUpdateWindow({ title: '최신 버전입니다', body: `지금 쓰는 v${update?.currentVersion || ''}이 가장 새 버전입니다.`, confirm: '확인' });
+    }
   } catch (error) {
-    if (showMessage) alert(`업데이트를 확인하지 못했습니다.\n${error.message || error}`);
+    if (showMessage) showUpdateWindow({ title: '업데이트를 확인하지 못했습니다', body: `인터넷 연결을 확인한 뒤 다시 시도해 주세요.\n${error.message || error}`, confirm: '닫기', error: true });
   }
 }
 
+function askToUpdate() {
+  if (!availableUpdate) return;
+  showUpdateWindow({
+    title: `v${availableUpdate.latestVersion}으로 업데이트할까요?`,
+    body: `지금 쓰는 버전은 v${availableUpdate.currentVersion}입니다. 설치 파일을 내려받아 확인한 뒤 설치하고, 앱을 다시 엽니다. 보통 1분이 안 걸립니다.`,
+    notes: availableUpdate.notes,
+    confirm: '지금 업데이트', later: '나중에', onConfirm: downloadAvailableUpdate
+  });
+}
+
 async function downloadAvailableUpdate() {
-  if (!availableUpdate || !updateButton || !updateButtonLabel) return;
-  updateButton.disabled = true;
-  updateButtonLabel.textContent = '다운로드 중…';
+  if (!availableUpdate || updateBusy) return;
+  updateBusy = true;
+  if (updateButton) updateButton.disabled = true;
+  if (updateButtonLabel) updateButtonLabel.textContent = '업데이트 중…';
+  showUpdateWindow({ title: updatingTitle(), body: '최신 버전 정보를 확인하고 있습니다.', working: true, where: '1/3 확인' });
+  const fail = message => {
+    updateBusy = false;
+    if (updateButton) updateButton.disabled = false;
+    if (updateButtonLabel) updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
+    showUpdateWindow({ title: '업데이트를 마치지 못했습니다', body: message, confirm: '닫기', error: true });
+  };
   try {
     const result = await window.dawithAPI.downloadUpdate();
-    if (!result.success) {
-      alert(`업데이트를 적용하지 못했습니다.\n${result.error || '알 수 없는 오류'}`);
-      updateButton.disabled = false;
-      updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
-      return;
-    }
-    updateButtonLabel.textContent = result.action === 'relaunch' ? '재실행 중…' : '설치 파일 열림';
-    updateButton.hidden = result.action !== 'relaunch';
-    if (result.action === 'open-installer') {
-      alert('최신 설치 파일을 열었습니다. 설치를 완료한 뒤 앱을 다시 실행하세요.');
-      updateButton.disabled = false;
-    }
+    if (!result.success) return fail(result.error || '알 수 없는 오류');
+    if (updateButtonLabel) updateButtonLabel.textContent = '재실행 중…';
   } catch (error) {
-    alert(`업데이트를 적용하지 못했습니다.\n${error.message || error}`);
-    updateButton.disabled = false;
-    updateButtonLabel.textContent = `v${availableUpdate.latestVersion} 업데이트`;
+    fail(String(error.message || error));
   }
 }
 
@@ -1396,7 +1499,7 @@ historyList.addEventListener('click', (e) => {
 });
 
 document.getElementById('btnSaveBookmark').addEventListener('click', saveCurrentBookmark);
-updateButton?.addEventListener('click', downloadAvailableUpdate);
+updateButton?.addEventListener('click', askToUpdate);
 document.getElementById('btnCheckUpdates')?.addEventListener('click', () => checkForUpdates(true));
 document.getElementById('btnClearHistory').addEventListener('click', async () => {
   await window.dawithAPI.clearSearchHistory();

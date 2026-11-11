@@ -77,13 +77,14 @@
         </button>
         <button class="btn btn-update" id="btnUpdate" type="button" hidden title="새 버전으로 업데이트합니다">
           <span aria-hidden="true">↻</span> <span id="btnUpdateLabel">업데이트</span>
+          <span class="update-dot" aria-label="새 버전 있음"></span>
         </button>
         <button class="btn btn-toggle advanced-only" id="btnAiToggle" title="인터넷이나 외부 AI 없이 자연어 문장을 검색 문법으로 해석합니다">
           <span class="icon">✦</span> 자연어 검색
         </button>
         <div class="tools-menu-wrap">
           <button class="btn btn-ghost" id="btnTools" type="button" aria-expanded="false" aria-controls="toolsMenu">
-            도구 <span class="menu-chevron">⌄</span>
+            도구 <span class="menu-chevron">⌄</span><span class="update-dot" id="toolsUpdateDot" hidden aria-label="새 버전 있음"></span>
           </button>
           <div class="tools-menu" id="toolsMenu" hidden>
             <div class="tools-menu-label">검색 도구</div>
@@ -104,7 +105,7 @@
               <span class="tool-menu-icon">◐</span><span><strong>테마 전환</strong><small>라이트·다크 모드</small></span>
             </button>
             <button class="tool-menu-item" id="btnCheckUpdates" title="최신 버전 확인">
-              <span class="tool-menu-icon">↻</span><span><strong>업데이트 확인</strong><small>새 패치가 있으면 바로 적용</small></span>
+              <span class="tool-menu-icon">↻</span><span><strong>업데이트 확인</strong><small id="checkUpdatesHint">새 패치가 있으면 바로 적용</small></span><span class="update-dot" id="menuUpdateDot" hidden></span>
             </button>
             <button class="tool-menu-item" id="btnSettings" title="색인 설정">
               <span class="tool-menu-icon">⚙</span><span><strong>색인 설정</strong><small>검색할 폴더와 단축키</small></span>
@@ -319,6 +320,32 @@
         <div class="index-intro-actions">
           <button class="btn btn-ghost" id="btnIndexIntroHide" type="button">닫고 기다리기</button>
           <button class="btn btn-primary" id="btnIndexIntroClose" type="button" disabled>잠시만 기다려 주세요…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="updateModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+    <div class="modal-dialog index-intro-dialog update-dialog" id="updateDialog">
+      <div class="modal-header">
+        <div>
+          <span class="modal-kicker" id="updateKicker">업데이트</span>
+          <h3 id="updateTitle">새 버전을 확인하고 있습니다</h3>
+        </div>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc" id="updateBody">잠시만 기다려 주세요.</p>
+        <div class="update-notes" id="updateNotes" hidden>
+          <strong>이번 업데이트에서 달라진 점</strong>
+          <ul id="updateNotesList"></ul>
+        </div>
+        <div class="index-intro-progress" id="updateProgress" aria-live="polite">
+          <div class="index-intro-track"><span id="updateBar"></span></div>
+          <div class="index-intro-meta"><strong id="updateCount"></strong><span id="updateWhere"></span></div>
+        </div>
+        <div class="index-intro-actions">
+          <button class="btn btn-ghost" id="btnUpdateLater" type="button" hidden>나중에</button>
+          <button class="btn btn-primary" id="btnUpdateConfirm" type="button" hidden>확인</button>
         </div>
       </div>
     </div>

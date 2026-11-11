@@ -31,6 +31,9 @@
         <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
         <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
       </div>
+      <button class="titlebar-settings" id="btnTitleSettings" type="button" title="설정: 버전·업데이트, 화면 구성, 검색 위치">
+        <span aria-hidden="true">⚙</span> 설정<span class="update-dot" id="settingsUpdateDot" hidden aria-label="새 버전 있음"></span>
+      </button>
       <button class="win-btn" id="btnMinimize" title="최소화">&#x2014;</button>
       <button class="win-btn" id="btnMaximize" title="최대화">&#x25A2;</button>
       <button class="win-btn win-close" id="btnClose" title="닫기">&#x2715;</button>
@@ -105,7 +108,7 @@
               <span class="tool-menu-icon">↻</span><span><strong>업데이트 확인</strong><small id="checkUpdatesHint">새 패치가 있으면 바로 적용</small></span><span class="update-dot" id="menuUpdateDot" hidden></span>
             </button>
             <button class="tool-menu-item" id="btnSettings" title="색인 설정">
-              <span class="tool-menu-icon">⚙</span><span><strong>색인 설정</strong><small>검색할 폴더와 단축키</small></span>
+              <span class="tool-menu-icon">⚙</span><span><strong>설정</strong><small>버전·업데이트, 화면, 검색 위치</small></span>
             </button>
           </div>
         </div>

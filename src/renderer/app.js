@@ -138,7 +138,7 @@ function applyUiMode(mode) {
   document.body.classList.toggle('ui-advanced', currentUiMode === 'advanced');
   if (uiModeStatus) {
     uiModeStatus.textContent = currentUiMode === 'simple'
-      ? '현재: 간편 모드 · 검색창과 결과만 크게 보여 줍니다. 검색 위치 추가는 도구 → 색인 설정에 있습니다.'
+      ? '현재: 간편 모드 · 검색창과 결과만 크게 보여 줍니다. 검색 위치 추가는 오른쪽 위 설정에 있습니다.'
       : '현재: 다양한 기능 모드 · 분석·저장·변환·필터를 모두 표시합니다.';
   }
   document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode, #btnViewSimple, #btnViewAdvanced').forEach(button => {
@@ -259,7 +259,7 @@ let availableUpdate = null;
 
 function renderUpdateButton(update) {
   availableUpdate = update && update.available ? update : null;
-  for (const id of ['toolsUpdateDot', 'menuUpdateDot']) {
+  for (const id of ['toolsUpdateDot', 'menuUpdateDot', 'settingsUpdateDot']) {
     const dot = document.getElementById(id);
     if (dot) dot.hidden = !availableUpdate;
   }
@@ -648,12 +648,18 @@ async function addSearchRoot() {
   }
 }
 
-async function openRootSettings({ focusNetwork = false } = {}) {
+async function openRootSettings({ focusNetwork = false, fromTop = false } = {}) {
   settingsModal.style.display = 'flex';
+  const body = settingsModal.querySelector('.modal-body');
+  if (body) body.scrollTop = 0;
   const config = await refreshSettingsRoots();
   if (focusNetwork) {
     networkRootForm.hidden = false;
     networkRootInput.focus();
+  } else if (fromTop) {
+    // General settings open at the top (version and update first).
+    document.getElementById('btnSettingsCheckUpdates')?.focus({ preventScroll: true });
+    if (body) body.scrollTop = 0;
   } else {
     document.getElementById('btnAddRoot')?.focus();
   }
@@ -1835,10 +1841,14 @@ document.getElementById('btnSetAdvancedMode')?.addEventListener('click', () => s
 viewSimpleButton?.addEventListener('click', () => saveUiMode('simple'));
 viewAdvancedButton?.addEventListener('click', () => saveUiMode('advanced'));
 
-document.getElementById('btnSettings').addEventListener('click', async () => {
-  const cfg = await openRootSettings();
+async function openGeneralSettings() {
+  document.getElementById('toolsMenu')?.setAttribute('hidden', '');
+  document.getElementById('btnTools')?.setAttribute('aria-expanded', 'false');
+  const cfg = await openRootSettings({ fromTop: true });
   applyUiMode(cfg.uiMode || 'advanced');
-});
+}
+document.getElementById('btnSettings').addEventListener('click', openGeneralSettings);
+document.getElementById('btnTitleSettings')?.addEventListener('click', openGeneralSettings);
 document.getElementById('btnCloseSettings').addEventListener('click', () => {
   settingsModal.style.display = 'none';
 });

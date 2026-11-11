@@ -237,5 +237,6 @@ Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools
 <p align="center">
   <a href="https://welfare-hub.site/"><img src="site/ci.png" alt="Dawith AI" width="48" /></a><br/>
   <sub>Created by</sub><br/>
-  <a href="https://welfare-hub.site/"><b>Dawith AI</b></a> · Dawith 복지 허브 - 사회복지 현장의 반복 업무를 줄입니다
+  <a href="https://welfare-hub.site/"><b>Dawith AI</b></a> · Dawith 복지 허브 - 사회복지 현장의 반복 업무를 줄입니다<br/>
+  <sub>오픈소스 <a href="https://github.com/tauri-apps/tauri">Tauri</a>·<a href="https://github.com/rayon-rs/rayon">rayon</a>을 바탕으로 만들었고, 한글 본문 읽기는 <a href="https://github.com/openhwp/openhwp">OpenHWP</a>, 검색 문법은 <a href="https://www.voidtools.com/ko-kr/">Everything</a>을 참고했습니다. <a href="https://dawith-ai.github.io/dawith-search/opensource.html">전체 목록</a> · <a href="THIRD_PARTY_NOTICES.md">오픈소스 고지</a></sub>
 </p>

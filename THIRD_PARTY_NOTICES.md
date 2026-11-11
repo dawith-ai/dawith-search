@@ -33,7 +33,7 @@ The application must not copy or redistribute the user's installed
 SDK helper and `goz` are optional components used only when the user sets
 `"useEverything": true` in `~/.dawith-search/config.json`.
 
-## Libraries bundled in the Windows/macOS Tauri app
+## Libraries bundled in the Windows/macOS/Linux Tauri app
 
 Versions are the ones locked in `src-tauri/Cargo.lock`. Each crate's license
 text ships with its source on crates.io or in the linked repository.
@@ -52,6 +52,8 @@ text ships with its source on crates.io or in the linked repository.
 | sha2 | 0.10.9 | MIT OR Apache-2.0 | https://github.com/RustCrypto/hashes |
 | trash | 5.3.0 | MIT | https://github.com/Byron/trash-rs |
 | rfd | 0.15.4 | MIT | https://github.com/PolyMeilex/rfd |
+| tauri-plugin-single-instance | 2.5.5 | MIT OR Apache-2.0 | https://github.com/tauri-apps/plugins-workspace |
+| windows-sys (Windows only) | 0.59.0 | MIT OR Apache-2.0 | https://github.com/microsoft/windows-rs |
 
 Transitive dependencies keep their own licenses; `cargo tree` lists them.
 

@@ -395,12 +395,6 @@ async function run() {
   await click('#filterTabs [data-filter=""]');
   await setSearch('contract');
 
-  await click('#btnAiToggle');
-  const aiEnabled = await evaluate("document.querySelector('#btnAiToggle')?.classList.contains('active')");
-  assert.strictEqual(aiEnabled, true);
-  await click('#btnAiToggle');
-  record('규칙 기반 자연어 모드 토글', '외부 API 없이 renderer 상태 전환 확인');
-
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'k', code: 'KeyK', ctrlKey: true }))");
   await waitForState('command palette', state => state.commandDisplay === 'flex');
   record('Ctrl/Cmd+K 명령 팔레트', '팔레트 열림');

@@ -612,6 +612,8 @@ ipcMain.handle('install-goz-backend', async () => {
   });
 });
 
+ipcMain.handle('app-version', () => app.getVersion());
+
 ipcMain.handle('check-for-updates', async () => {
   if (process.env.DAWITH_DISABLE_UPDATE_CHECK === '1') {
     return { supported: false, available: false, reason: 'disabled-for-test' };
@@ -628,12 +630,16 @@ ipcMain.handle('download-update', async () => {
     return { success: false, error: '업데이트 확인이 테스트 모드에서 비활성화되어 있습니다.' };
   }
   try {
+    mainWindow?.webContents.send('update-progress', { stage: 'checking' });
     const update = await UpdateManager.checkForUpdates(app.getVersion(), process.platform);
     if (!update.available) return { success: false, error: '현재 최신 버전입니다.' };
 
     const updateDir = path.join(app.getPath('downloads'), 'Dawith Search Updates');
     const destination = path.join(updateDir, update.asset.name);
-    await UpdateManager.downloadAndVerify(update, destination);
+    await UpdateManager.downloadAndVerify(update, destination, undefined, progress => {
+      mainWindow?.webContents.send('update-progress', { stage: 'downloading', ...progress });
+    });
+    mainWindow?.webContents.send('update-progress', { stage: 'verifying' });
 
     if (process.platform === 'win32') {
       const scriptPath = path.join(updateDir, `launch-${update.latestVersion}.cmd`);
@@ -650,11 +656,13 @@ ipcMain.handle('download-update', async () => {
         stdio: 'ignore'
       });
       launcher.unref();
+      mainWindow?.webContents.send('update-progress', { stage: 'installing' });
       app.isQuitting = true;
       app.quit();
       return { success: true, action: 'relaunch', path: destination, version: update.latestVersion };
     }
 
+    mainWindow?.webContents.send('update-progress', { stage: 'installing' });
     const openError = await shell.openPath(destination);
     if (openError) return { success: false, error: openError };
     return { success: true, action: 'open-installer', path: destination, version: update.latestVersion };

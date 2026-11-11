@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   inspectRoot: (rootPath) => ipcRenderer.invoke('inspect-root', rootPath),
   getBackendStatus: () => ipcRenderer.invoke('get-backend-status'),
   installGozBackend: () => ipcRenderer.invoke('install-goz-backend'),
+  getAppVersion: () => ipcRenderer.invoke('app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   openGuide: () => ipcRenderer.invoke('open-guide'),
@@ -53,5 +54,10 @@ contextBridge.exposeInMainWorld('dawithAPI', {
 
   onIndexStatus: (callback) => {
     ipcRenderer.on('index-status', (event, data) => callback(data));
+  },
+  onUpdateProgress: (callback) => {
+    const listener = (event, data) => callback(data);
+    ipcRenderer.on('update-progress', listener);
+    return () => ipcRenderer.removeListener('update-progress', listener);
   }
 });

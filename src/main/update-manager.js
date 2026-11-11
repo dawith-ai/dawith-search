@@ -21,7 +21,7 @@ function compareVersions(left, right) {
 
 function getAssetName(version, platform) {
   if (platform === 'win32') return `DawithSearch-${version}-portable.exe`;
-  if (platform === 'darwin') return `Dawith.Search-${version}-universal.dmg`;
+  if (platform === 'darwin') return `Dawith Search-${version}-universal.dmg`;
   return null;
 }
 
@@ -59,7 +59,7 @@ function requestJson(url, request = https.get) {
   });
 }
 
-function downloadFile(url, destination, request = https.get) {
+function downloadFile(url, destination, request = https.get, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
     const temporaryPath = `${destination}.download`;
     const start = targetUrl => {
@@ -74,6 +74,13 @@ function downloadFile(url, destination, request = https.get) {
           reject(new Error(`Update download failed (${response.statusCode})`));
           return;
         }
+        const total = Number(response.headers['content-length']) || 0;
+        let received = 0;
+        onProgress({ received, total });
+        response.on('data', chunk => {
+          received += chunk.length;
+          onProgress({ received, total });
+        });
         const output = fs.createWriteStream(temporaryPath);
         response.pipe(output);
         output.on('finish', () => {
@@ -127,9 +134,9 @@ async function checkForUpdates(currentVersion, platform, request = https.get) {
   };
 }
 
-async function downloadAndVerify(update, destination, request = https.get) {
+async function downloadAndVerify(update, destination, request = https.get, onProgress = () => {}) {
   fs.mkdirSync(path.dirname(destination), { recursive: true });
-  await downloadFile(update.asset.url, destination, request);
+  await downloadFile(update.asset.url, destination, request, onProgress);
   const expectedDigest = String(update.asset.digest || '').replace(/^sha256:/i, '').toLowerCase();
   if (expectedDigest) {
     const actualDigest = await sha256File(destination);

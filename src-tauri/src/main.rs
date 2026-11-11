@@ -1860,7 +1860,29 @@ fn get_file_stats(file_path: String, state: State<'_, AppState>) -> Option<Value
     path_record(&path)
 }
 
+/// Opens a file or folder with its default program the way Explorer does
+/// (ShellExecuteW). Launching `cmd /C start` and waiting for it took 0.4-2.5 s
+/// on PCs whose security software inspects every new process, and froze the
+/// window while it waited.
+#[cfg(windows)]
+fn shell_open(path: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    use windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    let wide = |text: &std::ffi::OsStr| text.encode_wide().chain(Some(0)).collect::<Vec<u16>>();
+    let verb = wide(std::ffi::OsStr::new("open"));
+    let file = wide(path.as_os_str());
+    let result = unsafe { ShellExecuteW(std::ptr::null_mut(), verb.as_ptr(), file.as_ptr(), std::ptr::null(), std::ptr::null(), SW_SHOWNORMAL) };
+    // Values above 32 mean success.
+    if result as isize > 32 { Ok(()) } else { Err(format!("파일을 열지 못했습니다 (오류 {})", result as isize)) }
+}
+
 fn run_open(path: &Path) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        return shell_open(path);
+    }
+    #[allow(unreachable_code)]
     let path_text = path.to_string_lossy().into_owned();
     let result = if cfg!(target_os = "macos") {
         hidden_command("open").arg(path).status()
@@ -1875,22 +1897,41 @@ fn run_open(path: &Path) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn open_file(file_path: String, state: State<'_, AppState>) -> Result<Value, String> {
+async fn open_file(file_path: String, state: State<'_, AppState>) -> Result<Value, String> {
     let path = PathBuf::from(&file_path);
-    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?;
-    if !is_allowed_path(&path, &config) || !path.is_file() {
-        return Err("허용된 검색 경로의 파일만 열 수 있습니다.".to_string());
-    }
-    run_open(&path)?;
-    Ok(json!({ "success": true }))
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    // Launching the document's program can take a moment; do it off the UI
+    // thread so the window never freezes while Windows starts it.
+    tauri::async_runtime::spawn_blocking(move || {
+        if !is_allowed_path(&path, &config) || !path.is_file() {
+            return Err("허용된 검색 경로의 파일만 열 수 있습니다.".to_string());
+        }
+        run_open(&path)?;
+        Ok(json!({ "success": true }))
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-fn open_folder(file_path: String, state: State<'_, AppState>) -> Result<Value, String> {
+async fn open_folder(file_path: String, state: State<'_, AppState>) -> Result<Value, String> {
     let path = PathBuf::from(&file_path);
-    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?;
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    tauri::async_runtime::spawn_blocking(move || open_folder_blocking(path, config))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+fn open_folder_blocking(path: PathBuf, config: Value) -> Result<Value, String> {
     if !is_allowed_path(&path, &config) {
         return Err("허용된 검색 경로의 폴더만 열 수 있습니다.".to_string());
+    }
+    // On Windows, open Explorer with the file already selected; don't wait for it.
+    if cfg!(windows) && !path.is_dir() {
+        let mut argument = std::ffi::OsString::from("/select,");
+        argument.push(path.as_os_str());
+        Command::new("explorer.exe").arg(argument).spawn().map_err(|error| error.to_string())?;
+        return Ok(json!({ "success": true }));
     }
     let folder = if path.is_dir() { path } else { path.parent().unwrap_or(Path::new(".")).to_path_buf() };
     run_open(&folder)?;

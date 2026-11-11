@@ -748,6 +748,15 @@ function renderResults(items, currentQuery) {
         openConversionDialog([item]);
         return;
       }
+      // Clicking the file name opens it right away, like a link; the rest of
+      // the row still just selects (Ctrl/Shift for multi-select).
+      if (e.target.closest('.file-name-text') && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        selectRow(idx);
+        row.classList.add('is-opening');
+        setTimeout(() => row.classList.remove('is-opening'), 600);
+        openItem(item).catch(error => alert(error.message || error));
+        return;
+      }
       if (e.metaKey || e.ctrlKey) {
         toggleRowSelection(idx);
       } else if (e.shiftKey && selectedIndex >= 0) {

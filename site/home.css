@@ -220,6 +220,42 @@
   .home-page .site-footer { margin-right: 16px; margin-left: 16px; }
 }
 
+/* Narrow screens: sections stack (heading above content) instead of keeping
+   the desktop two-column grid, which squeezed text into a thin column. */
+@media (max-width: 980px) {
+  .home-page .content-section,
+  .home-page .support-section { grid-template-columns: 1fr; gap: 24px; padding-top: 88px; }
+  .home-page .section-intro > p:last-child { max-width: 600px; }
+}
+
+@media (max-width: 700px) {
+  .home-page .content-section,
+  .home-page .support-section { gap: 18px; padding-top: 64px; }
+  .home-page .section-intro h2 { font-size: 28px; line-height: 1.3; }
+  /* Menu: second row under the logo, scrolls sideways. */
+  .home-page .sidebar { height: auto; grid-template-columns: 1fr; row-gap: 6px; padding: 10px 16px 8px; }
+  .home-page .side-nav { display: flex; justify-content: flex-start; gap: 4px; margin: 0 -16px; padding: 0 16px 2px; overflow-x: auto; scrollbar-width: none; }
+  .home-page .side-nav::-webkit-scrollbar { display: none; }
+  .home-page .side-link { flex: 0 0 auto; padding: 8px 12px; font-size: 14px; }
+  .home-page .side-link .nav-icon { display: none; }
+  .home-page .side-link span:last-child { display: inline; }
+  .home-page .app-main { padding-top: 99px; }
+  .home-page .content-section,
+  .home-page .support-section { scroll-margin-top: 116px; }
+  .home-page .section-intro > p:last-child { margin-top: 10px; font-size: 15px; }
+  .home-page .kpi-card strong { font-size: 16px; line-height: 1.35; word-break: keep-all; }
+  .home-page .kpi-card p { font-size: 13px; line-height: 1.55; }
+  .home-page .kpi-card small { font-size: 12px; }
+  .home-page .download-card { padding: 20px; }
+  .home-page .download-card h3 { margin-top: 16px; }
+  .home-page .card-button { padding: 14px 12px; }
+  .home-page .step { padding: 18px 0; }
+  .home-page .help-card { min-height: 0; }
+  .home-page .feature-row { grid-template-columns: 26px minmax(0, 1fr); }
+  .home-page .feature-tag { grid-column: 2; justify-self: start; white-space: normal; }
+  .home-page p, .home-page li, .home-page h2, .home-page h3 { word-break: keep-all; overflow-wrap: anywhere; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .home-page .reveal { opacity: 1; transform: none; transition: none; }
   .home-page .side-link:hover,

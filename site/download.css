@@ -108,6 +108,17 @@
   .dl-page .dl-footer { margin: 0 16px; }
 }
 
+@media (max-width: 760px) {
+  /* Full-bleed hero: undo the max-width that cancelled the negative margin. */
+  .dl-page .dl-hero { max-width: none; width: auto; }
+  .dl-page .dl-nav { overflow-x: auto; scrollbar-width: none; flex-wrap: nowrap; }
+  .dl-page .dl-nav::-webkit-scrollbar { display: none; }
+  .dl-page .dl-nav a { flex: 0 0 auto; }
+  .dl-page .dl-hashes { white-space: pre-wrap; word-break: break-all; font-size: 12px; }
+  .dl-page .dl-links { line-height: 2; }
+  .dl-page .dl-table td a { word-break: break-all; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dl-page .dl-nav a { transition: none; }
 }

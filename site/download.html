@@ -43,6 +43,7 @@
             <div class="card-topline"><span class="platform-icon windows">⊞</span><span class="version-chip">v<span data-latest="version">1.3.12</span> · x64</span></div>
             <h2>Windows</h2>
             <a class="card-button dl-primary" data-latest="win-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.3.12/Dawith-Search_1.3.12_x64-setup.exe" rel="noreferrer">Windows 64비트 설치파일 <span>↓</span></a>
+            <a class="dl-ss-hint" href="#smartscreen">설치할 때 파란 경고 창이 뜨면 → <b>추가 정보 → 실행</b></a>
             <small><span data-latest="win-name">Dawith-Search_1.3.12_x64-setup.exe</span> · <span data-latest="win-size-kb">최신 릴리스에서 확인</span> · Windows 10/11 x64</small>
           </article>
           <article class="dl-block" data-os="mac">
@@ -63,6 +64,39 @@
           <a href="./help.html">도움말</a><i>·</i>
           <a href="./faq.html">자주 묻는 질문</a>
         </nav>
+      </section>
+
+      <section class="dl-section ss-guide" id="smartscreen">
+        <h2>설치할 때 파란 경고 창이 뜨면</h2>
+        <p class="ss-lead">Windows에서 설치파일을 열면 <b>‘Windows의 PC 보호’</b> 창이 뜰 수 있습니다. 무료로 배포하는 프로그램이라 유료 코드 서명 인증서가 없어서 나오는 안내이고, 아래 순서로 설치하면 됩니다.</p>
+          <ol class="ss-steps">
+            <li class="ss-step">
+              <div class="ss-window" aria-hidden="true">
+                <strong>Windows의 PC 보호</strong>
+                <p>Microsoft Defender SmartScreen에서 인식할 수 없는 앱의 시작을 차단했습니다.</p>
+                <span class="ss-link ss-target">추가 정보</span>
+                <span class="ss-buttons"><span class="ss-btn">실행 안 함</span></span>
+              </div>
+              <p><b>1. 추가 정보</b>를 누릅니다.<br />창 왼쪽 위, 글자 아래의 밑줄 친 링크입니다.</p>
+            </li>
+            <li class="ss-step">
+              <div class="ss-window" aria-hidden="true">
+                <strong>Windows의 PC 보호</strong>
+                <p>앱: Dawith-Search_x64-setup.exe<br />게시자: 알 수 없는 게시자</p>
+                <span class="ss-buttons"><span class="ss-btn ss-target">실행</span><span class="ss-btn">실행 안 함</span></span>
+              </div>
+              <p><b>2. 실행</b>을 누릅니다.<br />‘실행 안 함’ 왼쪽에 새로 생긴 버튼입니다.</p>
+            </li>
+            <li class="ss-step">
+              <div class="ss-window ss-done" aria-hidden="true">
+                <strong>Dawith Search 설치</strong>
+                <p>파일을 설치하는 중입니다…</p>
+                <span class="ss-progress"><span></span></span>
+              </div>
+              <p><b>3. 설치가 이어집니다.</b><br />끝나면 Dawith Search가 자동으로 열립니다.</p>
+            </li>
+          </ol>
+        <p class="ss-note">이 사이트나 <a href="https://github.com/dawith-ai/dawith-search/releases" target="_blank" rel="noreferrer">GitHub 릴리스</a>에서 받은 파일만 이렇게 실행하세요. 받은 파일이 원본인지는 아래 <a href="#sha256">SHA256</a> 값으로 확인할 수 있습니다.</p>
       </section>
 
       <section class="dl-section" id="whats-new">
@@ -144,6 +178,19 @@
 
     <footer class="site-footer dl-footer"><span class="footer-brand">Dawith Search</span><span>파일은 이 PC 밖으로 나가지 않습니다.</span><span><a href="./download.html">다운로드</a> · <a href="./faq.html">자주 묻는 질문</a> · <a href="./help.html">도움말</a> · <a href="./opensource.html">오픈소스</a> · <a href="./contact.html">문의</a> · <a href="https://github.com/dawith-ai/dawith-search" target="_blank" rel="noreferrer">GitHub</a> · <a href="https://github.com/dawith-ai/dawith-search/releases" target="_blank" rel="noreferrer">릴리스</a> · <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">라이선스</a></span><span class="footer-tm"><a href="https://www.voidtools.com/ko-kr/" target="_blank" rel="noreferrer">Everything</a>은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다.</span><span class="footer-tm footer-legal">© 2026 Dawith AI · MIT License · <a href="./privacy.html">개인정보처리방침</a> · <a href="./terms.html">이용약관</a> · <a href="./privacy.html#data">데이터 처리 안내</a> · <a href="./privacy.html#overseas">해외 서버 안내</a> · <a href="./privacy.html#cookies">광고·쿠키 안내</a></span></footer>
 
+    <script>
+      document.querySelectorAll('[data-latest="win-url"]').forEach(function (link) {
+        link.addEventListener('click', function () {
+          setTimeout(function () {
+            var guide = document.getElementById('smartscreen');
+            if (!guide) return;
+            guide.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            guide.classList.add('is-highlight');
+            setTimeout(function () { guide.classList.remove('is-highlight'); }, 2400);
+          }, 400);
+        });
+      });
+    </script>
     <script>
       (function () {
         var ua = navigator.userAgent || '';

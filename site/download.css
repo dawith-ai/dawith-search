@@ -108,6 +108,13 @@
   .dl-page .dl-footer { margin: 0 16px; }
 }
 
+.dl-page .dl-ss-hint { display: block; margin: 10px 0 2px; color: #1f6b4b; font-size: 14px; text-decoration: none; }
+.dl-page .dl-ss-hint b { text-decoration: underline; }
+.dl-page .ss-guide { scroll-margin-top: 24px; }
+.dl-page .ss-lead { max-width: 760px; margin: 12px 0 0; color: #4c6457; font-size: 16px; line-height: 1.7; }
+.dl-page .ss-note { max-width: 760px; margin: 18px 0 0; color: #5b7064; font-size: 14px; line-height: 1.7; }
+.dl-page .ss-guide.is-highlight .ss-steps { outline: 3px solid #ffd43b; outline-offset: 10px; border-radius: 4px; transition: outline-color .4s; }
+
 @media (max-width: 760px) {
   /* Full-bleed hero: undo the max-width that cancelled the negative margin. */
   .dl-page .dl-hero { max-width: none; width: auto; }

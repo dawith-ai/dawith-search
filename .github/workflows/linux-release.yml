@@ -1,0 +1,54 @@
+name: Linux release build
+
+# Builds the Tauri app for Linux (deb, rpm, AppImage) and attaches the files
+# to the GitHub release. Runs for every published release, or by hand for an
+# existing tag.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and upload to (for example v1.3.14)
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf rpm
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: npm ci
+      - name: Build deb, rpm and AppImage
+        # The Windows helper programs are not needed on Linux.
+        run: >
+          npx tauri build --bundles deb,rpm,appimage
+          --config '{"bundle":{"resources":{"../bin/native/windows/x64/*.exe":null}}}'
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(src-tauri/target/release/bundle/deb/*.deb src-tauri/target/release/bundle/rpm/*.rpm src-tauri/target/release/bundle/appimage/*.AppImage)
+          if [ ${#files[@]} -eq 0 ]; then echo "No Linux packages were built" >&2; exit 1; fi
+          ls -la "${files[@]}"
+          gh release upload "$TAG" "${files[@]}" --clobber

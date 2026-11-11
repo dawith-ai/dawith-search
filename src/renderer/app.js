@@ -138,7 +138,7 @@ function applyUiMode(mode) {
   document.body.classList.toggle('ui-advanced', currentUiMode === 'advanced');
   if (uiModeStatus) {
     uiModeStatus.textContent = currentUiMode === 'simple'
-      ? '현재: 간편 모드 · 검색과 서치 경로 추가만 바로 보입니다.'
+      ? '현재: 간편 모드 · 검색창과 결과만 크게 보여 줍니다. 검색 위치 추가는 도구 → 색인 설정에 있습니다.'
       : '현재: 다양한 기능 모드 · 분석·저장·변환·필터를 모두 표시합니다.';
   }
   document.querySelectorAll('#btnSetSimpleMode, #btnSetAdvancedMode, #btnViewSimple, #btnViewAdvanced').forEach(button => {
@@ -265,6 +265,13 @@ function renderUpdateButton(update) {
   }
   const hint = document.getElementById('checkUpdatesHint');
   if (hint) hint.textContent = availableUpdate ? `v${availableUpdate.latestVersion} 새 버전이 있습니다` : '새 패치가 있으면 바로 적용';
+  const settingsStatus = document.getElementById('settingsVersionStatus');
+  if (settingsStatus) {
+    settingsStatus.textContent = availableUpdate
+      ? `v${availableUpdate.latestVersion} 새 버전이 있습니다. 업데이트 확인을 눌러 설치하세요.`
+      : (update ? '최신 버전입니다.' : '새 버전이 나오면 오른쪽 위 업데이트 버튼에 빨간 점이 표시됩니다.');
+  }
+  document.getElementById('appVersionTag')?.classList.toggle('has-update', Boolean(availableUpdate));
   if (!updateButton || !updateButtonLabel) return;
   if (!availableUpdate) {
     updateButton.hidden = true;
@@ -351,6 +358,17 @@ window.dawithAPI.onUpdateProgress?.((data = {}) => {
 });
 
 let lastAutoUpdateCheck = 0;
+
+// Version chip in the title bar and the settings window.
+window.dawithAPI.getAppVersion?.().then(version => {
+  const label = `v${version}`;
+  const tag = document.getElementById('appVersionTag');
+  if (tag) tag.textContent = label;
+  const current = document.getElementById('settingsVersion');
+  if (current) current.textContent = `Dawith Search ${label}`;
+}).catch(() => {});
+document.getElementById('appVersionTag')?.addEventListener('click', () => checkForUpdates(true));
+document.getElementById('btnSettingsCheckUpdates')?.addEventListener('click', () => checkForUpdates(true));
 
 async function checkForUpdates(showMessage = false) {
   if (!window.dawithAPI.checkForUpdates || updateBusy) return;

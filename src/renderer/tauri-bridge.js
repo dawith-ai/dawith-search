@@ -55,6 +55,7 @@
     saveAnalysisReport: unsupported,
     findDuplicates: unsupported,
     installGozBackend: () => invoke('install_goz_backend'),
+    getAppVersion: () => invoke('app_version'),
     checkForUpdates: () => invoke('check_for_updates'),
     downloadUpdate: () => invoke('download_update'),
     onUpdateProgress: (callback) => {

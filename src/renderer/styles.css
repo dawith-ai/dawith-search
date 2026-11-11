@@ -112,6 +112,9 @@ body {
 }
 
 .version-tag {
+  cursor: pointer;
+  font-family: inherit;
+  -webkit-app-region: no-drag;
   font-size: 9px;
   background: #eff6ff;
   color: var(--accent);
@@ -1753,19 +1756,15 @@ kbd {
   white-space: nowrap;
 }
 
+.root-open,
 .root-remove {
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 16px;
+  min-width: 48px;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  white-space: nowrap;
 }
-
-.root-remove:hover { background: var(--bg-hover); color: var(--danger); }
 .root-auto-badge {
   flex: 0 0 auto;
   padding: 3px 6px;
@@ -1777,7 +1776,14 @@ kbd {
 }
 .roots-empty { padding: 12px; color: var(--text-muted); font-size: 11px; text-align: center; }
 .setting-help { margin: 5px 0 9px; color: var(--text-muted); font-size: 11px; line-height: 1.5; }
-.root-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.root-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.root-actions .btn { width: 100%; height: 34px; justify-content: center; white-space: nowrap; font-size: 12px; }
+.version-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-main); }
+.version-current { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.version-current strong { font-size: 13px; }
+.version-current small { color: var(--text-muted); font-size: 11px; }
+.version-row .btn { flex: 0 0 auto; white-space: nowrap; }
+.version-tag.has-update { border-color: #e5484d; color: #e5484d; background: #fff1f1; }
 .network-root-form { margin-top: 10px; padding: 10px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--bg-main); }
 .network-root-form[hidden] { display: none; }
 .network-root-form > label { display: block; margin-bottom: 6px; color: var(--text-muted); font-size: 11px; font-weight: 700; }
@@ -2011,19 +2017,49 @@ input:focus-visible,
 
 /* The simple mode keeps the Everything-like search surface quiet while
    leaving advanced tools available from the tools menu and settings. */
-body.ui-simple .advanced-only { display: none !important; }
-body.ui-simple .workspace-sidebar { width: 196px; min-width: 196px; }
-body.ui-simple .sidebar-heading h2 { font-size: 14px; }
-body.ui-simple .sidebar-save-btn { margin-bottom: 4px; }
-body.ui-simple .workspace-main { padding-top: 10px; }
+/* Simple mode: one big search box and a plain list of files.
+   No sidebar, tabs, banner, column headers or extra buttons. */
+body.ui-simple .advanced-only,
+body.ui-simple .workspace-sidebar,
+body.ui-simple .search-intro,
+body.ui-simple .search-helper,
+body.ui-simple .search-target-summary,
+body.ui-simple .btn-add-root,
+body.ui-simple .indexing-banner,
 body.ui-simple .table-header,
-body.ui-simple .table-row { grid-template-columns: minmax(210px, 2.4fr) minmax(190px, 2fr) minmax(82px, .8fr) 94px; }
-body.ui-simple .table-header .col-size,
-body.ui-simple .table-header .col-mtime,
-body.ui-simple .table-header .col-ext,
+body.ui-simple .status-right,
+body.ui-simple .search-shortcut { display: none !important; }
+body.ui-simple .search-header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 26px max(24px, calc((100vw - 860px) / 2)) 22px;
+  gap: 14px;
+}
+body.ui-simple #searchInput { height: 58px; padding-left: 52px; border-radius: 14px; font-size: 18px; }
+body.ui-simple .search-icon { left: 18px; font-size: 20px; }
+body.ui-simple .results-container { padding: 0 max(24px, calc((100vw - 860px) / 2)); background: var(--bg-main); }
+body.ui-simple .table-body { padding: 4px 0 12px; }
+body.ui-simple .table-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  min-height: 62px;
+  margin-bottom: 6px;
+  padding: 8px 4px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-surface);
+}
 body.ui-simple .table-row .col-size,
 body.ui-simple .table-row .col-mtime,
-body.ui-simple .table-row .col-ext { display: none; }
+body.ui-simple .table-row .col-ext,
+body.ui-simple .table-row .row-star { display: none; }
+body.ui-simple .table-row .col-name { grid-column: 1; grid-row: 1; min-width: 0; font-size: 15px; font-weight: 700; }
+body.ui-simple .table-row .file-icon { font-size: 18px; }
+body.ui-simple .table-row .col-path { grid-column: 1; grid-row: 2; min-width: 0; padding-left: 46px; font-size: 12px; color: var(--text-muted); }
+body.ui-simple .table-row .col-actions { grid-column: 2; grid-row: 1 / span 2; width: auto; }
+body.ui-simple .table-row .col-actions .btn { height: 34px; min-width: 52px; font-size: 13px; }
+body.ui-simple .table-row.selected { box-shadow: inset 0 0 0 2px var(--accent); }
+body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2)); }
 
 .indexing-banner {
   position: relative;

@@ -14,7 +14,7 @@
       <div class="logo">
         <img class="logo-icon" src="assets/icon.png" alt="Dawith CI">
         <span class="logo-text">Dawith Search</span>
-        <span class="version-tag">CROSS-PLATFORM</span>
+        <button class="version-tag" id="appVersionTag" type="button" title="눌러서 업데이트 확인">버전 확인</button>
       </div>
       <div class="titlebar-status" id="titlebarStatus">
         <span class="status-dot"></span>
@@ -84,20 +84,20 @@
             도구 <span class="menu-chevron">⌄</span><span class="update-dot" id="toolsUpdateDot" hidden aria-label="새 버전 있음"></span>
           </button>
           <div class="tools-menu" id="toolsMenu" hidden>
-            <div class="tools-menu-label">검색 도구</div>
-            <button class="tool-menu-item" id="btnRemoteServer" title="스마트폰에서 내 PC 파일 검색 및 다운로드">
+            <div class="tools-menu-label advanced-only">검색 도구</div>
+            <button class="tool-menu-item advanced-only" id="btnRemoteServer" title="스마트폰에서 내 PC 파일 검색 및 다운로드">
               <span class="tool-menu-icon">▣</span><span><strong>모바일 공유</strong><small>QR 코드로 이 PC 연결</small></span>
             </button>
-            <button class="tool-menu-item" id="btnStorageAnalyzer" title="디스크 용량 분석 및 중복 파일 찾기">
+            <button class="tool-menu-item advanced-only" id="btnStorageAnalyzer" title="디스크 용량 분석 및 중복 파일 찾기">
               <span class="tool-menu-icon">◒</span><span><strong>용량·중복 분석</strong><small>큰 파일과 중복 파일 확인</small></span>
             </button>
-            <button class="tool-menu-item" id="btnEvidenceAnalyzer" title="폴더 구조와 소스 관계를 증거 기반으로 분석">
+            <button class="tool-menu-item advanced-only" id="btnEvidenceAnalyzer" title="폴더 구조와 소스 관계를 증거 기반으로 분석">
               <span class="tool-menu-icon">⌘</span><span><strong>구조·증거 분석</strong><small>파일 관계와 Electron 경계 확인</small></span>
             </button>
-            <button class="tool-menu-item" id="btnExport" title="검색 결과 내보내기">
+            <button class="tool-menu-item advanced-only" id="btnExport" title="검색 결과 내보내기">
               <span class="tool-menu-icon">⇩</span><span><strong>검색 결과 내보내기</strong><small>CSV 파일로 저장</small></span>
             </button>
-            <div class="tools-menu-divider"></div>
+            <div class="tools-menu-divider advanced-only"></div>
             <button class="tool-menu-item" id="btnThemeToggle" title="테마 전환">
               <span class="tool-menu-icon">◐</span><span><strong>테마 전환</strong><small>라이트·다크 모드</small></span>
             </button>
@@ -493,6 +493,13 @@
         <button class="btn-close" id="btnCloseSettings">✕</button>
       </div>
       <div class="modal-body">
+        <div class="setting-group version-setting">
+          <label>버전</label>
+          <div class="version-row">
+            <span class="version-current"><strong id="settingsVersion">-</strong><small id="settingsVersionStatus">새 버전이 나오면 오른쪽 위 업데이트 버튼에 빨간 점이 표시됩니다.</small></span>
+            <button class="btn btn-sm btn-primary" id="btnSettingsCheckUpdates" type="button">업데이트 확인</button>
+          </div>
+        </div>
         <div class="setting-group ui-mode-setting">
           <label>화면 구성</label>
           <p class="setting-help">버튼이 많아 복잡하게 느껴지면 간편 모드를 선택하세요. 검색 기능은 동일합니다.</p>
@@ -520,8 +527,9 @@
           </div>
           <div class="roots-list" id="rootsList"></div>
           <div class="root-actions">
-            <button class="btn btn-sm btn-primary mt-2" id="btnAddRoot">＋ 폴더·드라이브 선택</button>
-            <button class="btn btn-sm btn-ghost mt-2" id="btnAddNetworkRoot">⌁ 공유폴더 경로 입력</button>
+            <button class="btn btn-sm btn-primary" id="btnAddRoot">＋ 폴더·드라이브 선택</button>
+            <button class="btn btn-sm btn-ghost" id="btnAddNetworkRoot">⌁ 공유폴더 경로 입력</button>
+            <button class="btn btn-sm btn-ghost" id="btnReindexNow">↻ 추가한 위치 다시 읽기</button>
           </div>
           <div class="network-root-form" id="networkRootForm" hidden>
             <label for="networkRootInput">공유 폴더 경로</label>
@@ -532,10 +540,9 @@
             </div>
             <p class="setting-help" id="networkRootStatus">Windows 공유폴더는 현재 Windows 계정의 접근 권한으로 확인합니다. macOS는 Finder에서 연결한 뒤 /Volumes 경로를 사용하세요.</p>
           </div>
-          <button class="btn btn-sm btn-ghost mt-2" id="btnReindexNow">↻ 추가한 위치 다시 읽기</button>
         </div>
         <div class="setting-group mt-4">
-          <label>단축키 안내:</label>
+          <label>단축키</label>
           <div class="shortcuts-list">
             <div class="shortcut-card"><div class="shortcut-keys"><kbd>Alt</kbd><span>+</span><kbd>Space</kbd></div><div><strong>앱 호출 / 숨기기</strong><small>어느 앱에서든 Dawith Search를 엽니다.</small></div></div>
             <div class="shortcut-card"><div class="shortcut-keys"><kbd>Space</kbd></div><div><strong>빠른 미리보기</strong><small>선택한 파일을 Quick Look으로 봅니다.</small></div></div>

@@ -2105,6 +2105,11 @@ fn fetch_update_info() -> Result<Value, String> {
 }
 
 #[tauri::command]
+fn app_version() -> String {
+    current_app_version()
+}
+
+#[tauri::command]
 async fn check_for_updates() -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(fetch_update_info)
         .await
@@ -2261,6 +2266,7 @@ fn main() {
             window_close,
             open_guide,
             check_for_updates,
+            app_version,
             download_update,
             stub_success
         ])

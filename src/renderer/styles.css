@@ -2220,6 +2220,12 @@ body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2));
 .table-row .file-name-text:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 .table-row.is-opening { background: var(--accent-soft); transition: background .2s; }
 
+.excluded-roots { margin-top: 12px; }
+.excluded-roots[hidden] { display: none; }
+.excluded-roots-title { margin: 0 0 6px; color: var(--text-muted); font-size: 11px; font-weight: 800; }
+.root-item.is-excluded { border-style: dashed; background: transparent; opacity: .85; }
+.root-item.is-excluded code { color: var(--text-muted); text-decoration: line-through; }
+
 /* Settings window: give each section room and a divider. */
 .setting-group + .setting-group { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color); }
 .setting-group > label { display: block; margin-bottom: 6px; color: var(--text-main); font-size: 13px; font-weight: 800; }

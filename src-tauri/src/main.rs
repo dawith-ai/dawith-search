@@ -124,26 +124,44 @@ fn read_config(dir: &Path) -> Value {
     // existing install find Desktop/Documents after an update.
     let auto_local = config.get("autoLocalRoots").and_then(Value::as_bool).unwrap_or(true);
     if auto_local {
-        let local_roots = default_local_roots();
-        if let Some(object) = config.as_object_mut() {
-            let mut roots = object
-                .get("roots")
-                .and_then(Value::as_array)
-                .cloned()
-                .unwrap_or_default();
-            for root in &local_roots {
-                if !roots.iter().any(|value| value.as_str() == Some(root)) {
-                    roots.push(Value::String(root.clone()));
-                }
-            }
-            object.insert("roots".to_string(), Value::Array(roots));
-            object.insert(
-                "localRoots".to_string(),
-                Value::Array(local_roots.into_iter().map(Value::String).collect()),
-            );
-        }
+        apply_local_roots(&mut config, default_local_roots());
     }
     config
+}
+
+fn same_root(a: &str, b: &str) -> bool {
+    if cfg!(windows) { a.eq_ignore_ascii_case(b) } else { a == b }
+}
+
+// Adds the detected local drives to the search roots, except the ones the
+// user removed in settings (excludedLocalRoots), which stay out.
+fn apply_local_roots(config: &mut Value, detected: Vec<String>) {
+    let excluded: Vec<String> = config
+        .get("excludedLocalRoots")
+        .and_then(Value::as_array)
+        .map(|items| items.iter().filter_map(Value::as_str).map(str::to_string).collect())
+        .unwrap_or_default();
+    let is_excluded = |root: &str| excluded.iter().any(|item| same_root(item, root));
+    let local_roots: Vec<String> = detected.into_iter().filter(|root| !is_excluded(root)).collect();
+    let Some(object) = config.as_object_mut() else { return };
+    let mut roots: Vec<Value> = object
+        .get("roots")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|value| value.as_str().map_or(true, |root| !is_excluded(root)))
+        .collect();
+    for root in &local_roots {
+        if !roots.iter().any(|value| value.as_str().is_some_and(|item| same_root(item, root))) {
+            roots.push(Value::String(root.clone()));
+        }
+    }
+    object.insert("roots".to_string(), Value::Array(roots));
+    object.insert(
+        "localRoots".to_string(),
+        Value::Array(local_roots.into_iter().map(Value::String).collect()),
+    );
 }
 
 fn atomic_write(path: &Path, value: &Value) -> Result<(), String> {
@@ -2376,6 +2394,19 @@ mod tests {
         assert!(!query_needs_native_metadata("ext:hwp;hwpx 대응"));
         assert!(query_needs_native_metadata("대응 size:>1mb"));
         assert!(query_needs_native_metadata("dm:today"));
+    }
+
+    #[test]
+    fn excluded_local_drives_stay_out_of_search_roots() {
+        let mut config = json!({
+            "roots": ["C:\\", "H:\\", "\\\\server\\share"],
+            "excludedLocalRoots": ["H:\\"]
+        });
+        apply_local_roots(&mut config, vec!["C:\\".into(), "D:\\".into(), "H:\\".into()]);
+        let roots: Vec<&str> = config["roots"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+        let local: Vec<&str> = config["localRoots"].as_array().unwrap().iter().filter_map(Value::as_str).collect();
+        assert_eq!(roots, vec!["C:\\", "\\\\server\\share", "D:\\"]);
+        assert_eq!(local, vec!["C:\\", "D:\\"]);
     }
 
     #[test]

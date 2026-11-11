@@ -523,12 +523,13 @@
         </div>
         <div class="setting-group">
           <label>검색 위치</label>
-          <p class="setting-help">내 PC의 로컬 파일은 자동으로 검색합니다. 공유폴더, 외장 드라이브, 다른 위치만 아래에 추가하면 함께 검색됩니다.</p>
+          <p class="setting-help">내 PC의 드라이브는 자동으로 검색합니다. 검색하지 않을 드라이브(예: 구글 드라이브, USB)는 <b>제거</b>로 뺄 수 있고, 공유폴더·다른 위치는 아래에서 추가합니다.</p>
           <div class="root-setting-summary">
             <span>현재 검색 위치</span>
             <strong id="rootCount">0곳</strong>
           </div>
           <div class="roots-list" id="rootsList"></div>
+          <div class="roots-list excluded-roots" id="excludedRootsList" hidden></div>
           <div class="root-actions">
             <button class="btn btn-sm btn-primary" id="btnAddRoot">＋ 폴더·드라이브 선택</button>
             <button class="btn btn-sm btn-ghost" id="btnAddNetworkRoot">⌁ 공유폴더 경로 입력</button>

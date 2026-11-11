@@ -487,6 +487,25 @@ function isLocalAutoRoot(root) {
   return configuredLocalRoots.includes(root);
 }
 
+let configuredExcludedLocalRoots = [];
+
+// Drives the user took out of the automatic local scope; shown with "다시 포함".
+function renderExcludedLocalRoots() {
+  const box = document.getElementById('excludedRootsList');
+  if (!box) return;
+  box.hidden = configuredExcludedLocalRoots.length === 0;
+  box.innerHTML = configuredExcludedLocalRoots.length
+    ? '<div class="excluded-roots-title">검색에서 뺀 드라이브</div>' + configuredExcludedLocalRoots.map(root => `
+    <div class="root-item is-excluded">
+      <span class="root-item-icon">⌂</span>
+      <span class="root-item-copy"><strong>제외됨 · 자동 검색 안 함</strong><code>${escapeHtml(root)}</code></span>
+      <span class="root-item-actions">
+        <button class="root-open" type="button" data-include-root="${escapeHtml(root)}" title="이 드라이브를 다시 검색합니다" aria-label="다시 포함: ${escapeHtml(root)}">다시 포함</button>
+      </span>
+    </div>`).join('')
+    : '';
+}
+
 function renderSettingsRoots(roots = [], localRoots = configuredLocalRoots) {
   const rootsList = document.getElementById('rootsList');
   const rootCount = document.getElementById('rootCount');
@@ -508,7 +527,8 @@ function renderSettingsRoots(roots = [], localRoots = configuredLocalRoots) {
       <span class="root-item-copy"><strong>${escapeHtml(getRootKindLabel(root))}</strong><code>${escapeHtml(root)}</code></span>
       <span class="root-item-actions">
         <button class="root-open" type="button" data-open-root="${escapeHtml(root)}" title="이 위치를 파일 탐색기에서 엽니다" aria-label="검색 위치 열기: ${escapeHtml(root)}">열기</button>
-        ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : `<button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="이 검색 위치를 제거합니다" aria-label="검색 위치 제거: ${escapeHtml(root)}">제거</button>`}
+        ${isAutoLocal ? '<span class="root-auto-badge">자동</span>' : ''}
+        <button class="root-remove" type="button" data-remove-root="${escapeHtml(root)}" title="${isAutoLocal ? '이 드라이브를 검색에서 뺍니다' : '이 검색 위치를 제거합니다'}" aria-label="검색 위치 제거: ${escapeHtml(root)}">제거</button>
       </span>
     </div>
   `; }).join('');
@@ -578,7 +598,9 @@ async function saveCurrentBookmark() {
 
 async function refreshSettingsRoots() {
   const config = await window.dawithAPI.getConfig();
+  configuredExcludedLocalRoots = Array.isArray(config.excludedLocalRoots) ? config.excludedLocalRoots.slice() : [];
   renderSettingsRoots(config.roots || [], config.localRoots || []);
+  renderExcludedLocalRoots();
   return config;
 }
 
@@ -1928,22 +1950,53 @@ document.getElementById('rootsList').addEventListener('click', async event => {
   const button = event.target.closest('[data-remove-root]');
   if (!button) return;
   const root = button.dataset.removeRoot;
-  if (!window.confirm(`이 검색 위치를 제거할까요?\n${root}\n\n파일은 삭제되지 않습니다.`)) return;
   const config = await window.dawithAPI.getConfig();
+  const isLocal = (config.localRoots || []).includes(root);
+  const question = isLocal
+    ? `이 드라이브를 검색에서 뺄까요?\n${root}\n\n파일은 삭제되지 않습니다. 아래 '검색에서 뺀 드라이브'에서 언제든 다시 포함할 수 있습니다.`
+    : `이 검색 위치를 제거할까요?\n${root}\n\n파일은 삭제되지 않습니다.`;
+  if (!window.confirm(question)) return;
   const roots = (config.roots || []).filter(item => item !== root);
   if (!roots.length) {
     alert('검색 위치는 한 곳 이상 필요합니다. 다른 위치를 먼저 추가하세요.');
     return;
   }
+  const localRoots = (config.localRoots || []).filter(item => item !== root);
+  const excludedLocalRoots = isLocal
+    ? Array.from(new Set([...(config.excludedLocalRoots || []), root]))
+    : (config.excludedLocalRoots || []);
   setButtonBusy(button, true, '제거 중…', '제거');
   try {
-    await window.dawithAPI.saveConfig({ roots });
-    renderSidebarRoots(roots, config.localRoots || []);
-    renderSettingsRoots(roots, config.localRoots || []);
-    setRootStatus('검색 위치를 제거했습니다. 다시 읽는 중…');
+    await window.dawithAPI.saveConfig({ roots, localRoots, excludedLocalRoots });
+    configuredExcludedLocalRoots = excludedLocalRoots.slice();
+    renderSidebarRoots(roots, localRoots);
+    renderSettingsRoots(roots, localRoots);
+    renderExcludedLocalRoots();
+    setRootStatus(isLocal ? `${root} 드라이브를 검색에서 뺐습니다. 다시 읽는 중…` : '검색 위치를 제거했습니다. 다시 읽는 중…');
     await reindexFromSettings();
   } catch (error) {
     setRootStatus(error.message || '검색 위치를 제거하지 못했습니다.', 'error');
+  }
+});
+document.getElementById('excludedRootsList')?.addEventListener('click', async (event) => {
+  const button = event.target.closest('[data-include-root]');
+  if (!button) return;
+  const root = button.dataset.includeRoot;
+  const config = await window.dawithAPI.getConfig();
+  const excludedLocalRoots = (config.excludedLocalRoots || []).filter(item => item !== root);
+  const localRoots = Array.from(new Set([...(config.localRoots || []), root]));
+  const roots = Array.from(new Set([...(config.roots || []), root]));
+  setButtonBusy(button, true, '포함 중…', '다시 포함');
+  try {
+    await window.dawithAPI.saveConfig({ roots, localRoots, excludedLocalRoots });
+    configuredExcludedLocalRoots = excludedLocalRoots.slice();
+    renderSidebarRoots(roots, localRoots);
+    renderSettingsRoots(roots, localRoots);
+    renderExcludedLocalRoots();
+    setRootStatus(`${root} 드라이브를 다시 검색합니다. 다시 읽는 중…`);
+    await reindexFromSettings();
+  } catch (error) {
+    setRootStatus(error.message || '드라이브를 다시 포함하지 못했습니다.', 'error');
   }
 });
 document.getElementById('btnReindexNow').addEventListener('click', async () => {

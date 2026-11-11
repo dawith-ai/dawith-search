@@ -2190,6 +2190,8 @@ body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2));
 .index-intro-meta span { min-width: 0; overflow: hidden; color: var(--text-dim); text-overflow: ellipsis; white-space: nowrap; }
 .index-intro-tips { margin: 0 0 16px; padding-left: 18px; color: var(--text-dim); font-size: 13px; line-height: 1.7; }
 .index-intro-actions { display: flex; justify-content: flex-end; }
+/* The update window opens from settings too, so it must sit above other dialogs. */
+#updateModal { z-index: 1500; }
 .update-dialog .index-intro-actions { gap: 8px; }
 .update-dialog .btn[hidden], .update-dialog [hidden] { display: none !important; }
 .btn-update, #btnTools, #btnCheckUpdates { position: relative; }

@@ -380,7 +380,9 @@ async function checkForUpdates(showMessage = false) {
 }
 
 function askToUpdate() {
-  if (!availableUpdate) return;
+  // No known update (or it was just released): check now and say so, rather
+  // than ignoring the click.
+  if (!availableUpdate) return checkForUpdates(true);
   showUpdateWindow({
     title: `v${availableUpdate.latestVersion}으로 업데이트할까요?`,
     body: `지금 쓰는 버전은 v${availableUpdate.currentVersion}입니다. 설치 파일을 내려받아 확인한 뒤 설치하고, 앱을 다시 엽니다. 보통 1분이 안 걸립니다.`,

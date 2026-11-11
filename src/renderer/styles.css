@@ -721,6 +721,8 @@ body.dark-theme .search-target-summary.is-scoped {
 
 .btn-update:hover { border-color: #76d7b4; background: #dff8ec; }
 .btn-update:disabled { cursor: wait; opacity: .7; }
+/* .btn sets display, which would otherwise override the hidden attribute. */
+.btn[hidden] { display: none !important; }
 
 .btn-add-root {
   white-space: nowrap;

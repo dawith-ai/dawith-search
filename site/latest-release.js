@@ -16,7 +16,8 @@
   var CACHE_KEY = 'dawith-latest-release:v1';
   var CACHE_MS = 10 * 60 * 1000;
   var WIN_SETUP = /^Dawith-Search_[\d.]+_x64-setup\.exe$/;
-  var MAC_DMG = /\.dmg$/i;
+  // Prefer the lightweight Tauri Universal package over the Electron fallback.
+  var MAC_DMG = /^Dawith\.Search_[\d.]+_universal\.dmg$/i;
 
   function readCache() {
     try {

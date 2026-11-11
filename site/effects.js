@@ -68,7 +68,20 @@
   });
   var ids = Object.keys(byId);
   if (!ids.length) return;
+  // A clicked menu item stays highlighted while the page scrolls to it, even
+  // when a short section never crosses the detection band.
+  var lockUntil = 0;
+  links.forEach(function (link) {
+    link.addEventListener('click', function () {
+      var id = link.getAttribute('href').split('#')[1];
+      if (!byId[id]) return;
+      lockUntil = Date.now() + 1500;
+      links.forEach(function (other) { other.classList.remove('is-current', 'active'); });
+      byId[id].forEach(function (other) { other.classList.add('is-current'); });
+    });
+  });
   var spy = new IntersectionObserver(function (entries) {
+    if (Date.now() < lockUntil) return;
     entries.forEach(function (entry) {
       if (!entry.isIntersecting) return;
       // The section on screen becomes the only highlighted menu item.

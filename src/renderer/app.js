@@ -8,7 +8,6 @@ let searchRequestId = 0;
 let selectedIndex = -1;
 let selectedIndexes = new Set();
 let currentFilter = '';
-let isAiMode = false;
 let currentSortBy = '';
 let currentSortOrder = 'asc';
 let searchDebounceTimer = null;
@@ -27,7 +26,6 @@ let configuredLocalRoots = [];
 // UI Elements
 const searchInput = document.getElementById('searchInput');
 const clearBtn = document.getElementById('btnClear');
-const aiToggleBtn = document.getElementById('btnAiToggle');
 const toolsButton = document.getElementById('btnTools');
 const toolsMenu = document.getElementById('toolsMenu');
 const btnThemeToggle = document.getElementById('btnThemeToggle');
@@ -667,11 +665,6 @@ function getActiveQuery() {
   return `${currentFilter ? `${currentFilter} ` : ''}${searchInput.value.trim()}`.trim();
 }
 
-function shouldUseNaturalLanguage(query) {
-  if (isAiMode) return true;
-  return /(?:오늘|어제|지난주|문서|사진|이미지|동영상|엑셀|스프레드시트|큰 파일|대용량|중복 파일|이상|이하)/i.test(query);
-}
-
 // Everything answers one query at a time, so firing a search per keystroke
 // queues them and the table lags behind the typing. Keep a single search in
 // flight and, when it finishes, run only the latest input.
@@ -702,7 +695,6 @@ async function runSearch() {
 
   try {
     const res = await window.dawithAPI.search(query, {
-      useAI: shouldUseNaturalLanguage(query),
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
       // Keep the result table responsive. The backend still reports the
@@ -1161,9 +1153,7 @@ cmdPaletteList.addEventListener('click', (e) => {
 });
 
 function handleCmdAction(action) {
-  if (action === 'toggle-ai') {
-    aiToggleBtn.click();
-  } else if (action === 'save-bookmark') {
+  if (action === 'save-bookmark') {
     saveCurrentBookmark();
   } else if (action === 'open-remote') {
     document.getElementById('btnRemoteServer').click();
@@ -1450,12 +1440,6 @@ if (btnThemeToggle) {
 initTheme();
 
 // AI Mode Toggle
-aiToggleBtn.addEventListener('click', () => {
-  isAiMode = !isAiMode;
-  aiToggleBtn.classList.toggle('active', isAiMode);
-  executeSearch();
-});
-
 // Category Filter Tabs
 document.getElementById('filterTabs').addEventListener('click', (e) => {
   if (e.target.classList.contains('tab-btn')) {

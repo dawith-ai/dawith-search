@@ -6,18 +6,23 @@
  * Keys: version (1.3.3), tag (v1.3.3), date (2026년 11월 10일), release-url (href),
  *       win-url (href), win-name, win-size-kb, win-sha256,
  *       mac-url (href), mac-name, mac-version, mac-size-kb, mac-size-mb, mac-sha256,
- *       mac-pending (hidden when the latest release ships a DMG).
+ *       mac-pending (hidden when the latest release ships a DMG),
+ *       linux-deb-url, linux-rpm-url, linux-appimage-url (href), linux-version.
  */
 (function () {
   'use strict';
 
   var API = 'https://api.github.com/repos/dawith-ai/dawith-search/releases/latest';
   var DOWNLOAD_PREFIX = 'https://github.com/dawith-ai/dawith-search/releases/';
-  var CACHE_KEY = 'dawith-latest-release:v1';
+  var CACHE_KEY = 'dawith-latest-release:v2';
   var CACHE_MS = 10 * 60 * 1000;
   var WIN_SETUP = /^Dawith-Search_[\d.]+_x64-setup\.exe$/;
   // Prefer the lightweight Tauri Universal package over the Electron fallback.
   var MAC_DMG = /^Dawith\.Search_[\d.]+_universal\.dmg$/i;
+  // Linux packages are attached by CI a few minutes after the release.
+  var LINUX_DEB = /^Dawith\.Search_[\d.]+_amd64\.deb$/;
+  var LINUX_RPM = /^Dawith\.Search-[\d.]+-\d+\.x86_64\.rpm$/;
+  var LINUX_APPIMAGE = /^Dawith\.Search_[\d.]+_amd64\.AppImage$/;
 
   function readCache() {
     try {
@@ -60,7 +65,10 @@
       publishedAt: typeof data.published_at === 'string' ? data.published_at : '',
       htmlUrl: htmlUrl,
       win: pickAsset(WIN_SETUP),
-      mac: pickAsset(MAC_DMG)
+      mac: pickAsset(MAC_DMG),
+      deb: pickAsset(LINUX_DEB),
+      rpm: pickAsset(LINUX_RPM),
+      appimage: pickAsset(LINUX_APPIMAGE)
     };
   }
 
@@ -99,11 +107,15 @@
       'mac-version': dmgVersion,
       'mac-size-kb': mac && mac.size ? kb(mac.size) : '',
       'mac-size-mb': mac && mac.size ? mb(mac.size) : '',
-      'mac-sha256': mac && mac.sha256
+      'mac-sha256': mac && mac.sha256,
+      'linux-version': release.deb ? release.version : ''
     };
     var links = {
       'win-url': win && win.url,
       'mac-url': mac && mac.url,
+      'linux-deb-url': release.deb && release.deb.url,
+      'linux-rpm-url': release.rpm && release.rpm.url,
+      'linux-appimage-url': release.appimage && release.appimage.url,
       'release-url': release.htmlUrl
     };
 

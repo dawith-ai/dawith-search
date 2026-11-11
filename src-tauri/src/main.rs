@@ -55,6 +55,11 @@ fn home_dir() -> PathBuf {
 }
 
 fn data_dir() -> PathBuf {
+    // DAWITH_DATA_DIR runs the app with a separate config and index (demo
+    // recordings, portable use) without touching the user's own.
+    if let Some(dir) = std::env::var_os("DAWITH_DATA_DIR").filter(|dir| !dir.is_empty()) {
+        return PathBuf::from(dir);
+    }
     home_dir().join(".dawith-search")
 }
 
@@ -1718,10 +1723,13 @@ fn get_file_content(file_path: String, state: State<'_, AppState>) -> Result<Val
 }
 
 #[tauri::command]
-fn get_file_url(file_path: String, state: State<'_, AppState>) -> Result<Value, String> {
+fn get_file_url(file_path: String, state: State<'_, AppState>, app: AppHandle) -> Result<Value, String> {
     let path = PathBuf::from(&file_path);
     let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?;
     if !is_allowed_path(&path, &config) || !path.is_file() { return Ok(json!({ "success": false, "error": "허용된 검색 경로의 파일만 미리볼 수 있습니다." })); }
+    // The asset protocol scope starts empty; open it only for the file being
+    // previewed, after the search-location check above.
+    app.asset_protocol_scope().allow_file(&path).map_err(|error| error.to_string())?;
     Ok(json!({ "success": true, "url": path.to_string_lossy() }))
 }
 

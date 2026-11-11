@@ -108,6 +108,8 @@
   .dl-page .dl-footer { margin: 0 16px; }
 }
 
+.dl-page .dl-blocks:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 980px) { .dl-page .dl-blocks:has(> :nth-child(3)) { grid-template-columns: 1fr; } }
 .dl-page .dl-ss-hint { display: block; margin: 10px 0 2px; color: #1f6b4b; font-size: 14px; text-decoration: none; }
 .dl-page .dl-ss-hint b { text-decoration: underline; }
 .dl-page .ss-guide { scroll-margin-top: 24px; }

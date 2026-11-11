@@ -220,6 +220,10 @@
   .home-page .site-footer { margin-right: 16px; margin-left: 16px; }
 }
 
+/* The feature showcase uses the full width: heading above the recordings. */
+.home-page .showcase-section { grid-template-columns: 1fr; gap: 28px; }
+.home-page .showcase-section .section-intro > p:last-child { max-width: 560px; }
+
 /* Narrow screens: sections stack (heading above content) instead of keeping
    the desktop two-column grid, which squeezed text into a thin column. */
 @media (max-width: 980px) {

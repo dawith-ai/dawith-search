@@ -1,8 +1,101 @@
-# Dawith Search
+<h1 align="center">
+  <img src="site/ci.png" alt="" width="56" valign="middle" /> Dawith Search
+</h1>
 
-macOS와 Windows에서 빠른 파일 검색을 제공하는 Dawith 데스크톱 앱입니다. 기본 경량 런타임은 Tauri/Rust이며, Electron 런타임은 기능 비교·롤백용으로 보존합니다. 검색 문법, 로컬 색인, Quick Look, 태그, 중복 분석을 하나의 로컬 도구로 묶었습니다.
+<p align="center">
+  <a href="https://github.com/dawith-ai/dawith-search/releases/latest"><img src="https://img.shields.io/github/v/release/dawith-ai/dawith-search?label=%EC%B5%9C%EC%8B%A0&color=2c7958" alt="최신 릴리스" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-2c7958?style=flat" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-315b46?style=flat" alt="지원 운영체제: Windows, macOS, Linux" />
+  <img src="https://img.shields.io/badge/%EC%98%A4%ED%94%88%EB%B2%A0%ED%83%80-f59f00?style=flat" alt="오픈베타" />
+</p>
 
-사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 기관 폴더별 검색, 저장 검색 공유를 빠르게 처리하도록 설계했습니다. 기본값은 내 PC 로컬 전체 자동 검색이며, 공유폴더·외부 경로만 직접 추가합니다. 검색과 자연어 해석은 외부 AI 없이 로컬 규칙과 색인으로 동작합니다.
+<p align="center">
+  <strong>기관 PC와 공유폴더의 파일을 바로 찾는 무료 검색 앱</strong><br/>
+  한 글자씩 칠 때마다 결과가 바뀌고, 초성만 쳐도 찾습니다. 검색어와 파일 목록은 이 PC 밖으로 나가지 않습니다.
+</p>
+
+<h3 align="center"><a href="https://dawith-ai.github.io/dawith-search/download.html"><ins>다운로드</ins></a> · <a href="https://dawith-ai.github.io/dawith-search/">안내 사이트</a> · <a href="https://dawith-ai.github.io/dawith-search/help.html">도움말</a></h3>
+
+## 주요 기능
+
+<sub>실제 앱을 예시 파일로 녹화했고, 경로는 흐리게 가렸습니다.</sub>
+
+<table>
+<tr>
+<td width="38%" valign="middle">
+
+### 입력하는 즉시 찾기
+
+한 글자씩 칠 때마다 결과가 바로 바뀝니다. 파일 수십만 개에서도 검색은 0.1초 안쪽이라 Enter를 누를 필요가 없습니다.
+
+</td>
+<td width="62%"><img src="site/media/search.gif" alt="검색어를 입력하자 결과가 바로 바뀌는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 초성만 쳐도 찾기
+
+`ㅁㅇㅈㅊ`처럼 초성만 입력해도 '마을잔치'가 들어간 파일과 폴더가 나옵니다.
+
+</td>
+<td width="62%"><img src="site/media/chosung.gif" alt="초성 ㅁㅇㅈㅊ로 마을잔치 파일을 찾는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 종류 필터와 정렬
+
+문서·사진·동영상 탭으로 종류를 좁히고, 머리글을 눌러 수정 날짜·크기·이름 순으로 정렬합니다.
+
+</td>
+<td width="62%"><img src="site/media/filter-sort.gif" alt="문서 탭을 고르고 수정 날짜로 정렬하는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 열지 않고 미리보기
+
+파일을 고르고 Space를 누르면 앱 안에서 바로 봅니다. Esc로 닫습니다.
+
+</td>
+<td width="62%"><img src="site/media/preview.gif" alt="Space로 사진을 미리보는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 찾은 자리에서 변환
+
+여러 파일을 골라 PDF로 묶거나 형식을 바꿉니다. 원본은 그대로 두고 같은 폴더에 새 파일을 만듭니다.
+
+</td>
+<td width="62%"><img src="site/media/convert.gif" alt="사진 세 장을 골라 PDF로 묶는 변환 창을 여는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 간편 화면과 기능 화면
+
+검색창과 결과만 크게 보이는 간편 화면, 필터·정렬·분석까지 보이는 기능 화면을 위쪽 '보기'에서 바꿉니다.
+
+</td>
+<td width="62%"><img src="site/media/modes.gif" alt="간편 화면과 기능 화면을 오가는 모습" width="100%" /></td>
+</tr>
+</table>
+
+## 설치
+
+| 운영체제 | 파일 | 비고 |
+| --- | --- | --- |
+| Windows 10·11 (x64) | `Dawith-Search_버전_x64-setup.exe` | 파란 'Windows의 PC 보호' 창이 뜨면 **추가 정보 → 실행** |
+| macOS (Apple Silicon·Intel) | `Dawith.Search_버전_universal.dmg` | 앱을 Applications로 옮긴 뒤 실행 |
+| Linux (x64, 베타) | `.deb` · `.rpm` · `.AppImage` | Ubuntu·Debian은 .deb, Fedora·RHEL은 .rpm |
+
+모든 파일은 [최신 릴리스](https://github.com/dawith-ai/dawith-search/releases/latest)에서 받을 수 있고, 앱 안의 업데이트 버튼으로도 새 버전을 설치합니다(Windows).
+
+## 소개
+
+사회복지기관·학교·소규모 사무실에서 반복하는 문서 찾기, 최근 수정 파일 확인, 통계 파일 모아보기, 공유폴더 검색을 빠르게 처리하도록 만들었습니다. 기본값은 내 PC 로컬 전체 자동 검색이며, 공유폴더·외부 경로만 직접 추가합니다. 검색은 외부 AI나 서버 없이 이 PC의 색인으로 동작합니다. 기본 런타임은 Tauri/Rust이며, Electron 런타임은 기능 비교·롤백용으로 보존합니다.
 
 ## 검색 백엔드
 
@@ -138,3 +231,11 @@ MIT License. 자세한 내용은 [LICENSE](LICENSE)를 참조하세요.
 본 제품은 한글과컴퓨터의 한글 문서 파일(.hwp) 공개 문서를 참고하여 개발하였습니다. 한글은 한글과컴퓨터의 상표이며, Dawith Search는 한글과컴퓨터와 관계없는 별도 프로젝트입니다.
 
 Everything은 voidtools의 제품이자 상표이며, Dawith Search는 voidtools와 관계없는 별도 프로젝트입니다. Dawith Search는 Everything을 포함하거나 재배포하지 않고, `useEverything`을 켠 경우에만 사용자가 따로 설치한 Everything과 공식 SDK(MIT)로 통신합니다. 설치본에는 `licenses` 폴더에 Dawith Search, Everything SDK, goz, Rust 라이브러리의 라이선스 전문이 함께 들어 있습니다. 전체 목록은 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)에 있습니다.
+
+---
+
+<p align="center">
+  <a href="https://welfare-hub.site/"><img src="site/ci.png" alt="Dawith AI" width="48" /></a><br/>
+  <sub>Created by</sub><br/>
+  <a href="https://welfare-hub.site/"><b>Dawith AI</b></a> · Dawith 복지 허브 - 사회복지 현장의 반복 업무를 줄입니다
+</p>

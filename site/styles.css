@@ -448,3 +448,5 @@ html { scroll-padding-top: 76px; }
 .footer-credit { flex-basis: 100%; order: 8; color: #4f6459; font-size: 13px; line-height: 1.7; word-break: keep-all; }
 .footer-credit a { text-decoration: underline; text-underline-offset: 2px; }
 .footer-credit b { color: #20382c; }
+
+.footer-credit .credit-line { display: block; }

@@ -1903,8 +1903,13 @@ async fn open_file(file_path: String, state: State<'_, AppState>) -> Result<Valu
     // Launching the document's program can take a moment; do it off the UI
     // thread so the window never freezes while Windows starts it.
     tauri::async_runtime::spawn_blocking(move || {
-        if !is_allowed_path(&path, &config) || !path.is_file() {
+        if !is_allowed_path(&path, &config) {
             return Err("허용된 검색 경로의 파일만 열 수 있습니다.".to_string());
+        }
+        // Folders are results too (opened in Explorer/Finder), so only require
+        // that the path still exists.
+        if !path.exists() {
+            return Err("파일이나 폴더를 찾을 수 없습니다. 이동되었거나 삭제되었을 수 있습니다.".to_string());
         }
         run_open(&path)?;
         Ok(json!({ "success": true }))

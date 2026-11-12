@@ -2277,3 +2277,25 @@ body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2));
 .setting-group + .setting-group { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--border-color); }
 .setting-group > label { display: block; margin-bottom: 6px; color: var(--text-main); font-size: 13px; font-weight: 800; }
 .setting-group .shortcuts-list { margin-top: 10px; }
+
+/* Body search: one line of the matching text after the file name. */
+.td.col-name .file-name-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.td.col-name .content-snippet { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); font-size: 11px; font-weight: 400; }
+.td.col-name .content-snippet .highlight { padding: 0 1px; }
+.content-index-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 6px 0 10px; }
+.setting-optional { margin-left: 6px; color: var(--text-dim); font-size: 11px; font-weight: 500; }
+
+/* Body search consent dialog: above the settings window. */
+#contentIndexModal { z-index: 1500; }
+.content-index-dialog { width: min(560px, calc(100vw - 32px)); }
+.content-warning-list { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.55; color: var(--text-main); }
+.content-warning-list strong { color: var(--text-main); }
+.content-warning-list code { font-size: 12px; }
+.content-warning-roots { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-th); font-size: 12px; }
+.content-warning-roots span { color: var(--text-muted); font-weight: 700; }
+.content-warning-roots code { white-space: pre-wrap; word-break: break-all; }
+.content-warning-roots small { color: var(--text-dim); }
+.content-warning-check { display: flex; align-items: flex-start; gap: 8px; margin: 14px 0; font-size: 13px; font-weight: 600; cursor: pointer; }
+.content-warning-check input { margin-top: 3px; }
+.content-warning-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.content-warning-actions .btn[disabled] { opacity: .45; cursor: not-allowed; }

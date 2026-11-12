@@ -14,6 +14,7 @@ let searchDebounceTimer = null;
 let lastInputAt = 0;
 let lastSearchAt = 0;
 let lastRenderedSignature = '';
+let lastSearchWarning = '';
 let searchInFlight = false;
 let searchQueued = false;
 let resultsRenderToken = 0;
@@ -672,6 +673,7 @@ async function addSearchRoot() {
 
 async function openRootSettings({ focusNetwork = false, fromTop = false } = {}) {
   settingsModal.style.display = 'flex';
+  refreshContentIndex();
   const body = settingsModal.querySelector('.modal-body');
   if (body) body.scrollTop = 0;
   const config = await refreshSettingsRoots();
@@ -763,7 +765,8 @@ async function runSearch() {
     }
     // Rebuilding identical rows resets scroll and selection and makes the
     // table flicker; keep the current rows when nothing changed.
-    const signature = rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
+    lastSearchWarning = res.warning || '';
+    const signature = currentFilter + '\u0000' + lastSearchWarning + '\u0000' + rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
     if (signature !== lastRenderedSignature) {
       lastRenderedSignature = signature;
       searchResults = nextResults;
@@ -839,7 +842,9 @@ function renderResults(items, currentQuery) {
     document.getElementById('emptyTitle').textContent = hasQuery
       ? '검색 결과가 없습니다'
       : '검색을 시작하세요';
-    document.getElementById('emptySub').textContent = hasQuery
+    document.getElementById('emptySub').textContent = lastSearchWarning && hasQuery
+      ? lastSearchWarning
+      : hasQuery
       ? '색인 중이면 잠시 뒤 자동으로 결과가 늘어납니다. 다른 키워드나 필터 조건도 사용해 보세요.'
       : '파일명이나 폴더명을 입력하면 이 PC의 파일을 바로 찾습니다.';
     document.getElementById('emptyExamples').style.display = hasQuery ? 'none' : 'flex';
@@ -860,6 +865,7 @@ function renderResults(items, currentQuery) {
         <span class="row-star ${starActive}" data-idx="${idx}" title="${item.starred ? '즐겨찾기 해제' : '즐겨찾기'}">${item.starred ? '★' : '☆'}</span>
         <span class="file-icon">${icon}</span>
         <span class="file-name-text">${highlightMatch(item.name, currentQuery)}</span>
+        ${item.snippet ? `<span class="content-snippet" title="${escapeHtml(item.snippet)}">${highlightMatch(item.snippet, currentQuery)}</span>` : ''}
       </div>
       <div class="td col-path" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</div>
       <div class="td col-size">${item.isDir ? '&lt;DIR&gt;' : item.metaUnknown ? '—' : formatBytes(item.size)}</div>
@@ -1249,7 +1255,159 @@ if (window.__TAURI__) {
     const element = document.querySelector(selector);
     if (element) element.style.display = 'none';
   });
+} else {
+  document.querySelectorAll('.tauri-only').forEach(element => { element.style.display = 'none'; });
 }
+
+// Body (document text) search: opt-in, and only in the Tauri build.
+const contentIndexStatusEl = document.getElementById('contentIndexStatus');
+const contentRootsList = document.getElementById('contentRootsList');
+const btnContentIndexToggle = document.getElementById('btnContentIndexToggle');
+const btnBodySearchOn = document.getElementById('btnBodySearchOn');
+const btnBodySearchOff = document.getElementById('btnBodySearchOff');
+const contentIndexModal = document.getElementById('contentIndexModal');
+const contentIndexAgree = document.getElementById('contentIndexAgree');
+const btnConfirmContentIndex = document.getElementById('btnConfirmContentIndex');
+let contentIndexState = null;
+let pendingContentRoots = [];
+
+function formatContentStatus(status) {
+  if (!status || !status.enabled) return '꺼짐 · 문서 내용은 읽지 않습니다.';
+  const parts = [`문서 ${formatNumber(status.documents)}개`];
+  if (status.protected) parts.push(`암호·DRM ${formatNumber(status.protected)}개 제외`);
+  if (status.failed) parts.push(`읽지 못함 ${formatNumber(status.failed)}개`);
+  parts.push(`저장 ${formatBytes(status.storedBytes)}`);
+  if (status.running) {
+    parts.unshift(status.total
+      ? `읽는 중 ${formatNumber(status.processed)}/${formatNumber(status.total)}`
+      : `문서 찾는 중 ${formatNumber(status.seen)}개`);
+  }
+  return parts.join(' · ');
+}
+
+function renderContentIndex(status) {
+  contentIndexState = status;
+  if (!contentIndexStatusEl) return;
+  const on = Boolean(status && status.enabled);
+  contentIndexStatusEl.textContent = formatContentStatus(status);
+  for (const [button, active] of [[btnBodySearchOn, on], [btnBodySearchOff, !on]]) {
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  btnBodySearchOn.title = on ? formatContentStatus(status) : '고른 폴더의 문서 내용으로도 찾습니다 (켤 때 안내를 확인합니다)';
+  btnContentIndexToggle.textContent = on ? '본문 검색 끄기' : '본문 검색 켜기';
+  btnContentIndexToggle.classList.toggle('btn-primary', !on);
+  btnContentIndexToggle.classList.toggle('btn-ghost', on);
+  contentRootsList.hidden = !on;
+  document.getElementById('contentIndexActions').hidden = !on;
+  const roots = on ? (status.roots || []) : [];
+  contentRootsList.innerHTML = roots.length ? roots.map(root => `
+    <div class="root-item">
+      <span class="root-item-icon">▤</span>
+      <span class="root-item-copy"><strong>본문을 읽는 폴더</strong><code>${escapeHtml(root)}</code></span>
+      <span class="root-item-actions"><button class="root-remove" type="button" data-remove-content-root="${escapeHtml(root)}" aria-label="본문 검색 폴더 제거: ${escapeHtml(root)}">제거</button></span>
+    </div>`).join('') : '<div class="roots-empty">본문을 읽을 폴더가 없습니다.</div>';
+}
+
+async function refreshContentIndex() {
+  if (!window.__TAURI__ || !window.dawithAPI.getContentIndexStatus) return;
+  try {
+    renderContentIndex(await window.dawithAPI.getContentIndexStatus());
+  } catch (error) {
+    console.error('Failed to read body search status:', error);
+  }
+}
+
+async function applyContentIndex(enabled, roots) {
+  try {
+    renderContentIndex(await window.dawithAPI.setContentIndex(enabled, roots));
+  } catch (error) {
+    alert(`본문 검색 설정을 바꾸지 못했습니다.\n${error.message || error}`);
+  }
+}
+
+if (btnContentIndexToggle) {
+  const turnContentIndexOff = async () => {
+    if (!window.confirm('본문 검색을 끌까요?\n\n이 PC에 저장해 둔 문서 내용이 바로 모두 지워집니다. 파일 이름 검색은 그대로입니다.')) return;
+    await applyContentIndex(false, null);
+  };
+
+  // Nothing is read until the user ticks the consent box in this dialog.
+  const askContentIndexOn = async () => {
+    const status = contentIndexState || await window.dawithAPI.getContentIndexStatus();
+    const roots = (status.roots && status.roots.length) ? status.roots : (status.defaultRoots || []);
+    pendingContentRoots = roots;
+    document.getElementById('contentIndexModalRoots').textContent = roots.length ? roots.join('\n') : '바탕화면 · 문서 · 다운로드';
+    contentIndexAgree.checked = false;
+    btnConfirmContentIndex.disabled = true;
+    contentIndexModal.style.display = 'flex';
+    contentIndexAgree.focus();
+  };
+
+  btnContentIndexToggle.addEventListener('click', async () => {
+    const status = contentIndexState || await window.dawithAPI.getContentIndexStatus();
+    if (status.enabled) await turnContentIndexOff();
+    else await askContentIndexOn();
+  });
+  // Title-bar switch, next to the view switch.
+  btnBodySearchOn.addEventListener('click', async () => {
+    const status = contentIndexState || await window.dawithAPI.getContentIndexStatus();
+    if (!status.enabled) await askContentIndexOn();
+  });
+  btnBodySearchOff.addEventListener('click', async () => {
+    const status = contentIndexState || await window.dawithAPI.getContentIndexStatus();
+    if (status.enabled) await turnContentIndexOff();
+  });
+
+  const closeContentIndexModal = () => { contentIndexModal.style.display = 'none'; };
+  contentIndexAgree.addEventListener('change', () => { btnConfirmContentIndex.disabled = !contentIndexAgree.checked; });
+  document.getElementById('btnCloseContentIndexModal').addEventListener('click', closeContentIndexModal);
+  document.getElementById('btnCancelContentIndex').addEventListener('click', closeContentIndexModal);
+  btnConfirmContentIndex.addEventListener('click', async () => {
+    if (!contentIndexAgree.checked) return;
+    closeContentIndexModal();
+    await applyContentIndex(true, pendingContentRoots);
+  });
+
+  document.getElementById('btnAddContentRoot').addEventListener('click', async () => {
+    const result = await window.dawithAPI.chooseRoot();
+    if (!result || result.canceled || !result.path) return;
+    const roots = (contentIndexState?.roots || []).slice();
+    if (roots.some(root => root.toLowerCase() === String(result.path).toLowerCase())) return;
+    roots.push(result.path);
+    await applyContentIndex(true, roots);
+  });
+
+  document.getElementById('btnContentReindex').addEventListener('click', async () => {
+    renderContentIndex(await window.dawithAPI.reindexContent());
+  });
+
+  contentRootsList.addEventListener('click', async event => {
+    const button = event.target.closest('[data-remove-content-root]');
+    if (!button) return;
+    const roots = (contentIndexState?.roots || []).filter(root => root !== button.dataset.removeContentRoot);
+    if (!roots.length) {
+      alert('본문을 읽을 폴더가 하나는 있어야 합니다. 모두 빼려면 "본문 검색 끄기"를 누르세요.');
+      return;
+    }
+    if (!window.confirm(`이 폴더의 문서 내용을 본문 검색에서 뺄까요?\n${button.dataset.removeContentRoot}\n\n파일은 삭제되지 않고, 저장해 둔 내용만 지워집니다.`)) return;
+    await applyContentIndex(true, roots);
+  });
+}
+
+if (window.dawithAPI.onContentIndexStatus) {
+  let lastBodyRefresh = 0;
+  window.dawithAPI.onContentIndexStatus(status => {
+    renderContentIndex(status);
+    // Show newly read documents in an open body search, at most every 3 s.
+    if (currentFilter === 'body:' && searchInput.value.trim() && Date.now() - lastBodyRefresh > 3000) {
+      lastBodyRefresh = Date.now();
+      executeSearch();
+    }
+  });
+}
+// The title-bar switch shows the current state from the start.
+refreshContentIndex();
 
 // Keyboard Navigation
 document.addEventListener('keydown', (e) => {

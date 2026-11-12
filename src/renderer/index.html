@@ -31,6 +31,11 @@
         <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
         <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
       </div>
+      <div class="view-switcher tauri-only" id="bodySearchSwitch" role="group" aria-label="본문 검색 켜기·끄기">
+        <span class="view-switcher-label">본문</span>
+        <button class="view-switch-btn" id="btnBodySearchOff" type="button" aria-pressed="true" title="문서 내용은 읽지 않습니다">끔</button>
+        <button class="view-switch-btn" id="btnBodySearchOn" type="button" aria-pressed="false" title="고른 폴더의 문서 내용으로도 찾습니다 (켤 때 안내를 확인합니다)">켬</button>
+      </div>
       <button class="titlebar-settings" id="btnTitleSettings" type="button" title="설정: 버전·업데이트, 화면 구성, 검색 위치">
         <span aria-hidden="true">⚙</span> 설정<span class="update-dot" id="settingsUpdateDot" hidden aria-label="새 버전 있음"></span>
       </button>
@@ -195,6 +200,7 @@
       <div class="filter-tabs" id="filterTabs">
         <button class="tab-btn active" data-filter="">모두</button>
         <button class="tab-btn" data-filter="doc:">문서</button>
+        <button class="tab-btn tauri-only" data-filter="body:" title="문서 내용으로 찾기 (설정에서 본문 검색을 켜야 합니다)">본문</button>
         <button class="tab-btn" data-filter="pic:">사진</button>
         <button class="tab-btn" data-filter="video:">동영상</button>
         <button class="tab-btn" data-filter="audio:">음악</button>
@@ -488,6 +494,32 @@
     </div>
   </div>
 
+  <!-- Body search consent: shown before document text is ever read -->
+  <div class="modal-overlay" id="contentIndexModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="contentIndexModalTitle">
+    <div class="modal-dialog content-index-dialog">
+      <div class="modal-header">
+        <h3 id="contentIndexModalTitle">본문 검색을 켜기 전에 꼭 확인하세요</h3>
+        <button class="btn-close" id="btnCloseContentIndexModal" type="button" aria-label="닫기">✕</button>
+      </div>
+      <div class="modal-body">
+        <ul class="content-warning-list">
+          <li><strong>문서 내용이 이 PC에 저장됩니다.</strong> 아래 폴더의 문서 글자를 읽어 사용자 폴더의 <code>.dawith-search</code>에 저장합니다. 인터넷으로는 보내지 않습니다.</li>
+          <li><strong>이 PC를 함께 쓰는 사람도 볼 수 있습니다.</strong> 저장된 내용은 따로 암호화되지 않습니다. 개인정보·인사·회계 등 민감한 문서가 있는 폴더는 넣지 마세요.</li>
+          <li><strong>암호·DRM 문서는 읽지 않습니다.</strong> 암호가 걸린 문서, 한글 배포용·보안 문서, 회사 DRM이 적용된 문서는 내용을 읽지 않고 건너뜁니다.</li>
+          <li><strong>회사·기관 PC라면 보안 담당자에게 먼저 확인하세요.</strong> 문서 내용을 따로 저장하는 것이 내부 보안 규정에 맞는지 확인이 필요합니다.</li>
+          <li><strong>처음에는 시간이 걸립니다.</strong> 문서가 많을수록, 특히 공유폴더는 오래 걸리고 문서 양에 따라 수십~수백 MB를 씁니다.</li>
+          <li><strong>언제든 끌 수 있습니다.</strong> 끄면 저장된 내용은 바로 지워집니다.</li>
+        </ul>
+        <div class="content-warning-roots"><span>읽을 폴더</span><code id="contentIndexModalRoots"></code><small>켠 뒤 설정에서 폴더를 더하거나 뺄 수 있습니다.</small></div>
+        <label class="content-warning-check"><input type="checkbox" id="contentIndexAgree"> 위 내용을 모두 읽었고, 고른 폴더의 문서 내용을 이 PC에 저장하는 데 동의합니다.</label>
+        <div class="content-warning-actions">
+          <button class="btn btn-ghost" id="btnCancelContentIndex" type="button">취소</button>
+          <button class="btn btn-primary" id="btnConfirmContentIndex" type="button" disabled>동의하고 본문 검색 켜기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div class="modal-overlay" id="settingsModal" style="display: none;">
     <div class="modal-dialog">
@@ -543,6 +575,19 @@
               <button class="btn btn-sm btn-ghost" id="btnCancelNetworkRoot" type="button">취소</button>
             </div>
             <p class="setting-help" id="networkRootStatus">Windows 공유폴더는 현재 Windows 계정의 접근 권한으로 확인합니다. macOS는 Finder에서 연결한 뒤 /Volumes 경로를 사용하세요.</p>
+          </div>
+        </div>
+        <div class="setting-group content-index-setting tauri-only" id="contentIndexSetting">
+          <label>본문 검색 <span class="setting-optional">선택 기능 · 기본 꺼짐</span></label>
+          <p class="setting-help">켜면 고른 폴더의 문서(HWP·HWPX·Word·Excel·PowerPoint·PDF·텍스트) 내용을 미리 읽어 두고, 검색창 아래 <b>본문</b> 탭에서 내용으로 찾습니다. 암호가 걸렸거나 DRM(보안)이 적용된 문서는 읽지 않습니다.</p>
+          <div class="content-index-row">
+            <span class="setting-inline-status" id="contentIndexStatus">꺼짐</span>
+            <button class="btn btn-sm btn-primary" id="btnContentIndexToggle" type="button">본문 검색 켜기</button>
+          </div>
+          <div class="roots-list" id="contentRootsList" hidden></div>
+          <div class="root-actions" id="contentIndexActions" hidden>
+            <button class="btn btn-sm btn-ghost" id="btnAddContentRoot" type="button">＋ 본문을 읽을 폴더 추가</button>
+            <button class="btn btn-sm btn-ghost" id="btnContentReindex" type="button">↻ 다시 읽기</button>
           </div>
         </div>
         <div class="setting-group mt-4">

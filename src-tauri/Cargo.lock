@@ -768,8 +768,11 @@ dependencies = [
 
 [[package]]
 name = "dawith-search"
-version = "1.3.17"
+version = "1.3.18"
 dependencies = [
+ "cfb 0.12.1",
+ "encoding_rs",
+ "flate2",
  "hwp",
  "image",
  "jwalk",

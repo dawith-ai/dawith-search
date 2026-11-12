@@ -34,6 +34,11 @@ contextBridge.exposeInMainWorld('dawithAPI', {
   addTag: (filePath, tag) => ipcRenderer.invoke('add-tag', filePath, tag),
   removeTag: (filePath, tag) => ipcRenderer.invoke('remove-tag', filePath, tag),
   toggleStar: (filePath) => ipcRenderer.invoke('toggle-star', filePath),
+  // Body search ships only in the Tauri build.
+  getContentIndexStatus: () => Promise.resolve({ supported: false, enabled: false, roots: [], defaultRoots: [] }),
+  setContentIndex: () => Promise.resolve({ supported: false, enabled: false, roots: [], defaultRoots: [] }),
+  reindexContent: () => Promise.resolve({ supported: false, enabled: false, roots: [], defaultRoots: [] }),
+  onContentIndexStatus: () => {},
   getAllTags: () => ipcRenderer.invoke('get-all-tags'),
   
   getConfig: () => ipcRenderer.invoke('get-config'),

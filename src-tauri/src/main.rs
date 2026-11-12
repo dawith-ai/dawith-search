@@ -11,6 +11,7 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager, State, Window};
 
 mod convert;
+mod content;
 mod fastindex;
 
 struct AppState {
@@ -596,6 +597,7 @@ fn start_index_watcher(app: AppHandle, roots: Vec<PathBuf>, excluded: Vec<String
                         }
                     }
                 }
+                content::files_changed(&app, &paths);
                 pending_notice = true;
             }
             // Tell the window at most every 1.5 s so busy folders don't flood it.
@@ -1133,6 +1135,10 @@ fn extract_hwp_text(path: &Path) -> Result<String, String> {
     if bytes.starts_with(&[0x9b, 0x20, 0x44, 0x52, 0x4d, 0x4f, 0x4e, 0x45]) {
         return Err("이 HWP는 DRM 보안 문서라 앱에서 본문을 직접 읽을 수 없습니다. 파일명(제목)으로는 계속 검색됩니다. 본문까지 검색하려면 한글에서 문서를 연 뒤 보안 해제본으로 저장하거나, 권한이 있는 위치에서 다시 추가해 주세요.".to_string());
     }
+    // Password, distribution (read-only) and DRM documents stay unread.
+    if content::hwp_is_protected(path) {
+        return Err("암호·배포용·보안이 설정된 HWP라 본문을 읽지 않습니다. 파일명(제목)으로는 계속 검색됩니다.".to_string());
+    }
     let document = hwp::HwpDocument::from_bytes(&bytes).map_err(|error| error.to_string())?;
     Ok(document.extract_text().to_string())
 }
@@ -1404,6 +1410,39 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
     let roots = effective_roots(&config, &options)?;
     let use_natural_language = options.get("useAI").and_then(Value::as_bool).unwrap_or(false);
     let normalized_query = if use_natural_language { translate_natural_query(&query) } else { query.clone() };
+    let lower_query = normalized_query.to_lowercase();
+    let body_mode = lower_query.split_whitespace().any(|token| token == "body:");
+    let has_content_terms = lower_query.split_whitespace().any(|token| token.starts_with("content:") && token.len() > "content:".len());
+    if body_mode || (has_content_terms && content::enabled(&config)) {
+        if !content::enabled(&config) {
+            return Ok(json!({
+                "results": [], "totalMatches": 0, "totalIndexed": 0,
+                "elapsedMs": started.elapsed().as_millis(), "backend": "content-index",
+                "warning": "본문 검색이 꺼져 있습니다. 제목 표시줄의 [본문 켬]을 누르면 문서 내용으로도 찾을 수 있습니다."
+            }));
+        }
+        let scope = options.get("scopeRoot").and_then(Value::as_str).map(PathBuf::from);
+        let parsed = content::parse_query(&normalized_query, body_mode, scope);
+        let (mut results, total) = content::search(&state.data_dir, &parsed, limit);
+        hydrate_records(&mut results, &metadata);
+        let status = content::status(&config, &state.data_dir);
+        let running = status.get("running").and_then(Value::as_bool).unwrap_or(false);
+        return Ok(json!({
+            "results": results,
+            "totalMatches": total,
+            "totalIndexed": status.get("documents").cloned().unwrap_or(json!(0)),
+            "elapsedMs": started.elapsed().as_millis(),
+            "backend": "content-index",
+            "indexing": false,
+            "warning": if parsed.body.is_empty() {
+                Value::String("문서 내용에서 찾을 단어를 입력하세요.".to_string())
+            } else if running {
+                Value::String("본문을 읽는 중이라 지금까지 읽은 문서에서만 찾았습니다.".to_string())
+            } else {
+                Value::Null
+            }
+        }));
+    }
     let native_query = query_with_scope(&translate_native_query(&normalized_query), &options);
     let native_can_handle_query = !normalized_query.to_ascii_lowercase().split_whitespace().any(|token| {
         token.starts_with("content:") || token.starts_with("tag:") || token == "starred:" || token == "star:" || token.starts_with("dupe:")
@@ -1508,6 +1547,8 @@ fn save_config(state: State<'_, AppState>, config: Value) -> Result<Value, Strin
     let mut current = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.".to_string())?;
     if let (Some(current_map), Some(new_map)) = (current.as_object_mut(), config.as_object()) {
         for (key, value) in new_map {
+            // Managed only through set_content_index.
+            if key == "contentIndex" { continue; }
             current_map.insert(key.clone(), value.clone());
         }
     }
@@ -2028,6 +2069,51 @@ async fn find_duplicates(app: AppHandle, options: Option<Value>) -> Result<Value
 }
 
 #[tauri::command]
+fn get_content_index_status(state: State<'_, AppState>) -> Result<Value, String> {
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    Ok(content::status(&config, &state.data_dir))
+}
+
+/// Turns the body index on or off and sets its folders. Off deletes the
+/// stored text right away.
+#[tauri::command]
+fn set_content_index(app: AppHandle, state: State<'_, AppState>, enabled: bool, roots: Option<Vec<String>>) -> Result<Value, String> {
+    let config = {
+        let mut config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?;
+        let mut roots: Vec<String> = roots
+            .unwrap_or_else(|| content::roots(&config).iter().map(|root| root.to_string_lossy().to_string()).collect())
+            .into_iter()
+            .map(|root| root.trim().to_string())
+            .filter(|root| !root.is_empty())
+            .collect();
+        if roots.is_empty() {
+            roots = content::default_roots();
+        }
+        roots.dedup_by(|a, b| same_root(a, b));
+        if let Some(map) = config.as_object_mut() {
+            map.insert("contentIndex".to_string(), json!({ "enabled": enabled, "roots": roots }));
+        }
+        atomic_write(&state.data_dir.join("config.json"), &config)?;
+        config.clone()
+    };
+    if enabled {
+        content::start_scan(&app);
+    } else {
+        content::clear(&state.data_dir);
+    }
+    Ok(content::status(&config, &state.data_dir))
+}
+
+#[tauri::command]
+fn reindex_content(app: AppHandle, state: State<'_, AppState>) -> Result<Value, String> {
+    let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    if content::enabled(&config) {
+        content::start_scan(&app);
+    }
+    Ok(content::status(&config, &state.data_dir))
+}
+
+#[tauri::command]
 fn choose_root() -> Value {
     match FileDialog::new().set_title("검색할 폴더 선택").pick_folder() {
         Some(path) => json!({ "canceled": false, "path": path }),
@@ -2474,6 +2560,10 @@ fn main() {
         .setup(|app| {
             build_tray(app)?;
             start_local_indexing(&app.handle()).map_err(std::io::Error::other)?;
+            let body_index_on = app.state::<AppState>().config.lock().map(|config| content::enabled(&config)).unwrap_or(false);
+            if body_index_on {
+                content::start_scan(&app.handle());
+            }
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -2511,6 +2601,9 @@ fn main() {
             delete_file,
             rename_file,
             get_conversion_options,
+            get_content_index_status,
+            set_content_index,
+            reindex_content,
             get_storage_analysis,
             find_duplicates,
             convert_files,

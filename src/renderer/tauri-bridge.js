@@ -40,6 +40,13 @@
     addTag: (filePath, tag) => invoke('add_tag', { filePath, tag }),
     removeTag: (filePath, tag) => invoke('remove_tag', { filePath, tag }),
     toggleStar: (filePath) => invoke('toggle_star', { filePath }).then(result => result?.starred ?? false),
+    getContentIndexStatus: () => invoke('get_content_index_status'),
+    setContentIndex: (enabled, roots) => invoke('set_content_index', { enabled, roots: roots || null }),
+    reindexContent: () => invoke('reindex_content'),
+    onContentIndexStatus: (callback) => {
+      if (!tauri.event?.listen) return;
+      tauri.event.listen('content-index-status', event => callback(event.payload));
+    },
     getAllTags: () => invoke('get_all_tags'),
     deleteFile: (filePath) => invoke('delete_file', { filePath }),
     renameFile: (oldPath, newPath) => invoke('rename_file', { oldPath, newPath }),

@@ -1,6 +1,7 @@
 /**
  * Dawith Search - Query Parser & Matcher Engine
- * Fully compatible with Voidtools Everything syntax + AI Natural Language Queries
+ * Everything-compatible search syntax (Everything is a trademark of voidtools;
+ * this is an independent implementation) + natural language queries
  */
 
 const EXTENSION_CATEGORIES = {

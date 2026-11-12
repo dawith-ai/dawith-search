@@ -435,7 +435,7 @@ html { scroll-padding-top: 76px; }
 .beta-note a { color: #8a4b00; font-weight: 700; }
 .dl-header-inner .beta-badge { margin-right: auto; }
 
-/* Signature badge in the footer, linking to the Dawith welfare hub. */
+/* Signature badge in the footer, linking to the Dawith AI page. */
 .signature-badge { display: inline-flex; flex: 0 0 auto; gap: 10px; align-items: center; margin-left: auto; padding: 9px 16px 9px 9px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: #20382c; box-shadow: 0 4px 14px rgba(20, 50, 35, .06); transition: border-color .16s, box-shadow .16s; }
 .signature-badge:hover { border-color: #bad7c3; box-shadow: 0 8px 22px rgba(20, 50, 35, .10); }
 .signature-badge img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
@@ -450,3 +450,4 @@ html { scroll-padding-top: 76px; }
 .footer-credit b { color: #20382c; }
 
 .footer-credit .credit-line { display: block; }
+.footer-credit .credit-line + .credit-line { margin-top: 4px; }

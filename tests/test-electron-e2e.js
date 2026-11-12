@@ -540,10 +540,12 @@ async function run() {
   assert.ok(fs.existsSync(conversionPath), 'conversion must preserve the original file');
   record('검색 결과 파일 변환', 'PNG→PDF 변환·원본 보존 확인');
   await setSearch('photo-report.png');
-  await waitFor('conversion result rows', async () => (await evaluate("document.querySelectorAll('#tableBody .table-row').length")) > 0);
+  // Wait for the new results; the previous search's rows are still on screen at first.
+  await waitFor('conversion result rows', async () => (await evaluate("[...document.querySelectorAll('#tableBody .file-name-text')].map(el => el.textContent).join('|')")) === 'photo-report.png');
   await click('#tableBody .row-btn-convert');
   await waitForState('conversion modal', state => state.conversionDisplay === 'flex');
-  assert.ok(await evaluate("document.querySelector('#conversionOptions')?.textContent.includes('PDF')"));
+  // The modal opens before the options finish loading, so wait for them.
+  await waitFor('conversion options', async () => (await evaluate("document.querySelector('#conversionOptions')?.textContent.includes('PDF')")) === true);
   await evaluate("document.querySelector('#btnCloseConversion').click()");
   record('검색 결과 변환 UI', '결과 행 변환 버튼·변환 옵션 모달 확인');
 

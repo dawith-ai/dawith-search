@@ -857,7 +857,7 @@ function renderResults(items, currentQuery) {
 
     row.innerHTML = `
       <div class="td col-name" title="${escapeHtml(item.name)}">
-        <span class="row-star ${starActive}" data-idx="${idx}" title="즐겨찾기">⭐</span>
+        <span class="row-star ${starActive}" data-idx="${idx}" title="${item.starred ? '즐겨찾기 해제' : '즐겨찾기'}">${item.starred ? '★' : '☆'}</span>
         <span class="file-icon">${icon}</span>
         <span class="file-name-text">${highlightMatch(item.name, currentQuery)}</span>
       </div>
@@ -1239,6 +1239,18 @@ if (toolsButton && toolsMenu) {
   });
 }
 
+// The lightweight Tauri build ships without mobile sharing, the evidence
+// analyzer and export, so don't offer them there.
+if (window.__TAURI__) {
+  ['#btnRemoteServer', '#btnEvidenceAnalyzer', '#btnExport',
+    '[data-action="open-remote"]', '[data-action="open-evidence"]',
+    '[data-action="export-csv"]', '[data-action="export-efu"]'
+  ].forEach(selector => {
+    const element = document.querySelector(selector);
+    if (element) element.style.display = 'none';
+  });
+}
+
 // Keyboard Navigation
 document.addEventListener('keydown', (e) => {
   // If Quick Look open, Escape closes it
@@ -1586,9 +1598,89 @@ document.getElementById('emptyExamples').addEventListener('click', (e) => {
   executeSearch();
 });
 
+// Column resizing (drag the header borders, double-click to fit the contents)
+const COLUMN_WIDTHS_KEY = 'dawith-column-widths';
+const COLUMN_LIMITS = { name: [120, 1600], size: [60, 240], mtime: [90, 260], ext: [50, 200] };
+const resultsContainer = document.querySelector('.results-container');
+let suppressSortClick = false;
+
+function maxColumnWidth(col) {
+  // Leave the path column at least its minimum width so nothing is pushed off screen.
+  const header = document.querySelector('.table-header');
+  const current = header.querySelector(`.th.col-${col}`).getBoundingClientRect().width;
+  const path = header.querySelector('.th.col-path').getBoundingClientRect().width;
+  return Math.min(COLUMN_LIMITS[col][1], current + Math.max(0, path - 160));
+}
+
+function setColumnWidth(col, width, { persist = true } = {}) {
+  const [min] = COLUMN_LIMITS[col];
+  const next = Math.round(Math.max(min, Math.min(width, maxColumnWidth(col))));
+  resultsContainer.style.setProperty(`--col-${col}-w`, `${next}px`);
+  if (persist) {
+    const saved = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
+    saved[col] = next;
+    localStorage.setItem(COLUMN_WIDTHS_KEY, JSON.stringify(saved));
+  }
+}
+
+try {
+  const saved = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
+  Object.entries(saved).forEach(([col, width]) => {
+    if (COLUMN_LIMITS[col] && Number.isFinite(width)) {
+      resultsContainer.style.setProperty(`--col-${col}-w`, `${Math.max(COLUMN_LIMITS[col][0], width)}px`);
+    }
+  });
+} catch (_) {
+  localStorage.removeItem(COLUMN_WIDTHS_KEY);
+}
+
+document.querySelectorAll('.table-header .col-resizer').forEach(handle => {
+  const col = handle.dataset.resize;
+  handle.addEventListener('click', e => e.stopPropagation());
+  handle.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const th = handle.parentElement;
+    const startX = e.clientX;
+    const startWidth = th.getBoundingClientRect().width;
+    let moved = false;
+    handle.classList.add('dragging');
+    document.body.classList.add('col-resizing');
+    const onMove = ev => {
+      if (Math.abs(ev.clientX - startX) > 2) moved = true;
+      setColumnWidth(col, startWidth + ev.clientX - startX, { persist: false });
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      handle.classList.remove('dragging');
+      document.body.classList.remove('col-resizing');
+      if (moved) {
+        setColumnWidth(col, th.getBoundingClientRect().width);
+        // The mouseup can land on a header cell and fire a sort click; swallow it.
+        suppressSortClick = true;
+        setTimeout(() => { suppressSortClick = false; }, 0);
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  handle.addEventListener('dblclick', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    const cells = document.querySelectorAll(`#tableBody .td.col-${col}`);
+    const header = handle.parentElement;
+    let widest = header.scrollWidth;
+    cells.forEach(cell => { widest = Math.max(widest, cell.scrollWidth); });
+    setColumnWidth(col, widest + 4);
+  });
+});
+
 // Table Column Sorting
 document.querySelectorAll('.table-header .th').forEach(th => {
   th.addEventListener('click', () => {
+    if (suppressSortClick) return;
     const col = th.dataset.col;
     if (!col) return;
     // Clicking a column cycles ascending → descending → default (relevance).
@@ -1646,7 +1738,8 @@ document.getElementById('btnCopyRemoteUrl').addEventListener('click', () => {
 // Storage Analyzer Modal
 document.getElementById('btnStorageAnalyzer').addEventListener('click', async () => {
   storageModal.style.display = 'flex';
-  loadStorageOverview();
+  setStorageTabActive(document.getElementById('tabStorageOverview'));
+  loadStorageOverview(true);
 });
 document.getElementById('btnCloseStorage').addEventListener('click', () => {
   storageModal.style.display = 'none';
@@ -1741,30 +1834,55 @@ btnSaveEvidence.addEventListener('click', async () => {
   else if (!result.canceled) alert(`저장 실패: ${result.error}`);
 });
 
-async function loadStorageOverview() {
-  const data = await window.dawithAPI.getStorageAnalysis();
-  if (!data) return;
+function storageError(data, fallback) {
+  if (!data) return fallback;
+  if (data.success === false) return data.error || fallback;
+  return '';
+}
+
+// The overview and TOP 50 tabs share one snapshot while the modal is open.
+let storageSnapshot = null;
+async function getStorageSnapshot(refresh = false) {
+  if (refresh || !storageSnapshot) storageSnapshot = await window.dawithAPI.getStorageAnalysis();
+  return storageSnapshot;
+}
+
+async function loadStorageOverview(refresh = false) {
   const storageBody = document.getElementById('storageBody');
+  storageBody.innerHTML = '<div class="storage-empty">색인을 집계하고 있습니다…</div>';
+  let data;
+  try {
+    data = await getStorageSnapshot(refresh);
+  } catch (error) {
+    data = { success: false, error: String((error && error.message) || error) };
+  }
+  const error = storageError(data, '색인이 아직 준비되지 않았습니다.');
+  if (error || !data.categories) {
+    storageSnapshot = null;
+    storageBody.innerHTML = `<div class="storage-empty">${escapeHtml(error || '용량 정보를 가져오지 못했습니다.')}</div>`;
+    return;
+  }
   const cats = data.categories;
+  const share = bytes => (data.totalBytes ? bytes / data.totalBytes * 100 : 0);
 
   storageBody.innerHTML = `
     <div class="storage-summary">
       <h4>전체 색인 파일: ${data.totalFiles.toLocaleString()}개 (${formatBytes(data.totalBytes)})</h4>
-      <p>카테고리별 디스크 사용량 현황입니다.</p>
+      <p>카테고리별 디스크 사용량 현황입니다.${data.indexing ? ' 색인 중이라 숫자가 계속 늘어날 수 있습니다.' : ''}</p>
     </div>
     <div class="storage-category-bar">
-      <div class="storage-seg seg-doc" style="width: ${(cats.documents.bytes / data.totalBytes * 100) || 0}%" title="문서"></div>
-      <div class="storage-seg seg-pic" style="width: ${(cats.pictures.bytes / data.totalBytes * 100) || 0}%" title="이미지"></div>
-      <div class="storage-seg seg-video" style="width: ${(cats.videos.bytes / data.totalBytes * 100) || 0}%" title="동영상"></div>
-      <div class="storage-seg seg-audio" style="width: ${(cats.audio.bytes / data.totalBytes * 100) || 0}%" title="오디오"></div>
-      <div class="storage-seg seg-zip" style="width: ${(cats.compressed.bytes / data.totalBytes * 100) || 0}%" title="압축"></div>
-      <div class="storage-seg seg-exe" style="width: ${(cats.executables.bytes / data.totalBytes * 100) || 0}%" title="실행"></div>
-      <div class="storage-seg seg-other" style="width: ${(cats.others.bytes / data.totalBytes * 100) || 0}%" title="기타"></div>
+      <div class="storage-seg seg-doc" style="width: ${share(cats.documents.bytes)}%" title="문서"></div>
+      <div class="storage-seg seg-pic" style="width: ${share(cats.pictures.bytes)}%" title="이미지"></div>
+      <div class="storage-seg seg-video" style="width: ${share(cats.videos.bytes)}%" title="동영상"></div>
+      <div class="storage-seg seg-audio" style="width: ${share(cats.audio.bytes)}%" title="오디오"></div>
+      <div class="storage-seg seg-zip" style="width: ${share(cats.compressed.bytes)}%" title="압축"></div>
+      <div class="storage-seg seg-exe" style="width: ${share(cats.executables.bytes)}%" title="실행"></div>
+      <div class="storage-seg seg-other" style="width: ${share(cats.others.bytes)}%" title="기타"></div>
     </div>
     <div class="storage-category-grid">
       ${Object.values(cats).map(c => `
         <div class="storage-category-card">
-          <div class="storage-category-label">${c.label}</div>
+          <div class="storage-category-label">${escapeHtml(c.label)}</div>
           <div class="storage-category-size">${formatBytes(c.bytes)}</div>
           <div class="storage-category-count">${c.count.toLocaleString()}개 파일</div>
         </div>
@@ -1781,23 +1899,42 @@ document.getElementById('tabStorageOverview').addEventListener('click', (e) => {
 document.getElementById('tabDuplicates').addEventListener('click', async (e) => {
   setStorageTabActive(e.target);
   const storageBody = document.getElementById('storageBody');
-  storageBody.innerHTML = '<div class="storage-empty">중복 파일을 확인하고 있습니다…</div>';
+  storageBody.innerHTML = '<div class="storage-empty">크기가 같은 파일의 내용을 비교하고 있습니다… (최대 20초)</div>';
 
-  const res = await window.dawithAPI.findDuplicates({ minSize: 10240 }); // > 10KB
-  if (res.groups.length === 0) {
-    storageBody.innerHTML = '<div class="storage-empty storage-empty-success">중복 파일이 없습니다.</div>';
+  let res;
+  try {
+    // 1 MB and up: small files barely matter for space and would mean many more reads.
+    res = await window.dawithAPI.findDuplicates({ minSize: 1024 * 1024 });
+  } catch (error) {
+    res = { success: false, error: String((error && error.message) || error) };
+  }
+  if (!document.getElementById('tabDuplicates').classList.contains('active')) return;
+  const error = storageError(res, '중복 파일을 확인하지 못했습니다.');
+  if (error || !Array.isArray(res.groups)) {
+    storageBody.innerHTML = `<div class="storage-empty">${escapeHtml(error || '중복 파일을 확인하지 못했습니다.')}</div>`;
     return;
   }
+  const partialNote = res.partial
+    ? `<p class="duplicate-note">시간 제한으로 절약 효과가 큰 후보 ${res.checkedGroups.toLocaleString()}/${res.candidateGroups.toLocaleString()}개 묶음까지만 확인했습니다.</p>`
+    : '';
+  if (res.groups.length === 0) {
+    storageBody.innerHTML = `<div class="storage-empty storage-empty-success">1MB 이상 중복 파일이 없습니다.</div>${partialNote}`;
+    return;
+  }
+  const totalGroups = res.totalGroups || res.groups.length;
+  const shownNote = totalGroups > res.groups.length ? ` 절약 효과가 큰 ${res.groups.length}개 묶음만 표시합니다.` : '';
 
   storageBody.innerHTML = `
     <div class="duplicate-summary">
-      발견된 중복 그룹: <strong>${res.groups.length}개</strong> · 절약 가능한 공간: <strong>${formatBytes(res.totalWastedBytes)}</strong>
+      발견된 중복 그룹: <strong>${totalGroups.toLocaleString()}개</strong> · 절약 가능한 공간: <strong>${formatBytes(res.totalWastedBytes)}</strong>
     </div>
+    <p class="duplicate-note">1MB 이상 파일 중 크기와 내용이 같은 파일입니다. 16MB가 넘는 파일은 처음·중간·끝 부분을 비교합니다.${shownNote}</p>
+    ${partialNote}
     <div class="duplicate-list">
       ${res.groups.map(grp => `
         <div class="duplicate-group">
           <div class="duplicate-group-heading">
-            <span>${grp.items[0].name} (${formatBytes(grp.size)})</span>
+            <span>${escapeHtml(grp.items[0].name)} (${formatBytes(grp.size)})</span>
             <span class="duplicate-count">${grp.items.length}개 중복</span>
           </div>
           ${grp.items.map(it => `
@@ -1817,25 +1954,40 @@ document.getElementById('tabDuplicates').addEventListener('click', async (e) => 
 
 document.getElementById('tabLargestFiles').addEventListener('click', async (e) => {
   setStorageTabActive(e.target);
-  const data = await window.dawithAPI.getStorageAnalysis();
   const storageBody = document.getElementById('storageBody');
+  let data;
+  try {
+    data = await getStorageSnapshot();
+  } catch (error) {
+    data = { success: false, error: String((error && error.message) || error) };
+  }
+  const error = storageError(data, '색인이 아직 준비되지 않았습니다.');
+  if (error || !Array.isArray(data.topLargest)) {
+    storageSnapshot = null;
+    storageBody.innerHTML = `<div class="storage-empty">${escapeHtml(error || '파일 목록을 가져오지 못했습니다.')}</div>`;
+    return;
+  }
   storageBody.innerHTML = `
     <div style="max-height:400px; overflow-y:auto;">
       <table class="syntax-table">
-        <thead><tr><th>순위</th><th>파일명</th><th>크기</th><th>경로</th></tr></thead>
+        <thead><tr><th>순위</th><th>파일명</th><th>크기</th><th>경로</th><th></th></tr></thead>
         <tbody>
           ${data.topLargest.map((f, i) => `
             <tr>
               <td>#${i + 1}</td>
-              <td style="font-weight:600; color:#38bdf8;">${f.name}</td>
+              <td style="font-weight:600; color:#38bdf8;">${escapeHtml(f.name)}</td>
               <td style="color:#f59e0b; font-weight:bold;">${formatBytes(f.size)}</td>
-              <td style="color:#64748b; font-size:11px;">${f.path}</td>
+              <td style="color:#64748b; font-size:11px;">${escapeHtml(f.path)}</td>
+              <td><button class="btn btn-sm btn-ghost" type="button" data-open-largest-folder="${escapeHtml(getFullPath(f))}">위치</button></td>
             </tr>
           `).join('')}
         </tbody>
       </table>
     </div>
   `;
+  storageBody.querySelectorAll('[data-open-largest-folder]').forEach(button => {
+    button.addEventListener('click', () => window.dawithAPI.openFolder(button.dataset.openLargestFolder));
+  });
 });
 
 function setStorageTabActive(btn) {

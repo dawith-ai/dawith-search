@@ -1045,11 +1045,43 @@ body.dark-theme .search-target-summary.is-scoped {
   background: var(--bg-hover);
 }
 
-.col-name { flex: 3; min-width: 250px; }
-.col-path { flex: 4; min-width: 300px; }
-.col-size { width: 90px; text-align: right; justify-content: flex-end; }
-.col-mtime { width: 140px; }
-.col-ext { width: 70px; }
+.results-container {
+  --col-name-w: 420px;
+  --col-size-w: 90px;
+  --col-mtime-w: 140px;
+  --col-ext-w: 70px;
+}
+/* Name keeps a fixed, user-draggable width; path takes whatever is left. */
+.col-name { flex: 0 0 var(--col-name-w); min-width: 0; }
+.col-path { flex: 1 1 0; min-width: 160px; }
+.col-size { flex: 0 0 var(--col-size-w); text-align: right; justify-content: flex-end; }
+.col-mtime { flex: 0 0 var(--col-mtime-w); }
+.col-ext { flex: 0 0 var(--col-ext-w); }
+
+.th { position: relative; }
+.col-resizer {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  bottom: 0;
+  width: 9px;
+  z-index: 2;
+  cursor: col-resize;
+}
+.col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 4px;
+  width: 1px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.col-resizer:hover::after,
+body.col-resizing .col-resizer.dragging::after { background: var(--accent); width: 2px; }
+body.col-resizing,
+body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
 .col-actions { width: 128px; gap: 6px; text-align: center; justify-content: center; overflow: visible; text-overflow: clip; }
 
 .table-body {
@@ -1124,10 +1156,17 @@ body.dark-theme .search-target-summary.is-scoped {
 .row-star {
   cursor: pointer;
   color: var(--text-dim);
+  opacity: 0.55;
+  font-size: 14px;
+  line-height: 1;
+  font-variant-emoji: text;
 }
+
+.row-star:hover { opacity: 1; color: #eab308; }
 
 .row-star.active {
   color: #eab308;
+  opacity: 1;
 }
 
 .highlight {
@@ -1648,6 +1687,13 @@ kbd {
 
 .duplicate-summary strong { color: var(--text-main); }
 
+.duplicate-note {
+  margin: -6px 0 12px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .duplicate-list {
   max-height: 350px;
   display: flex;
@@ -1956,7 +2002,6 @@ input:focus-visible,
     display: none;
   }
 
-  .col-name { min-width: 190px; }
   .col-path { min-width: 180px; }
 
   .search-helper { justify-content: flex-start; }

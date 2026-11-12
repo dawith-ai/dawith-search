@@ -1806,6 +1806,227 @@ async fn convert_files(file_paths: Vec<String>, operation: String, destination_d
     })
 }
 
+// Storage overview and duplicate finder work on the in-memory index, so they
+// never rescan the disk; only duplicate candidates of equal size are read.
+const STORAGE_CATEGORIES: [(&str, &str, &str); 6] = [
+    ("documents", "문서", "doc"),
+    ("pictures", "이미지/사진", "pic"),
+    ("videos", "동영상", "video"),
+    ("audio", "오디오", "audio"),
+    ("compressed", "압축 파일", "zip"),
+    ("executables", "실행 파일", "exe"),
+];
+
+fn storage_category(extension: &str) -> usize {
+    STORAGE_CATEGORIES
+        .iter()
+        .position(|(_, _, category)| category_extensions(category).contains(&extension))
+        .unwrap_or(STORAGE_CATEGORIES.len())
+}
+
+fn storage_analysis(state: &AppState) -> Result<Value, String> {
+    let guard = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
+    let index = &guard.index;
+    let mut counts = [0u64; STORAGE_CATEGORIES.len() + 1];
+    let mut bytes = [0u64; STORAGE_CATEGORIES.len() + 1];
+    let (mut total_files, mut total_folders, mut total_bytes) = (0u64, 0u64, 0u64);
+    let mut files: Vec<&fastindex::Entry> = Vec::new();
+    for entry in index.entries.iter().filter(|entry| entry.alive) {
+        if entry.is_dir {
+            total_folders += 1;
+            continue;
+        }
+        total_files += 1;
+        total_bytes += entry.size;
+        let category = storage_category(fastindex::entry_extension(entry));
+        counts[category] += 1;
+        bytes[category] += entry.size;
+        files.push(entry);
+    }
+    let top = 50.min(files.len());
+    if top > 0 && files.len() > top {
+        files.select_nth_unstable_by(top - 1, |a, b| b.size.cmp(&a.size));
+    }
+    files.truncate(top);
+    files.sort_by(|a, b| b.size.cmp(&a.size));
+
+    let mut categories = serde_json::Map::new();
+    for (position, (key, label, _)) in STORAGE_CATEGORIES.iter().enumerate() {
+        categories.insert(key.to_string(), json!({ "count": counts[position], "bytes": bytes[position], "label": label }));
+    }
+    let other = STORAGE_CATEGORIES.len();
+    categories.insert("others".to_string(), json!({ "count": counts[other], "bytes": bytes[other], "label": "기타" }));
+    Ok(json!({
+        "success": true,
+        "indexing": guard.indexing,
+        "totalBytes": total_bytes,
+        "totalFiles": total_files,
+        "totalFolders": total_folders,
+        "categories": categories,
+        "topLargest": files.iter().map(|entry| entry_record(index, entry)).collect::<Vec<_>>()
+    }))
+}
+
+#[tauri::command]
+async fn get_storage_analysis(app: AppHandle) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || storage_analysis(&app.state::<AppState>()))
+        .await
+        .map_err(|error| error.to_string())?
+}
+
+static DUPLICATE_SCAN_RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn hash_hex(digest: &[u8]) -> String {
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Hash of the first 64 KB: cheap first pass that rules out most look-alikes.
+fn head_hash(path: &Path) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut file = fs::File::open(path).ok()?;
+    let mut filled = 0;
+    while filled < buffer.len() {
+        match file.read(&mut buffer[filled..]) {
+            Ok(0) => break,
+            Ok(read) => filled += read,
+            Err(_) => return None,
+        }
+    }
+    Some(hash_hex(&Sha256::digest(&buffer[..filled])))
+}
+
+/// Content fingerprint: the whole file up to 16 MB, otherwise 1 MB from the
+/// start, middle and end, so multi-GB videos don't have to be read in full.
+fn content_hash(path: &Path, size: u64) -> Option<String> {
+    use sha2::{Digest, Sha256};
+    use std::io::{Seek, SeekFrom};
+    const CHUNK: u64 = 1024 * 1024;
+    let mut file = fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    if size <= 16 * CHUNK {
+        std::io::copy(&mut file, &mut hasher).ok()?;
+    } else {
+        let mut buffer = vec![0u8; CHUNK as usize];
+        for offset in [0, size / 2 - CHUNK / 2, size - CHUNK] {
+            file.seek(SeekFrom::Start(offset)).ok()?;
+            file.read_exact(&mut buffer).ok()?;
+            hasher.update(&buffer);
+        }
+    }
+    Some(hash_hex(&hasher.finalize()))
+}
+
+fn duplicate_scan(state: &AppState, min_size: u64) -> Result<Value, String> {
+    use rayon::prelude::*;
+    const TIME_BUDGET: std::time::Duration = std::time::Duration::from_secs(20);
+    const MAX_CANDIDATE_GROUPS: usize = 5000;
+    const MAX_RESULT_GROUPS: usize = 200;
+    let started = std::time::Instant::now();
+
+    // Equal size is required for equal content. Collect those groups and let
+    // go of the index before any disk access.
+    let candidates: Vec<(u64, Vec<(PathBuf, Value)>)> = {
+        let guard = state.local_index.lock().map_err(|_| "로컬 색인 잠금에 실패했습니다.")?;
+        let index = &guard.index;
+        let mut by_size: HashMap<u64, Vec<usize>> = HashMap::new();
+        for (position, entry) in index.entries.iter().enumerate() {
+            if entry.alive && !entry.is_dir && entry.size >= min_size {
+                by_size.entry(entry.size).or_default().push(position);
+            }
+        }
+        let mut groups: Vec<(u64, Vec<usize>)> = by_size.into_iter().filter(|(_, list)| list.len() >= 2).collect();
+        // Biggest possible savings first, so a time-limited run finds what matters.
+        groups.sort_by_key(|(size, list)| std::cmp::Reverse(size.saturating_mul(list.len() as u64 - 1)));
+        groups.truncate(MAX_CANDIDATE_GROUPS);
+        groups
+            .into_iter()
+            .map(|(size, list)| {
+                let items = list
+                    .into_iter()
+                    .map(|position| {
+                        let entry = &index.entries[position];
+                        (PathBuf::from(index.full_path(entry)), entry_record(index, entry))
+                    })
+                    .collect();
+                (size, items)
+            })
+            .collect()
+    };
+    let candidate_groups = candidates.len();
+
+    // A small dedicated pool keeps searching responsive while files are read.
+    let pool = rayon::ThreadPoolBuilder::new().num_threads(4).build().map_err(|error| error.to_string())?;
+    let mut groups: Vec<Value> = Vec::new();
+    let mut total_wasted = 0u64;
+    let mut checked_groups = 0usize;
+    for (size, items) in candidates {
+        if started.elapsed() > TIME_BUDGET {
+            break;
+        }
+        checked_groups += 1;
+        let heads: Vec<Option<String>> = pool.install(|| items.par_iter().map(|(path, _)| head_hash(path)).collect());
+        let mut by_head: HashMap<String, Vec<usize>> = HashMap::new();
+        for (position, head) in heads.into_iter().enumerate() {
+            if let Some(head) = head {
+                by_head.entry(head).or_default().push(position);
+            }
+        }
+        for same_head in by_head.into_values().filter(|list| list.len() >= 2) {
+            let hashes: Vec<Option<String>> = pool.install(|| same_head.par_iter().map(|position| content_hash(&items[*position].0, size)).collect());
+            let mut by_content: HashMap<String, Vec<usize>> = HashMap::new();
+            for (position, hash) in same_head.iter().zip(hashes) {
+                if let Some(hash) = hash {
+                    by_content.entry(hash).or_default().push(*position);
+                }
+            }
+            for (hash, list) in by_content.into_iter().filter(|(_, list)| list.len() >= 2) {
+                let wasted = size * (list.len() as u64 - 1);
+                total_wasted += wasted;
+                groups.push(json!({
+                    "hash": hash,
+                    "size": size,
+                    "wastedBytes": wasted,
+                    "items": list.iter().map(|position| items[*position].1.clone()).collect::<Vec<_>>()
+                }));
+            }
+        }
+    }
+    groups.sort_by_key(|group| std::cmp::Reverse(group["wastedBytes"].as_u64().unwrap_or(0)));
+    let total_groups = groups.len();
+    let total_duplicates: usize = groups.iter().map(|group| group["items"].as_array().map(Vec::len).unwrap_or(0)).sum();
+    groups.truncate(MAX_RESULT_GROUPS);
+    Ok(json!({
+        "success": true,
+        "groups": groups,
+        "totalGroups": total_groups,
+        "totalDuplicates": total_duplicates,
+        "totalWastedBytes": total_wasted,
+        "minSize": min_size,
+        "checkedGroups": checked_groups,
+        "candidateGroups": candidate_groups,
+        "partial": checked_groups < candidate_groups,
+        "elapsedMs": started.elapsed().as_millis() as u64
+    }))
+}
+
+#[tauri::command]
+async fn find_duplicates(app: AppHandle, options: Option<Value>) -> Result<Value, String> {
+    use std::sync::atomic::Ordering;
+    let min_size = options
+        .as_ref()
+        .and_then(|value| value.get("minSize"))
+        .and_then(Value::as_u64)
+        .unwrap_or(1024 * 1024)
+        .max(1);
+    if DUPLICATE_SCAN_RUNNING.swap(true, Ordering::SeqCst) {
+        return Ok(json!({ "success": false, "error": "중복 파일을 이미 확인하고 있습니다. 잠시 후 다시 시도하세요." }));
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || duplicate_scan(&app.state::<AppState>(), min_size)).await;
+    DUPLICATE_SCAN_RUNNING.store(false, Ordering::SeqCst);
+    result.map_err(|error| error.to_string())?
+}
+
 #[tauri::command]
 fn choose_root() -> Value {
     match FileDialog::new().set_title("검색할 폴더 선택").pick_folder() {
@@ -2290,6 +2511,8 @@ fn main() {
             delete_file,
             rename_file,
             get_conversion_options,
+            get_storage_analysis,
+            find_duplicates,
             convert_files,
             reindex,
             window_minimize,
@@ -2315,6 +2538,47 @@ mod tests {
         let child = root.join("Users").join("dawith").join("Desktop").join("report.pdf");
         let config = json!({ "roots": [root.to_string_lossy()] });
         assert!(is_allowed_path(&child, &config));
+    }
+
+    #[test]
+    fn storage_and_duplicates_use_index_and_content() {
+        let dir = std::env::temp_dir().join(format!("dawith-dupe-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let small: Vec<u8> = (0..2 * 1024 * 1024).map(|i| (i % 251) as u8).collect();
+        let mut small_tail = small.clone();
+        *small_tail.last_mut().unwrap() ^= 1;
+        let large: Vec<u8> = (0..20 * 1024 * 1024).map(|i| (i % 253) as u8).collect();
+        let files: Vec<(&str, &[u8])> = vec![
+            ("a.pdf", &small), ("b.pdf", &small), ("c.pdf", &small_tail),
+            ("movie1.mp4", &large), ("movie2.mp4", &large), ("tiny.txt", b"hello"),
+        ];
+        let mut index = fastindex::FastIndex::default();
+        let folder = index.add_dir(&dir.to_string_lossy());
+        for (name, data) in &files {
+            fs::write(dir.join(name), data).unwrap();
+            index.push(folder, name, data.len() as u64, 0, false);
+        }
+        let state = AppState {
+            config: Mutex::new(json!({})),
+            data_dir: dir.clone(),
+            local_index: Mutex::new(LocalIndex { index, ..Default::default() }),
+        };
+
+        let storage = storage_analysis(&state).unwrap();
+        assert_eq!(storage["totalFiles"], 6);
+        assert_eq!(storage["categories"]["documents"]["count"], 4);
+        assert_eq!(storage["categories"]["videos"]["count"], 2);
+        assert_eq!(storage["topLargest"][0]["name"], "movie1.mp4");
+
+        let result = duplicate_scan(&state, 1024 * 1024).unwrap();
+        let groups = result["groups"].as_array().unwrap();
+        assert_eq!(groups.len(), 2, "{result}");
+        assert_eq!(groups[0]["size"], 20 * 1024 * 1024);
+        let names: Vec<&str> = groups[1]["items"].as_array().unwrap().iter().map(|item| item["name"].as_str().unwrap()).collect();
+        assert!(names.contains(&"a.pdf") && names.contains(&"b.pdf") && !names.contains(&"c.pdf"));
+        assert_eq!(result["partial"], false);
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]

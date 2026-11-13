@@ -374,7 +374,7 @@ html { scroll-padding-top: 76px; }
 .showcase-copy h3 { margin: 10px 0 8px; color: #20382c; font-size: 22px; letter-spacing: -.03em; }
 .showcase-copy p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.75; word-break: keep-all; }
 .showcase-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #fff4e5; color: #b54708; font-size: 12px; font-weight: 700; letter-spacing: 0; vertical-align: middle; }
-.showcase-media { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 14px 34px rgba(20, 50, 35, .10); }
+.showcase-media { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 14px 34px rgba(0, 0, 0, .10); }
 .showcase-media img { display: block; width: 100%; height: auto; }
 @media (max-width: 980px) {
   .download-grid:has(> :nth-child(3)) { grid-template-columns: 1fr; }
@@ -390,7 +390,7 @@ html { scroll-padding-top: 76px; }
 .ss-step { min-width: 0; }
 .ss-step > p { margin: 10px 2px 0; color: var(--muted); font-size: 15px; line-height: 1.6; word-break: keep-all; }
 .ss-step > p b { color: #20382c; }
-.ss-window { position: relative; display: flex; flex-direction: column; min-height: 172px; padding: 16px 16px 14px; border-radius: 4px; background: #0b5ea8; color: #fff; box-shadow: 0 10px 24px rgba(11, 94, 168, .18); }
+.ss-window { position: relative; display: flex; flex-direction: column; min-height: 172px; padding: 16px 16px 14px; border-radius: 4px; background: #0b5ea8; color: #fff; box-shadow: 0 10px 24px rgba(0, 0, 0, .18); }
 .ss-window strong { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .ss-window p { margin: 8px 0 0; color: rgba(255, 255, 255, .92); font-size: 12px; line-height: 1.5; }
 .ss-link { align-self: flex-start; margin-top: 8px; font-size: 12px; text-decoration: underline; }
@@ -437,8 +437,8 @@ html { scroll-padding-top: 76px; }
 .dl-header-inner .beta-badge { margin-right: auto; }
 
 /* Signature badge in the footer, linking to the Dawith AI page. */
-.signature-badge { display: inline-flex; flex: 0 0 auto; gap: 10px; align-items: center; margin-left: auto; padding: 9px 16px 9px 9px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: #20382c; box-shadow: 0 4px 14px rgba(20, 50, 35, .06); transition: border-color .16s, box-shadow .16s; }
-.signature-badge:hover { border-color: #bad7c3; box-shadow: 0 8px 22px rgba(20, 50, 35, .10); }
+.signature-badge { display: inline-flex; flex: 0 0 auto; gap: 10px; align-items: center; margin-left: auto; padding: 9px 16px 9px 9px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: #20382c; box-shadow: 0 4px 14px rgba(0, 0, 0, .06); transition: border-color .16s, box-shadow .16s; }
+.signature-badge:hover { border-color: #bad7c3; box-shadow: 0 8px 22px rgba(0, 0, 0, .10); }
 .signature-badge img { width: 40px; height: 40px; border-radius: 10px; object-fit: cover; }
 .signature-badge span { display: flex; flex-direction: column; line-height: 1.25; }
 .signature-badge small { color: var(--meta); font-size: 11px; }

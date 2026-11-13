@@ -165,20 +165,25 @@ impl FastIndex {
         self.search_sorted(terms, composing, SortKey::Relevance, false, limit, keep)
     }
 
-    /// 0 = the name starts with the first word, 1 = the word starts after a
-    /// space or punctuation, 2 = anywhere else.
-    fn rank(lower: &str, term: &str, pattern: Option<&Vec<QChar>>) -> u8 {
+    /// 0 = the name (without extension) is exactly the query, 1 = it starts
+    /// with the first word, 2 = the word starts after a space or punctuation,
+    /// 3 = anywhere else.
+    fn rank(lower: &str, term: &str, pattern: Option<&Vec<QChar>>, whole: &str) -> u8 {
+        let stem = lower.rsplit_once('.').map(|(stem, _)| stem).filter(|stem| !stem.is_empty()).unwrap_or(lower);
+        if !whole.is_empty() && (lower == whole || stem == whole) {
+            return 0;
+        }
         let start = match pattern {
             Some(pattern) => pattern_position(lower, pattern),
             None => lower.find(term).map(|byte| lower[..byte].chars().count()),
         };
         match start {
-            Some(0) => 0,
+            Some(0) => 1,
             Some(position) => match lower.chars().nth(position - 1) {
-                Some(c) if !c.is_alphanumeric() => 1,
-                _ => 2,
+                Some(c) if !c.is_alphanumeric() => 2,
+                _ => 3,
             },
-            None => 2,
+            None => 3,
         }
     }
 
@@ -206,20 +211,21 @@ impl FastIndex {
             .map(|(index, _)| index as u32)
             .collect();
         let total = hits.len();
-        // Better matches first, then by name (Everything sorts by name only).
+        // Better matches first, then the most recently modified, then by name.
+        let whole = terms.join(" ");
         let first_term = terms.first().map(String::as_str).unwrap_or("");
         let first_pattern = patterns.first().and_then(Option::as_ref);
         let ranks: HashMap<u32, u8> = if first_term.is_empty() || sort != SortKey::Relevance {
             HashMap::new()
         } else {
-            hits.par_iter().map(|hit| (*hit, Self::rank(&self.entries[*hit as usize].lower, first_term, first_pattern))).collect()
+            hits.par_iter().map(|hit| (*hit, Self::rank(&self.entries[*hit as usize].lower, first_term, first_pattern, &whole))).collect()
         };
         let by_name = |a: &u32, b: &u32| -> Ordering {
             let (ea, eb) = (&self.entries[*a as usize], &self.entries[*b as usize]);
             let ordering = match sort {
                 SortKey::Relevance => {
-                    let rank = |hit: &u32| ranks.get(hit).copied().unwrap_or(2);
-                    rank(a).cmp(&rank(b)).then_with(|| ea.lower.cmp(&eb.lower))
+                    let rank = |hit: &u32| ranks.get(hit).copied().unwrap_or(3);
+                    rank(a).cmp(&rank(b)).then_with(|| eb.mtime.cmp(&ea.mtime)).then_with(|| ea.lower.cmp(&eb.lower))
                 }
                 SortKey::Name => ea.lower.cmp(&eb.lower),
                 SortKey::Path => self.dir_of(ea).cmp(self.dir_of(eb)).then_with(|| ea.lower.cmp(&eb.lower)),
@@ -438,6 +444,26 @@ mod tests {
         // Only the top `limit` come back, still in the requested order.
         let (hits, total) = index.search_sorted(&["보고서".to_string()], false, SortKey::Size, true, 1, |_, _| true);
         assert_eq!((total, index.entries[hits[0] as usize].size), (3, 300));
+    }
+
+    #[test]
+    fn relevance_is_match_quality_then_newest() {
+        let mut index = FastIndex::default();
+        let dir = index.add_dir(r"C:Docs");
+        index.push(dir, "잘잇수다", 0, 100, true);
+        index.push(dir, "잘잇수다", 0, 300, true);
+        index.push(dir, "회의 잘잇.hwp", 1, 900, false);
+        index.push(dir, "잘잇.pdf", 1, 50, false);
+        index.push(dir, "프로젝트잘잇.txt", 1, 999, false);
+        let (hits, _) = index.search_typed(&["잘잇".to_string()], false, 10, |_, _| true);
+        let order: Vec<(String, u64)> = hits.iter().map(|i| (index.entries[*i as usize].name.to_string(), index.entries[*i as usize].mtime)).collect();
+        assert_eq!(order, vec![
+            ("잘잇.pdf".to_string(), 50),          // exact name
+            ("잘잇수다".to_string(), 300),         // starts with, newer first
+            ("잘잇수다".to_string(), 100),
+            ("회의 잘잇.hwp".to_string(), 900),    // word start
+            ("프로젝트잘잇.txt".to_string(), 999), // anywhere
+        ]);
     }
 
     #[test]

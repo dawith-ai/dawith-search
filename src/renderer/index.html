@@ -237,7 +237,7 @@
     <main class="results-container">
       <div class="table-header">
         <div class="th col-name" data-col="name">이름<span class="col-resizer" data-resize="name" title="드래그해 너비 조절 · 더블클릭하면 내용에 맞춤"></span></div>
-        <div class="th col-path" data-col="path">경로</div>
+        <div class="th col-path" data-col="path">경로<span class="col-resizer" data-resize="path" title="드래그해 너비 조절 · 더블클릭하면 내용에 맞춤"></span></div>
         <div class="th col-size" data-col="size">크기<span class="col-resizer" data-resize="size" title="드래그해 너비 조절 · 더블클릭하면 내용에 맞춤"></span></div>
         <div class="th col-mtime" data-col="mtime">수정 날짜<span class="col-resizer" data-resize="mtime" title="드래그해 너비 조절 · 더블클릭하면 내용에 맞춤"></span></div>
         <div class="th col-ext" data-col="ext">확장자<span class="col-resizer" data-resize="ext" title="드래그해 너비 조절 · 더블클릭하면 내용에 맞춤"></span></div>
@@ -502,13 +502,39 @@
         <button class="btn-close" id="btnCloseContentIndexModal" type="button" aria-label="닫기">✕</button>
       </div>
       <div class="modal-body">
+        <div class="content-warning-alert" role="alert">
+          <span class="content-warning-alert-icon" aria-hidden="true">!</span>
+          <p><strong>켜면 문서 내용이 이 PC에 저장됩니다.</strong>아래 주의 사항을 꼭 읽고, 민감한 문서가 있는 폴더는 넣지 마세요.</p>
+        </div>
+        <h4 class="content-warning-heading is-caution">주의하세요</h4>
         <ul class="content-warning-list">
-          <li><strong>문서 내용이 이 PC에 저장됩니다.</strong> 아래 폴더의 문서 글자를 읽어 사용자 폴더의 <code>.dawith-search</code>에 저장합니다. 인터넷으로는 보내지 않습니다.</li>
-          <li><strong>이 PC를 함께 쓰는 사람도 볼 수 있습니다.</strong> 저장된 내용은 따로 암호화되지 않습니다. 개인정보·인사·회계 등 민감한 문서가 있는 폴더는 넣지 마세요.</li>
-          <li><strong>암호·DRM 문서는 읽지 않습니다.</strong> 암호가 걸린 문서, 한글 배포용·보안 문서, 회사 DRM이 적용된 문서는 내용을 읽지 않고 건너뜁니다.</li>
-          <li><strong>회사·기관 PC라면 보안 담당자에게 먼저 확인하세요.</strong> 문서 내용을 따로 저장하는 것이 내부 보안 규정에 맞는지 확인이 필요합니다.</li>
-          <li><strong>처음에는 시간이 걸립니다.</strong> 문서가 많을수록, 특히 공유폴더는 오래 걸리고 문서 양에 따라 수십~수백 MB를 씁니다.</li>
-          <li><strong>언제든 끌 수 있습니다.</strong> 끄면 저장된 내용은 바로 지워집니다.</li>
+          <li class="is-caution">
+            <strong>문서 내용이 이 PC에 저장됩니다</strong>
+            <p>아래 폴더의 문서 글자를 읽어 사용자 폴더의 <code>.dawith-search</code>에 저장합니다. 인터넷으로는 보내지 않습니다.</p>
+          </li>
+          <li class="is-caution">
+            <strong>이 PC를 함께 쓰는 사람도 볼 수 있습니다</strong>
+            <p>저장된 내용은 따로 암호화되지 않습니다. 개인정보·인사·회계 등 민감한 문서가 있는 폴더는 넣지 마세요.</p>
+          </li>
+          <li class="is-caution">
+            <strong>회사·기관 PC라면 보안 담당자에게 먼저 확인하세요</strong>
+            <p>문서 내용을 따로 저장하는 것이 내부 보안 규정에 맞는지 확인이 필요합니다.</p>
+          </li>
+        </ul>
+        <h4 class="content-warning-heading">알아 두세요</h4>
+        <ul class="content-warning-list">
+          <li>
+            <strong>암호·DRM 문서는 읽지 않습니다</strong>
+            <p>암호가 걸린 문서, 한글 배포용·보안 문서, 회사 DRM이 적용된 문서는 내용을 읽지 않고 건너뜁니다.</p>
+          </li>
+          <li>
+            <strong>처음에는 시간이 걸립니다</strong>
+            <p>문서가 많을수록, 특히 공유폴더는 오래 걸리고 문서 양에 따라 수십~수백 MB를 씁니다.</p>
+          </li>
+          <li>
+            <strong>언제든 끌 수 있습니다</strong>
+            <p>끄면 저장된 내용은 바로 지워집니다.</p>
+          </li>
         </ul>
         <div class="content-warning-roots"><span>읽을 폴더</span><code id="contentIndexModalRoots"></code><small>켠 뒤 설정에서 폴더를 더하거나 뺄 수 있습니다.</small></div>
         <label class="content-warning-check"><input type="checkbox" id="contentIndexAgree"> 위 내용을 모두 읽었고, 고른 폴더의 문서 내용을 이 PC에 저장하는 데 동의합니다.</label>

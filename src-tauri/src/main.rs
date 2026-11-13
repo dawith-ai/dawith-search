@@ -1360,6 +1360,8 @@ fn search_local_index(
                 fastindex::SortKey::Modified => ea.mtime.cmp(&eb.mtime),
                 fastindex::SortKey::Path => index.dir_of(ea).cmp(index.dir_of(eb)),
                 fastindex::SortKey::Extension => fastindex::entry_extension(ea).cmp(fastindex::entry_extension(eb)),
+                // Default order: most recently modified first.
+                fastindex::SortKey::Relevance => eb.mtime.cmp(&ea.mtime),
                 _ => std::cmp::Ordering::Equal,
             }
             .then_with(|| ea.lower.cmp(&eb.lower));

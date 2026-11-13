@@ -1047,13 +1047,20 @@ body.dark-theme .search-target-summary.is-scoped {
 
 .results-container {
   --col-name-w: 420px;
+  --col-path-w: 160px;
   --col-size-w: 90px;
   --col-mtime-w: 140px;
   --col-ext-w: 70px;
+  /* Columns that don't fit scroll sideways, header and rows together. */
+  overflow-x: auto;
+  overflow-y: hidden;
 }
-/* Name keeps a fixed, user-draggable width; path takes whatever is left. */
+.results-container > .table-header,
+.results-container > .table-body { min-width: var(--table-min-w, 0); }
+body.ui-simple .results-container > .table-body { min-width: 0; }
+/* Every column keeps its user-draggable width; path also takes spare space. */
 .col-name { flex: 0 0 var(--col-name-w); min-width: 0; }
-.col-path { flex: 1 1 0; min-width: 160px; }
+.col-path { flex: 1 0 var(--col-path-w); min-width: 0; }
 .col-size { flex: 0 0 var(--col-size-w); text-align: right; justify-content: flex-end; }
 .col-mtime { flex: 0 0 var(--col-mtime-w); }
 .col-ext { flex: 0 0 var(--col-ext-w); }
@@ -1082,7 +1089,7 @@ body.dark-theme .search-target-summary.is-scoped {
 body.col-resizing .col-resizer.dragging::after { background: var(--accent); width: 2px; }
 body.col-resizing,
 body.col-resizing * { cursor: col-resize !important; user-select: none !important; }
-.col-actions { width: 128px; gap: 6px; text-align: center; justify-content: center; overflow: visible; text-overflow: clip; }
+.col-actions { flex: 0 0 128px; width: 128px; gap: 6px; text-align: center; justify-content: center; overflow: visible; text-overflow: clip; }
 
 .table-body {
   flex: 1;
@@ -1149,9 +1156,9 @@ body.col-resizing * { cursor: col-resize !important; user-select: none !importan
   color: var(--text-dim);
 }
 
-.td.col-path:hover {
-  text-decoration: underline;
-}
+/* The path opens its folder on click, like a link. */
+.td.col-path .path-link { cursor: pointer; }
+.td.col-path .path-link:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
 
 .row-star {
   cursor: pointer;
@@ -2288,9 +2295,6 @@ body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2));
 /* Body search consent dialog: above the settings window. */
 #contentIndexModal { z-index: 1500; }
 .content-index-dialog { width: min(560px, calc(100vw - 32px)); }
-.content-warning-list { margin: 0 0 14px; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.55; color: var(--text-main); }
-.content-warning-list strong { color: var(--text-main); }
-.content-warning-list code { font-size: 12px; }
 .content-warning-roots { display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-th); font-size: 12px; }
 .content-warning-roots span { color: var(--text-muted); font-weight: 700; }
 .content-warning-roots code { white-space: pre-wrap; word-break: break-all; }
@@ -2299,3 +2303,40 @@ body.ui-simple .status-bar { padding-left: max(24px, calc((100vw - 860px) / 2));
 .content-warning-check input { margin-top: 3px; }
 .content-warning-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .content-warning-actions .btn[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* File type badges: plain colored labels, not vendor logos. */
+.type-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 27px; height: 16px; padding: 0 3px; border-radius: 4px; color: #fff; font-size: 8.5px; font-weight: 800; letter-spacing: .2px; line-height: 1; flex: 0 0 auto; font-family: "Segoe UI", system-ui, sans-serif; }
+.type-badge.type-xls { background: #1d7a46; }
+.type-badge.type-ppt { background: #c8501e; }
+.type-badge.type-doc { background: #2b5fb8; }
+.type-badge.type-hwp { background: #1f8fbf; }
+.type-badge.type-pdf { background: #c62f2f; }
+.type-badge.type-txt { background: #6b7280; }
+.type-badge.type-zip { background: #8a6d1f; }
+body.ui-simple .table-row .type-badge { min-width: 32px; height: 19px; font-size: 10px; }
+
+/* Update notes: bold title line, description paragraph under it. */
+.update-notes ul { display: grid; gap: 10px; }
+.update-note-title { display: block; font-weight: 800; color: var(--text-main); }
+.update-note-detail { display: block; color: var(--text-muted); line-height: 1.6; }
+.update-notes li strong { display: inline; margin: 0; }
+
+/* Consent dialog: red for what needs care, grey for what to know. */
+.content-index-dialog .modal-header h3::before { content: "⚠ "; color: #d92d20; }
+.content-warning-alert { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 14px; padding: 11px 13px; border: 1px solid #f4b4ae; border-radius: 10px; background: #fef3f2; color: #912018; }
+.content-warning-alert p { margin: 0; font-size: 13px; line-height: 1.55; }
+.content-warning-alert strong { display: block; margin-bottom: 2px; color: #b42318; font-size: 14px; }
+.content-warning-alert-icon { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; background: #d92d20; color: #fff; font-weight: 900; font-size: 14px; }
+.content-warning-heading { margin: 14px 0 6px; color: var(--text-muted); font-size: 12px; font-weight: 800; letter-spacing: .3px; }
+.content-warning-heading.is-caution { margin-top: 0; color: #b42318; }
+.content-warning-list { list-style: none; margin: 0 0 4px; padding: 0; display: grid; gap: 8px; }
+.content-warning-list li { padding: 8px 12px; border-left: 3px solid var(--border-color); border-radius: 0 8px 8px 0; background: var(--bg-th); }
+.content-warning-list li strong { display: block; color: var(--text-main); font-size: 13px; }
+.content-warning-list li p { margin: 3px 0 0; color: var(--text-muted); font-size: 12.5px; line-height: 1.55; }
+.content-warning-list li code { font-size: 12px; }
+.content-warning-list li.is-caution { border-left-color: #d92d20; background: #fff7f6; }
+.content-warning-list li.is-caution strong { color: #b42318; }
+.content-warning-roots { margin-top: 14px; }
+.content-warning-check { padding: 10px 12px; border: 1px solid #f4b4ae; border-radius: 10px; background: #fff7f6; }
+.content-warning-check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.content-index-dialog .modal-body { max-height: min(78vh, 720px); overflow-y: auto; }

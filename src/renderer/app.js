@@ -112,6 +112,24 @@ function getFileIcon(ext, isDir) {
   return '📄';
 }
 
+// Office and document types get a colored text badge (our own design, not
+// the vendors' logos) so Excel, PowerPoint, HWP and PDF stand out at a glance.
+const FILE_BADGES = {
+  xls: ['XLS', 'xls'], xlsx: ['XLS', 'xls'], xlsm: ['XLS', 'xls'], csv: ['CSV', 'xls'],
+  ppt: ['PPT', 'ppt'], pptx: ['PPT', 'ppt'],
+  doc: ['DOC', 'doc'], docx: ['DOC', 'doc'],
+  hwp: ['HWP', 'hwp'], hwpx: ['HWP', 'hwp'],
+  pdf: ['PDF', 'pdf'],
+  txt: ['TXT', 'txt'], md: ['TXT', 'txt'],
+  zip: ['ZIP', 'zip'], '7z': ['ZIP', 'zip'], rar: ['ZIP', 'zip'],
+};
+
+function fileIconHtml(ext, isDir) {
+  const badge = !isDir && FILE_BADGES[(ext || '').toLowerCase()];
+  if (!badge) return getFileIcon(ext, isDir);
+  return `<span class="type-badge type-${badge[1]}" aria-hidden="true">${badge[0]}</span>`;
+}
+
 function highlightMatch(text, query) {
   if (!query || !text) return escapeHtml(text);
   const terms = query.replace(/[|*?!():]/g, ' ').split(/\s+/).filter(t => t.length > 0 && !t.includes(':'));
@@ -293,11 +311,40 @@ const updateConfirmButton = document.getElementById('btnUpdateConfirm');
 let updateConfirmAction = null;
 let updateBusy = false;
 
+// Release notes come as "제목 — 설명" lines (plain text, so older app
+// versions show them cleanly too). Show the title in bold on its own line
+// with the description under it; **bold** and `code` marks are honored.
+function appendInlineMarkup(parent, text) {
+  for (const part of String(text).split(/(\*\*[^*]+\*\*|`[^`]+`)/)) {
+    if (!part) continue;
+    if (part.startsWith('**') && part.endsWith('**')) parent.appendChild(Object.assign(document.createElement('strong'), { textContent: part.slice(2, -2) }));
+    else if (part.startsWith('`') && part.endsWith('`')) parent.appendChild(Object.assign(document.createElement('code'), { textContent: part.slice(1, -1) }));
+    else parent.appendChild(document.createTextNode(part));
+  }
+}
+
+function renderUpdateNote(line) {
+  const item = document.createElement('li');
+  const split = line.indexOf(' — ');
+  if (split > 0 && split <= 30) {
+    const title = document.createElement('span');
+    title.className = 'update-note-title';
+    appendInlineMarkup(title, line.slice(0, split).replace(/\*\*/g, ''));
+    const detail = document.createElement('span');
+    detail.className = 'update-note-detail';
+    appendInlineMarkup(detail, line.slice(split + 3));
+    item.append(title, detail);
+  } else {
+    appendInlineMarkup(item, line);
+  }
+  return item;
+}
+
 function showUpdateWindow({ title, body = '', notes = '', percent = null, working = false, count = '', where = '', confirm = '', later = '', error = false, onConfirm = null }) {
   if (!updateModal) return;
   const noteLines = String(notes || '').split('\n').map(line => line.trim()).filter(Boolean);
   const list = document.getElementById('updateNotesList');
-  list.replaceChildren(...noteLines.map(line => Object.assign(document.createElement('li'), { textContent: line })));
+  list.replaceChildren(...noteLines.map(renderUpdateNote));
   document.getElementById('updateNotes').hidden = noteLines.length === 0;
   document.getElementById('updateTitle').textContent = title;
   document.getElementById('updateBody').textContent = body;
@@ -857,7 +904,7 @@ function renderResults(items, currentQuery) {
     row.className = `table-row ${selectedIndexes.has(idx) ? 'selected' : ''}`;
     row.dataset.index = idx;
 
-    const icon = getFileIcon(item.ext, item.isDir);
+    const icon = fileIconHtml(item.ext, item.isDir);
     const starActive = item.starred ? 'active' : '';
 
     row.innerHTML = `
@@ -867,7 +914,7 @@ function renderResults(items, currentQuery) {
         <span class="file-name-text">${highlightMatch(item.name, currentQuery)}</span>
         ${item.snippet ? `<span class="content-snippet" title="${escapeHtml(item.snippet)}">${highlightMatch(item.snippet, currentQuery)}</span>` : ''}
       </div>
-      <div class="td col-path" title="${escapeHtml(item.path)}">${escapeHtml(item.path)}</div>
+      <div class="td col-path" title="클릭하면 이 폴더를 엽니다&#10;${escapeHtml(item.path)}"><span class="path-link">${escapeHtml(item.path)}</span></div>
       <div class="td col-size">${item.isDir ? '&lt;DIR&gt;' : item.metaUnknown ? '—' : formatBytes(item.size)}</div>
       <div class="td col-mtime">${item.metaUnknown ? '—' : formatDate(item.mtime)}</div>
       <div class="td col-ext">${item.isDir ? '폴더' : (item.ext ? item.ext.toUpperCase() : '파일')}</div>
@@ -904,6 +951,12 @@ function renderResults(items, currentQuery) {
         row.classList.add('is-opening');
         setTimeout(() => row.classList.remove('is-opening'), 600);
         openItem(item).catch(error => alert(error.message || error));
+        return;
+      }
+      // Clicking the path opens its folder with the file selected.
+      if (e.target.closest('.path-link') && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+        selectRow(idx);
+        openItemFolder(item).catch(error => alert(error.message || error));
         return;
       }
       if (e.metaKey || e.ctrlKey) {
@@ -1758,22 +1811,24 @@ document.getElementById('emptyExamples').addEventListener('click', (e) => {
 
 // Column resizing (drag the header borders, double-click to fit the contents)
 const COLUMN_WIDTHS_KEY = 'dawith-column-widths';
-const COLUMN_LIMITS = { name: [120, 1600], size: [60, 240], mtime: [90, 260], ext: [50, 200] };
+const COLUMN_LIMITS = { name: [120, 1600], path: [160, 3000], size: [60, 240], mtime: [90, 260], ext: [50, 200] };
 const resultsContainer = document.querySelector('.results-container');
 let suppressSortClick = false;
 
-function maxColumnWidth(col) {
-  // Leave the path column at least its minimum width so nothing is pushed off screen.
-  const header = document.querySelector('.table-header');
-  const current = header.querySelector(`.th.col-${col}`).getBoundingClientRect().width;
-  const path = header.querySelector('.th.col-path').getBoundingClientRect().width;
-  return Math.min(COLUMN_LIMITS[col][1], current + Math.max(0, path - 160));
+// Like Explorer: columns keep their widths and the table scrolls sideways
+// when they don't fit. The path column also takes any spare space.
+function updateTableMinWidth() {
+  const style = getComputedStyle(resultsContainer);
+  const width = col => parseFloat(style.getPropertyValue(`--col-${col}-w`)) || 0;
+  const total = ['name', 'path', 'size', 'mtime', 'ext'].reduce((sum, col) => sum + width(col), 0) + 128 + 14;
+  resultsContainer.style.setProperty('--table-min-w', `${Math.round(total)}px`);
 }
 
 function setColumnWidth(col, width, { persist = true } = {}) {
-  const [min] = COLUMN_LIMITS[col];
-  const next = Math.round(Math.max(min, Math.min(width, maxColumnWidth(col))));
+  const [min, max] = COLUMN_LIMITS[col];
+  const next = Math.round(Math.max(min, Math.min(width, max)));
   resultsContainer.style.setProperty(`--col-${col}-w`, `${next}px`);
+  updateTableMinWidth();
   if (persist) {
     const saved = JSON.parse(localStorage.getItem(COLUMN_WIDTHS_KEY) || '{}');
     saved[col] = next;
@@ -1791,6 +1846,7 @@ try {
 } catch (_) {
   localStorage.removeItem(COLUMN_WIDTHS_KEY);
 }
+updateTableMinWidth();
 
 document.querySelectorAll('.table-header .col-resizer').forEach(handle => {
   const col = handle.dataset.resize;

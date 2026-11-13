@@ -1077,7 +1077,7 @@ pub fn search(data_dir: &Path, query: &Query, limit: usize) -> (Vec<Value>, usiz
         return (Vec::new(), 0);
     }
     with_store(data_dir, |store| {
-        let mut hits: Vec<(u64, Value)> = store
+        let mut hits: Vec<(bool, u64, Value)> = store
             .docs
             .par_iter()
             .filter(|doc| doc.kind == Kind::Text)
@@ -1099,7 +1099,9 @@ pub fn search(data_dir: &Path, query: &Query, limit: usize) -> (Vec<Value>, usiz
                     return None;
                 }
                 let folder = path.parent().map(|parent| parent.to_string_lossy().to_string()).unwrap_or_default();
-                Some((doc.mtime, json!({
+                // A document whose name also has the word is the better match.
+                let name_hit = query.body.iter().any(|term| lower_name.contains(term.as_str()));
+                Some((name_hit, doc.mtime, json!({
                     "name": name,
                     "path": folder,
                     "fullPath": doc.path.as_ref(),
@@ -1115,9 +1117,9 @@ pub fn search(data_dir: &Path, query: &Query, limit: usize) -> (Vec<Value>, usiz
             })
             .collect();
         let total = hits.len();
-        // Most recently changed documents first.
-        hits.sort_by(|a, b| b.0.cmp(&a.0));
-        (hits.into_iter().take(limit).map(|(_, record)| record).collect(), total)
+        // Name matches first, then the most recently changed documents.
+        hits.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| b.1.cmp(&a.1)));
+        (hits.into_iter().take(limit).map(|(_, _, record)| record).collect(), total)
     })
     .unwrap_or_default()
 }

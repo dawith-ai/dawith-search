@@ -70,6 +70,11 @@
     </div>
     <script>
       (function () {
+        var macUrl = 'https://github.com/dawith-ai/dawith-search/releases/download/v1.3.19/Dawith.Search_1.3.19_universal.dmg';
+        document.querySelectorAll('[data-latest="mac-version"]').forEach(function (node) { node.textContent = '1.3.19'; });
+        document.querySelectorAll('[data-latest="mac-url"]').forEach(function (node) { node.href = macUrl; });
+      })();
+      (function () {
         var ua = navigator.userAgent || '';
         var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
         var mobile = /Android|iPhone|iPad|iPod/i.test(ua);

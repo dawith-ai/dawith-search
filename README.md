@@ -11,7 +11,8 @@
 
 <p align="center">
   <strong>기관 PC와 공유폴더의 파일을 바로 찾는 무료 검색 앱</strong><br/>
-  한 글자씩 칠 때마다 결과가 바뀌고, 초성만 쳐도 찾습니다. 검색어와 파일 목록은 이 PC 밖으로 나가지 않습니다.
+  한 글자씩 칠 때마다 결과가 바뀌고, 초성만 쳐도 찾습니다. 필요하면 본문 검색을 켜서 문서 내용으로도 찾습니다.<br/>
+  검색어와 파일 목록, 문서 내용은 이 PC 밖으로 나가지 않습니다.
 </p>
 
 <h3 align="center"><a href="https://dawith-ai.github.io/dawith-search/download.html"><ins>다운로드</ins></a> · <a href="https://dawith-ai.github.io/dawith-search/">안내 사이트</a> · <a href="https://dawith-ai.github.io/dawith-search/help.html">도움말</a></h3>
@@ -80,6 +81,26 @@
 
 </td>
 <td width="62%"><img src="site/media/modes.gif" alt="간편 화면과 기능 화면을 오가는 모습" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 문서 내용으로도 찾기 (선택 기능)
+
+파일 이름이 기억나지 않으면 `본문` 탭에서 문서 속 단어로 찾습니다. 한글(HWP·HWPX)·Word·Excel·PowerPoint·PDF·텍스트를 읽고, 결과에 그 단어가 들어 있는 문장이 함께 보입니다.
+
+</td>
+<td width="62%"><img src="site/media/body-search.png" alt="본문 탭에서 '예산'을 검색해 문서 속 문장이 함께 보이는 화면" width="100%" /></td>
+</tr>
+<tr>
+<td width="38%" valign="middle">
+
+### 필요할 때만 켜고 끄기
+
+본문 검색은 기본으로 꺼져 있습니다. 제목 표시줄의 `본문 끔 | 켬`에서 켜고, 켤 때는 주의 사항을 읽고 동의해야 합니다. 암호·DRM 문서는 읽지 않고, 끄면 저장한 내용이 바로 지워집니다. [자세히](#본문-검색-선택-기능)
+
+</td>
+<td width="62%"><img src="site/media/body-search-consent.png" alt="본문 검색을 켤 때 나오는 주의 사항 안내창" width="100%" /></td>
 </tr>
 </table>
 

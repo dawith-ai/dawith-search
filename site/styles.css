@@ -373,6 +373,7 @@ html { scroll-padding-top: 76px; }
 .showcase-index { color: var(--eyebrow); font: 700 13px var(--mono); }
 .showcase-copy h3 { margin: 10px 0 8px; color: #20382c; font-size: 22px; letter-spacing: -.03em; }
 .showcase-copy p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.75; word-break: keep-all; }
+.showcase-badge { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 999px; background: #fff4e5; color: #b54708; font-size: 12px; font-weight: 700; letter-spacing: 0; vertical-align: middle; }
 .showcase-media { margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 14px 34px rgba(20, 50, 35, .10); }
 .showcase-media img { display: block; width: 100%; height: auto; }
 @media (max-width: 980px) {

@@ -2267,10 +2267,16 @@ fn open_folder_blocking(path: PathBuf, config: Value) -> Result<Value, String> {
         return Err("허용된 검색 경로의 폴더만 열 수 있습니다.".to_string());
     }
     // On Windows, open Explorer with the file already selected; don't wait for it.
-    if cfg!(windows) && !path.is_dir() {
-        let mut argument = std::ffi::OsString::from("/select,");
+    // Explorer only understands `/select,"path"`: passing it as one normal
+    // argument quotes the whole thing when the path has a space, and Explorer
+    // then silently opens Documents instead.
+    #[cfg(windows)]
+    if !path.is_dir() {
+        use std::os::windows::process::CommandExt;
+        let mut argument = std::ffi::OsString::from("/select,\"");
         argument.push(path.as_os_str());
-        Command::new("explorer.exe").arg(argument).spawn().map_err(|error| error.to_string())?;
+        argument.push("\"");
+        Command::new("explorer.exe").raw_arg(argument).spawn().map_err(|error| error.to_string())?;
         return Ok(json!({ "success": true }));
     }
     let folder = if path.is_dir() { path } else { path.parent().unwrap_or(Path::new(".")).to_path_buf() };

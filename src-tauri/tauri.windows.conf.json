@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "../bin/native/windows/x64/*.exe": "bin/native/windows/x64/"
+    }
+  }
+}

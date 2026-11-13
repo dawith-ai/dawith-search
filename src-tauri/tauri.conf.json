@@ -35,7 +35,6 @@
       "dmg"
     ],
     "resources": {
-      "../bin/native/windows/x64/*.exe": "bin/native/windows/x64/",
       "../LICENSE": "licenses/LICENSE-Dawith-Search.txt",
       "../THIRD_PARTY_NOTICES.md": "licenses/THIRD_PARTY_NOTICES.md",
       "../native/everything-sdk/LICENSE": "licenses/LICENSE-Everything-SDK.txt",

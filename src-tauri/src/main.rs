@@ -2363,9 +2363,12 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+const HELP_URL: &str = "https://dawith-ai.github.io/dawith-search/help.html";
+
+/// "사용 안내" opens Dawith Search's own help page.
 #[tauri::command]
 fn open_guide() -> Value {
-    let _ = run_open(Path::new("https://www.voidtools.com/ko-kr/"));
+    let _ = run_open(Path::new(HELP_URL));
     json!({ "success": true })
 }
 

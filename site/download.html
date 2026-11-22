@@ -4,9 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f4f7f4" />
-    <meta name="description" content="Dawith Search 최신 Windows 설치파일과 macOS DMG를 내려받고 SHA256 값을 확인하세요." />
+    <meta name="description" content="Dawith Search Windows 설치파일을 다운로드하세요. macOS용 Apple 서명·공증 설치본은 준비 중입니다." />
     <meta property="og:title" content="Dawith Search 다운로드" />
-    <meta property="og:description" content="Windows 64비트 설치파일과 macOS Universal DMG 다운로드." />
+    <meta property="og:description" content="Windows 64비트 설치파일 다운로드와 macOS 설치본 준비 상태." />
     <meta property="og:type" content="website" />
     <title>Dawith Search 다운로드</title>
     <link rel="icon" href="./ci.png" type="image/png" />
@@ -20,7 +20,7 @@
     <header class="dl-header">
       <div class="dl-header-inner">
         <a class="brand" href="./" aria-label="Dawith Search 홈"><img src="./ci.png" alt="" aria-hidden="true" /><span>Dawith <small>Search · 파일 작업대</small></span></a>
-        <span class="beta-badge" title="오픈베타 · macOS·Windows 지원">오픈베타</span>
+        <span class="beta-badge" title="Windows 오픈베타 · macOS 설치본 준비 중">오픈베타</span>
         <nav class="dl-nav" aria-label="사이트 메뉴">
           <a href="./">홈</a>
           <a class="active" href="./download.html" aria-current="page">다운로드</a>
@@ -35,8 +35,8 @@
     <main class="dl-main">
       <section class="dl-hero">
         <h1>Dawith Search <span data-latest="version">1.3.21</span> 다운로드</h1>
-        <p class="dl-lead"><span data-latest="date">2026년 11월 10일</span> 배포. Windows 10·11(64비트), macOS(Apple Silicon·Intel), Linux(x64)용 경량 빌드를 제공합니다.</p>
-        <p class="beta-note"><strong>오픈베타</strong> 두 운영체제의 최신 검색 엔진을 함께 제공합니다. 사용 중 불편한 점은 <a href="./contact.html">문의하기</a>로 알려 주세요.</p>
+        <p class="dl-lead"><span data-latest="date">2026년 11월 16일</span> 배포. Windows 10·11(64비트) 설치파일과 Linux(x64) 패키지를 제공합니다. macOS 설치본은 Apple 서명·공증을 마친 뒤 공개합니다.</p>
+        <p class="beta-note"><strong>오픈베타</strong> Windows 설치파일과 Linux 패키지를 제공합니다. macOS 설치본은 서명·공증을 마친 뒤 공개합니다. 사용 중 불편한 점은 <a href="./contact.html">문의하기</a>로 알려 주세요.</p>
 
         <div class="dl-blocks">
           <article class="dl-block" data-os="windows">
@@ -46,12 +46,12 @@
             <a class="dl-ss-hint" href="#smartscreen">설치할 때 파란 경고 창이 뜨면 → <b>추가 정보 → 실행</b></a>
             <small><span data-latest="win-name">Dawith-Search_1.3.21_x64-setup.exe</span> · <span data-latest="win-size-kb">최신 릴리스에서 확인</span> · Windows 10/11 x64</small>
           </article>
-          <article class="dl-block" data-os="mac">
-            <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip">v<span data-latest="mac-version">1.3.20</span> · Universal</span></div>
+          <article class="dl-block" data-os="mac" id="macos">
+            <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip" data-latest="mac-status">설치본 준비 중</span></div>
             <h2>macOS</h2>
-            <a class="card-button dl-primary" data-latest="mac-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.3.20/Dawith.Search_1.3.20_universal.dmg" rel="noreferrer">macOS 설치파일 (<span data-latest="mac-version">1.3.20</span>, Universal) <span>↓</span></a>
-            <p class="dl-pending" data-latest="mac-pending" hidden></p>
-            <small><span data-latest="mac-name">Dawith.Search_1.3.20_universal.dmg</span> · <span data-latest="mac-size-mb">최신 릴리스에서 확인</span> · Apple Silicon·Intel 공용</small>
+            <a class="card-button dl-primary mac-unavailable" data-latest="mac-url" aria-disabled="true">macOS 설치 파일 준비 중</a>
+            <p class="dl-pending" data-latest="mac-pending" aria-live="polite">현재 다운로드할 수 있는 Mac 설치 파일이 없습니다. Developer ID 서명과 Apple 공증을 마친 파일만 공개합니다.</p>
+            <small>Apple Silicon·Intel Universal 빌드 · 서명·공증 완료 후 다운로드 제공</small>
           </article>
           <article class="dl-block" data-os="linux">
             <div class="card-topline"><span class="platform-icon linux">🐧</span><span class="version-chip">v<span data-latest="linux-version">1.3.17</span> · x64</span></div>
@@ -158,11 +158,11 @@
                 <td data-label="크기" class="num"><span data-latest="win-size-kb">5,233 KB</span></td>
               </tr>
               <tr data-os="mac">
-                <td data-label="파일 이름"><a data-latest="mac-url" href="https://github.com/dawith-ai/dawith-search/releases/download/v1.3.20/Dawith.Search_1.3.20_universal.dmg" rel="noreferrer"><span data-latest="mac-name">Dawith.Search_1.3.20_universal.dmg</span></a></td>
-                <td data-label="버전"><span data-latest="mac-version">1.3.20</span></td>
-                <td data-label="종류">DMG</td>
-                <td data-label="운영체제">macOS Universal (Apple Silicon·Intel)</td>
-                <td data-label="크기" class="num"><span><span data-latest="mac-size-kb">최신 릴리스에서 확인</span> <small>(<span data-latest="mac-size-mb">최신 릴리스에서 확인</span>)</small></span></td>
+                <td data-label="파일 이름"><a class="mac-unavailable" data-latest="mac-url" aria-disabled="true"><span data-latest="mac-name">서명·공증 설치본 등록 대기</span></a></td>
+                <td data-label="버전"><span data-latest="mac-version">—</span></td>
+                <td data-label="종류">Universal DMG</td>
+                <td data-label="운영체제">macOS (Apple Silicon·Intel)</td>
+                <td data-label="크기" class="num"><span data-latest="mac-size-kb">등록 후 제공</span></td>
               </tr>
             </tbody>
           </table>
@@ -173,9 +173,9 @@
       <section class="dl-section" id="notes">
         <h2>설치 전에 확인하세요</h2>
         <ul class="dl-notes">
-          <li><strong>지원 환경</strong> Windows 10·11 64비트, macOS(Apple Silicon·Intel)에서 동작합니다.</li>
+          <li><strong>지원 환경</strong> 현재 Windows 10·11 64비트 설치파일을 제공합니다. macOS Universal 설치본은 서명·공증 검증을 마친 뒤 공개합니다.</li>
           <li><strong>SmartScreen 경고</strong> 코드 서명 인증서가 없어 “Windows의 PC 보호” 창이 뜰 수 있습니다. <b>추가 정보 → 실행</b>을 누르면 설치가 이어집니다.</li>
-          <li><strong>macOS 첫 실행</strong> Gatekeeper 경고가 나오면 Finder에서 앱을 우클릭한 뒤 <b>열기</b>를 선택하세요.</li>
+          <li><strong>macOS 설치</strong> 현재 공개된 설치본이 없습니다. Gatekeeper 경고를 우회해 예전 미서명 파일을 실행하지 마세요.</li>
           <li><strong>첫 실행</strong> Windows에서는 처음 실행할 때 파일 목록을 만듭니다. C 드라이브 기준 1분 정도 걸리며, 그동안에도 찾은 파일부터 검색됩니다. 다른 프로그램을 따로 설치할 필요는 없습니다.</li>
         </ul>
       </section>
@@ -186,8 +186,8 @@
         <pre class="dl-hashes"><span data-latest="win-name">Dawith-Search_1.3.21_x64-setup.exe</span>
 <span data-latest="win-sha256">b9ea71ada01aea9403bb6b0e16bc7b0f4499bf5c1ce6441de5809f9e454d2747</span>
 
-<span data-latest="mac-name">Dawith.Search_1.3.20_universal.dmg</span>
-<span data-latest="mac-sha256">5fbfed539f9a9202fa9df2ad8b571afd113f46e299f3bf24ca9dfcc9a2a91ca9</span></pre>
+<span data-latest="mac-name">macOS 설치본은 아직 공개되지 않았습니다.</span>
+<span data-latest="mac-sha256">서명·공증된 파일 공개 후 SHA256을 제공합니다.</span></pre>
         <p class="dl-table-note"><a href="https://github.com/dawith-ai/dawith-search/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">오픈소스 고지</a> · <a href="https://github.com/dawith-ai/dawith-search/blob/main/LICENSE" target="_blank" rel="noreferrer">라이선스</a></p>
       </section>
     </main>

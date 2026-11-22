@@ -60,6 +60,9 @@
 .dl-page .dl-block .dl-primary { border-radius: 2px; background: var(--dl-green); }
 .dl-page .dl-block .dl-primary:hover { background: #0b4f3b; }
 .dl-page .dl-block > small { color: #53695d; }
+.dl-page .mac-unavailable { background: #e8eee9; color: #53695d; cursor: not-allowed; pointer-events: none; text-decoration: none; }
+.dl-page .dl-table .mac-unavailable { color: #53695d; font-weight: 600; pointer-events: none; text-decoration: none; }
+.dl-page .dl-pending { max-width: 520px; color: #455e50; }
 .dl-page .dl-links { gap: 6px 10px; margin-top: 24px; }
 .dl-page .dl-links a { color: #c6dfcd; }
 .dl-page .dl-links a:hover { color: #fff; }

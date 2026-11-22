@@ -6,7 +6,7 @@
  * Keys: version (1.3.3), tag (v1.3.3), date (2026년 11월 10일), release-url (href),
  *       win-url (href), win-name, win-size-kb, win-sha256,
  *       mac-url (href), mac-name, mac-version, mac-size-kb, mac-size-mb, mac-sha256,
- *       mac-pending (hidden when the latest release ships a DMG),
+ *       mac-pending (hidden when the latest release ships a DMG), mac-status,
  *       linux-deb-url, linux-rpm-url, linux-appimage-url (href), linux-version.
  */
 (function () {
@@ -119,25 +119,37 @@
       'release-url': release.htmlUrl
     };
 
+    function updateLink(el, url) {
+      if (!url) return;
+      el.setAttribute('href', url);
+      el.removeAttribute('aria-disabled');
+      el.classList.remove('mac-unavailable');
+    }
+
     // The quick-start button on the home page copies the Windows card's href
     // when the OS is detected; follow it to the new installer.
     var quick = document.getElementById('os-download');
-    var quickWasWin = quick && /\/Dawith-Search_[\d.]+_x64-setup\.exe$/.test(quick.getAttribute('href') || '');
-
     var nodes = document.querySelectorAll('[data-latest]');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
       var key = el.getAttribute('data-latest');
       if (key === 'mac-pending') {
-        if (mac) el.hidden = true;
+        el.hidden = !!mac;
       } else if (Object.prototype.hasOwnProperty.call(links, key)) {
-        if (links[key]) el.setAttribute('href', links[key]);
+        updateLink(el, links[key]);
       } else if (values[key]) {
         el.textContent = values[key];
+      } else if (key === 'mac-status' && mac) {
+        el.textContent = 'v' + dmgVersion + ' · Universal';
       }
     }
 
-    if (quickWasWin && win) quick.setAttribute('href', win.url);
+    var detectedOs = document.documentElement.getAttribute('data-detected-os');
+    if (quick && detectedOs === 'windows' && win) quick.setAttribute('href', win.url);
+    if (quick && detectedOs === 'mac') {
+      quick.setAttribute('href', mac ? mac.url : './download.html#macos');
+      quick.innerHTML = mac ? 'macOS 설치파일 받기 <span>↓</span>' : 'macOS 설치 안내 보기 <span>→</span>';
+    }
     document.documentElement.setAttribute('data-latest-loaded', release.tag);
   }
 

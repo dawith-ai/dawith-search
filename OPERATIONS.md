@@ -68,7 +68,9 @@
 - `git diff --check` 통과
 - GitHub Actions에서 Ubuntu·macOS·Windows 검증 및 macOS·Windows 패키징 성공
 - 릴리스 태그가 `main` 커밋과 일치하고 공개 다운로드 자산이 존재
-- 코드 서명 인증서가 없는 환경에서는 Gatekeeper/SmartScreen 첫 실행 안내를 릴리스 문서에 명시
+- macOS 공개 릴리스는 `Developer ID Application` 서명과 Apple 공증이 완료되어야 함
+- Apple 인증서·공증 시크릿이 없는 환경에서는 서명되지 않은 macOS 자산을 공개 릴리스에 올리지 않음
+- 서명 릴리스는 `.github/workflows/macos-signed-release.yml`에서 DMG 내부 앱의 `codesign`·`spctl` 검증 후 업로드
 
 검증 명령:
 
@@ -80,7 +82,20 @@ npm run build:mac
 npm run build:win
 ```
 
-현재 릴리스: [v1.0.4](https://github.com/dawith-ai/dawith-search/releases/tag/v1.0.4)
+현재 릴리스: [v1.3.21](https://github.com/dawith-ai/dawith-search/releases/tag/v1.3.21)
+
+### macOS 서명 릴리스 준비
+
+GitHub 저장소에 아래 Actions secrets를 등록한 뒤 `Signed macOS release` 워크플로를 태그로 실행한다.
+
+- `APPLE_CERTIFICATE`: Developer ID Application `.p12`의 base64 값
+- `APPLE_CERTIFICATE_PASSWORD`: `.p12` 내보내기 암호
+- `APPLE_ID`: Apple Developer 계정 이메일
+- `APPLE_PASSWORD`: 공증용 앱 전용 암호
+- `APPLE_TEAM_ID`: Apple Developer Team ID
+- `KEYCHAIN_PASSWORD`: CI 임시 키체인 암호
+
+시크릿이 하나라도 없으면 워크플로는 unsigned DMG 생성을 거부하고 실패한다. 현재 unsigned DMG를 이미 받은 사용자는 앱을 Applications로 옮긴 뒤 Finder에서 앱을 우클릭하여 `열기`를 선택하거나, 신뢰할 수 있는 공식 파일임을 확인한 경우 `xattr -dr com.apple.quarantine "/Applications/Dawith Search.app"`로 임시 실행할 수 있다.
 
 ## 운영 경계
 

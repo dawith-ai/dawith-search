@@ -50,7 +50,7 @@
             <div class="card-topline"><span class="platform-icon apple">⌘</span><span class="version-chip" data-latest="mac-status">설치본 준비 중</span></div>
             <h2>macOS</h2>
             <a class="card-button dl-primary mac-unavailable" data-latest="mac-url" aria-disabled="true">macOS 설치 파일 준비 중</a>
-            <p class="dl-pending" data-latest="mac-pending" aria-live="polite">현재 다운로드할 수 있는 Mac 설치 파일이 없습니다. Developer ID 서명과 Apple 공증을 마친 파일만 공개합니다.</p>
+            <p class="dl-pending" data-latest="mac-pending" aria-live="polite">새 Mac 설치 파일은 준비 중입니다. 이미 공식 DMG를 받은 경우 <a href="#macos-open">무료로 처음 실행하는 방법</a>을 확인하세요.</p>
             <small>Apple Silicon·Intel Universal 빌드 · 서명·공증 완료 후 다운로드 제공</small>
           </article>
           <article class="dl-block" data-os="linux">
@@ -175,9 +175,21 @@
         <ul class="dl-notes">
           <li><strong>지원 환경</strong> 현재 Windows 10·11 64비트 설치파일을 제공합니다. macOS Universal 설치본은 서명·공증 검증을 마친 뒤 공개합니다.</li>
           <li><strong>SmartScreen 경고</strong> 코드 서명 인증서가 없어 “Windows의 PC 보호” 창이 뜰 수 있습니다. <b>추가 정보 → 실행</b>을 누르면 설치가 이어집니다.</li>
-          <li><strong>macOS 설치</strong> 현재 공개된 설치본이 없습니다. Gatekeeper 경고를 우회해 예전 미서명 파일을 실행하지 마세요.</li>
+          <li><strong>macOS 설치</strong> 새 설치본은 준비 중입니다. 이미 받은 공식 DMG는 아래 안내에 따라 Mac에서 직접 허용할 수 있습니다.</li>
           <li><strong>첫 실행</strong> Windows에서는 처음 실행할 때 파일 목록을 만듭니다. C 드라이브 기준 1분 정도 걸리며, 그동안에도 찾은 파일부터 검색됩니다. 다른 프로그램을 따로 설치할 필요는 없습니다.</li>
         </ul>
+      </section>
+
+      <section class="dl-section" id="macos-open">
+        <h2>Mac에서 처음 실행하기</h2>
+        <p class="dl-table-note">현재 Mac 앱은 Apple 서명·공증 전이라 처음 열 때 macOS 경고가 나타납니다. 아래는 사용자가 해당 앱을 직접 허용하는 무료 방법입니다. <strong>공식 Dawith Search 릴리스에서 받은 파일인지 확인한 경우에만</strong> 진행하세요.</p>
+        <ol class="dl-notes mac-open-steps">
+          <li><strong>앱 설치</strong> DMG를 열고 Dawith Search 앱을 응용 프로그램 폴더로 옮깁니다.</li>
+          <li><strong>한 번 열기</strong> Finder의 응용 프로그램에서 Dawith Search를 Control-클릭(또는 오른쪽 클릭)하고 <b>열기</b>를 누릅니다. 경고가 나오면 창을 닫습니다.</li>
+          <li><strong>열기 허용</strong> Apple 메뉴 → 시스템 설정 → 개인정보 보호 및 보안으로 가서 보안 항목의 <b>그래도 열기</b>를 누릅니다. 다시 뜨는 확인 창에서 <b>열기</b>를 선택합니다. 암호를 요청하면 Mac 로그인 암호를 입력합니다.</li>
+          <li><strong>다음부터 실행</strong> 허용한 앱은 이후 응용 프로그램 폴더에서 더블클릭해 열 수 있습니다.</li>
+        </ol>
+        <p class="dl-table-note">이 허용은 Mac마다 한 번 필요하며 Apple의 악성코드 검사를 통과했다는 뜻은 아닙니다. 경고에 “컴퓨터를 손상시킵니다” 또는 “앱이 손상되었습니다”라고 표시되면 진행하지 말고 <a href="./contact.html">문의</a>해 주세요. <a href="https://support.apple.com/en-us/102445" target="_blank" rel="noreferrer">Apple의 Gatekeeper 안내 ↗</a></p>
       </section>
 
       <section class="dl-section" id="sha256">

@@ -147,7 +147,7 @@
     var detectedOs = document.documentElement.getAttribute('data-detected-os');
     if (quick && detectedOs === 'windows' && win) quick.setAttribute('href', win.url);
     if (quick && detectedOs === 'mac') {
-      quick.setAttribute('href', mac ? mac.url : './download.html#macos');
+      quick.setAttribute('href', mac ? mac.url : './download.html#macos-open');
       quick.innerHTML = mac ? 'macOS 설치파일 받기 <span>↓</span>' : 'macOS 설치 안내 보기 <span>→</span>';
     }
     document.documentElement.setAttribute('data-latest-loaded', release.tag);

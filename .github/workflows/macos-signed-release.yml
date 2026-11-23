@@ -67,4 +67,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           dmg=$(find src-tauri/target -type f -name '*.dmg' -print -quit)
-          gh release upload "$TAG" "$dmg" --clobber
+          version="${TAG#v}"
+          legacy_name="$(dirname "$dmg")/Dawith.Search-${version}-universal.dmg"
+          cp "$dmg" "$legacy_name"
+          # Keep both the Tauri filename and the updater-compatible legacy alias.
+          gh release upload "$TAG" "$dmg" "$legacy_name" --clobber

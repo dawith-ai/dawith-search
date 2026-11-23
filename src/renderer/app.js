@@ -2436,7 +2436,11 @@ document.getElementById('btnInstallGoz')?.addEventListener('click', async () => 
 
 // Syntax Guide
 document.getElementById('syntaxHintBtn').addEventListener('click', () => {
-  window.dawithAPI.openGuide();
+  window.dawithAPI.openGuide().then(result => {
+    if (!result?.success) throw new Error(result?.error || '사용 안내를 열지 못했습니다.');
+  }).catch(() => {
+    window.alert('사용 안내 페이지를 열지 못했습니다. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.');
+  });
 });
 document.getElementById('btnCloseSyntax').addEventListener('click', () => {
   syntaxModal.style.display = 'none';

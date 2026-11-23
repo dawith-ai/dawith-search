@@ -63,9 +63,38 @@
 .dl-page .mac-unavailable { background: #e8eee9; color: #53695d; cursor: not-allowed; pointer-events: none; text-decoration: none; }
 .dl-page .dl-table .mac-unavailable { color: #53695d; font-weight: 600; pointer-events: none; text-decoration: none; }
 .dl-page .dl-pending { max-width: 520px; color: #455e50; }
-.dl-page .mac-open-steps { padding-left: 25px; list-style: decimal; }
-.dl-page .mac-open-steps li { padding-left: 4px; }
-.dl-page .mac-open-steps li::before { content: none; }
+.dl-page .mac-visual-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 18px; margin: 22px 0 0; padding: 0; list-style: none; counter-reset: mac-step; }
+.dl-page .mac-visual-step { min-width: 0; counter-increment: mac-step; }
+.dl-page .mac-shot { position: relative; display: flex; min-height: 190px; flex-direction: column; overflow: hidden; border: 1px solid #d8ddd9; border-radius: 9px; background: #f4f5f4; color: #26332b; box-shadow: 0 8px 22px rgba(20, 39, 27, .08); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+.dl-page .mac-titlebar { display: flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 11px; border-bottom: 1px solid #dfe3e0; background: #fafbfa; color: #515d55; font-size: 12px; }
+.dl-page .mac-titlebar i { width: 9px; height: 9px; border-radius: 50%; background: #e87570; }
+.dl-page .mac-titlebar i:nth-child(2) { background: #e9bd57; }
+.dl-page .mac-titlebar i:nth-child(3) { background: #67b879; }
+.dl-page .mac-titlebar span { margin: auto; padding-right: 35px; }
+.dl-page .mac-finder-body { display: flex; flex: 1; align-items: center; justify-content: space-evenly; padding: 18px 8px; text-align: center; }
+.dl-page .mac-app-icon, .dl-page .mac-app-folder { display: flex; flex-direction: column; align-items: center; gap: 8px; font-size: 11px; }
+.dl-page .mac-app-icon span { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid #c5d8cb; border-radius: 12px; background: #e6f1e9; color: #17684f; font-size: 25px; font-weight: 800; }
+.dl-page .mac-app-folder span { color: #3686c9; font-size: 43px; line-height: 1; }
+.dl-page .mac-drag-arrow { color: #65776b; font-size: 22px; }
+.dl-page .mac-shot > small { padding: 0 10px 10px; color: #526057; text-align: center; font-size: 11px; }
+.dl-page .mac-warning, .dl-page .mac-confirm { align-items: center; justify-content: center; padding: 20px; background: rgba(248, 249, 248, .97); text-align: center; }
+.dl-page .mac-warning b, .dl-page .mac-confirm b { margin-top: 9px; font-size: 14px; }
+.dl-page .mac-warning p, .dl-page .mac-confirm p { max-width: 350px; margin: 8px auto 14px; color: #56635b; font-size: 11px; line-height: 1.5; }
+.dl-page .mac-warning-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 10px; background: #f1dca7; color: #634e14; font-size: 21px; font-weight: 800; }
+.dl-page .mac-warning-icon.small { width: 28px; height: 28px; border-radius: 50%; background: #e5e9e6; color: #55645a; font-size: 16px; }
+.dl-page .mac-button { display: inline-flex; align-items: center; justify-content: center; min-height: 25px; padding: 0 12px; border: 1px solid #d4d9d5; border-radius: 6px; background: #f7f8f7; color: #26332b; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.dl-page .mac-button-blue { border-color: #1675df; background: #1675df; color: white; }
+.dl-page .mac-settings { padding: 18px 16px 12px; background: #f3f4f3; }
+.dl-page .mac-settings-title { margin-bottom: 15px; color: #303b33; font-size: 16px; font-weight: 700; }
+.dl-page .mac-security-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 10px; border-top: 1px solid #dce1dd; color: #4b584f; font-size: 10px; }
+.dl-page .mac-security-row b { font-size: 11px; }
+.dl-page .mac-open-row { align-items: flex-start; }
+.dl-page .mac-settings-path { margin-top: auto; padding-top: 10px; color: #526057; font-size: 11px; }
+.dl-page .mac-confirm-actions { display: flex; justify-content: center; gap: 8px; }
+.dl-page .mac-visual-step > p { margin: 11px 2px 0; color: #4b6153; font-size: 14px; line-height: 1.65; }
+.dl-page .mac-visual-step > p b { color: #213d2f; }
+.dl-page .mac-safety-note { max-width: 900px; margin: 22px 0 0; padding: 13px 15px; border-left: 3px solid #b87b43; background: #f5efe7; color: #4c463d; font-size: 14px; line-height: 1.7; }
+.dl-page .mac-safety-note a { color: #315d47; font-weight: 650; }
 .dl-page .dl-links { gap: 6px 10px; margin-top: 24px; }
 .dl-page .dl-links a { color: #c6dfcd; }
 .dl-page .dl-links a:hover { color: #fff; }
@@ -112,6 +141,9 @@
   .dl-page .dl-section { padding-top: 68px; }
   .dl-page .dl-section > h2 { font-size: 29px; }
   .dl-page .dl-footer { margin: 0 16px; }
+  .dl-page .mac-visual-steps { grid-template-columns: 1fr; gap: 20px; }
+  .dl-page .mac-shot { min-height: 174px; }
+  .dl-page .mac-security-row { flex-wrap: wrap; }
 }
 
 .dl-page .dl-blocks:has(> :nth-child(3)) { grid-template-columns: repeat(3, minmax(0, 1fr)); }

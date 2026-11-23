@@ -569,9 +569,13 @@ async function run() {
   assert.ok(mainSource.includes("const HELP_URL = 'https://dawith-search-guide.vercel.app/'"));
   assert.ok(mainSource.includes('await shell.openExternal(HELP_URL)'));
   assert.ok(tauriSource.includes('const HELP_URL: &str = "https://dawith-search-guide.vercel.app/"'));
-  assert.ok(tauriSource.includes('run_open(Path::new(HELP_URL))'));
-  assert.ok(await evaluate("Boolean(document.querySelector('#syntaxHintBtn'))"));
-  record('사용 안내 링크', '앱 메뉴 버튼과 Electron·Tauri 양쪽 Vercel 연결 확인');
+  assert.ok(tauriSource.includes('run_open(Path::new(HELP_URL))?'));
+  assert.ok(tauriSource.includes('fn open_guide() -> Result<Value, String>'));
+  assert.ok((await evaluate("Boolean(document.querySelector('#syntaxHintBtn'))")));
+  const rendererSource = fs.readFileSync(path.join(repoRoot, 'src/renderer/app.js'), 'utf8');
+  assert.ok(rendererSource.includes('window.dawithAPI.openGuide().then(result =>'));
+  assert.ok(rendererSource.includes('사용 안내 페이지를 열지 못했습니다. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.'));
+  record('사용 안내 링크', '앱 메뉴 버튼, Electron·Tauri Vercel 연결, 실패 안내 확인');
 
   await saveScreenshot();
   console.log(`E2E_SCREENSHOT=${screenshotPath}`);

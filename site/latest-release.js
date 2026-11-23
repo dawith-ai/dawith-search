@@ -7,7 +7,7 @@
  *       win-url (href), win-name, win-size-kb, win-sha256,
  *       mac-url (href), mac-name, mac-version, mac-size-kb, mac-size-mb, mac-sha256,
  *       mac-pending (hidden when the latest release ships a DMG), mac-status,
- *       linux-deb-url, linux-rpm-url, linux-appimage-url (href), linux-version.
+ *       linux-deb-url, linux-rpm-url, linux-appimage-url (href), Linux names/sizes/version.
  */
 (function () {
   'use strict';
@@ -108,7 +108,13 @@
       'mac-size-kb': mac && mac.size ? kb(mac.size) : '',
       'mac-size-mb': mac && mac.size ? mb(mac.size) : '',
       'mac-sha256': mac && mac.sha256,
-      'linux-version': release.deb ? release.version : ''
+      'linux-version': release.deb ? release.version : '',
+      'linux-deb-name': release.deb && release.deb.name,
+      'linux-rpm-name': release.rpm && release.rpm.name,
+      'linux-appimage-name': release.appimage && release.appimage.name,
+      'linux-deb-size': release.deb && release.deb.size ? mb(release.deb.size) : '',
+      'linux-rpm-size': release.rpm && release.rpm.size ? mb(release.rpm.size) : '',
+      'linux-appimage-size': release.appimage && release.appimage.size ? mb(release.appimage.size) : ''
     };
     var links = {
       'win-url': win && win.url,

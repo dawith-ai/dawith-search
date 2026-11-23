@@ -2403,9 +2403,9 @@ const HELP_URL: &str = "https://dawith-search-guide.vercel.app/";
 
 /// Opens the current hosted guide in the system browser on every platform.
 #[tauri::command]
-fn open_guide() -> Value {
-    let _ = run_open(Path::new(HELP_URL));
-    json!({ "success": true })
+fn open_guide() -> Result<Value, String> {
+    run_open(Path::new(HELP_URL))?;
+    Ok(json!({ "success": true, "url": HELP_URL }))
 }
 
 const LATEST_RELEASE_API: &str = "https://api.github.com/repos/dawith-ai/dawith-search/releases/latest";

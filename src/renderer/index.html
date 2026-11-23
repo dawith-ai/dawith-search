@@ -10,19 +10,19 @@
 <body class="light-theme">
   <!-- Custom Titlebar -->
   <div class="titlebar">
-    <div class="titlebar-drag">
+    <div class="titlebar-drag" data-tauri-drag-region>
       <div class="logo">
-        <img class="logo-icon" src="assets/icon.png" alt="Dawith CI">
-        <span class="logo-text">Dawith Search</span>
+        <img class="logo-icon" src="assets/icon.png" alt="Dawith CI" data-tauri-drag-region>
+        <span class="logo-text" data-tauri-drag-region>Dawith Search</span>
         <button class="version-tag" id="appVersionTag" type="button" title="눌러서 업데이트 확인">버전 확인</button>
       </div>
-      <div class="titlebar-status" id="titlebarStatus">
-        <span class="status-dot"></span>
-        <span id="titlebarStatusText">준비 완료</span>
-        <span class="title-progress" id="titleProgress" hidden aria-hidden="true"><span id="titleProgressFill"></span></span>
-        <span class="title-progress-pct" id="titleProgressPct" hidden></span>
-        <span class="status-divider">·</span>
-        <span id="backendStatusText">백엔드 확인 중</span>
+      <div class="titlebar-status" id="titlebarStatus" data-tauri-drag-region>
+        <span class="status-dot" data-tauri-drag-region></span>
+        <span id="titlebarStatusText" data-tauri-drag-region>준비 완료</span>
+        <span class="title-progress" id="titleProgress" hidden aria-hidden="true" data-tauri-drag-region><span id="titleProgressFill" data-tauri-drag-region></span></span>
+        <span class="title-progress-pct" id="titleProgressPct" hidden data-tauri-drag-region></span>
+        <span class="status-divider" data-tauri-drag-region>·</span>
+        <span id="backendStatusText" data-tauri-drag-region>백엔드 확인 중</span>
       </div>
     </div>
     <div class="titlebar-controls">

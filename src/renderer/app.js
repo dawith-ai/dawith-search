@@ -15,6 +15,7 @@ let lastInputAt = 0;
 let lastSearchAt = 0;
 let lastRenderedSignature = '';
 let lastSearchWarning = '';
+let lastSearchIndexing = false;
 let searchInFlight = false;
 let searchQueued = false;
 let resultsRenderToken = 0;
@@ -813,6 +814,7 @@ async function runSearch() {
     // Rebuilding identical rows resets scroll and selection and makes the
     // table flicker; keep the current rows when nothing changed.
     lastSearchWarning = res.warning || '';
+    lastSearchIndexing = Boolean(res.indexing);
     const signature = currentFilter + '\u0000' + lastSearchWarning + '\u0000' + rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
     if (signature !== lastRenderedSignature) {
       lastRenderedSignature = signature;
@@ -835,6 +837,10 @@ async function runSearch() {
         : res.backend === 'local-indexing' ? 'Dawith 색인'
         : '내장 로컬 색인';
     }
+    statusDot.className = 'status-dot';
+    titlebarStatus.textContent = res.backend === 'spotlight'
+      ? 'Spotlight 사용 중'
+      : '검색 준비 완료';
 
     statMatches.textContent = `${res.totalMatches.toLocaleString()}개 항목 발견`;
     statElapsed.textContent = `${res.elapsedMs} ms`;
@@ -864,7 +870,24 @@ async function runSearch() {
     }
   } catch (err) {
     console.error('Search error:', err);
+    if (requestId !== searchRequestId) return;
+    renderSearchError(err, rawInput);
   }
+}
+
+function renderSearchError(error, rawInput = searchInput.value.trim()) {
+  searchResults = [];
+  selectedIndex = -1;
+  selectedIndexes = new Set();
+  lastSearchWarning = error?.message || '검색 요청을 처리하지 못했습니다.';
+  lastSearchIndexing = false;
+  lastRenderedSignature = '';
+  renderResults([], rawInput);
+  document.getElementById('emptyTitle').textContent = '검색을 실행하지 못했습니다';
+  statMatches.textContent = '검색 오류';
+  statElapsed.textContent = '—';
+  statusDot.className = 'status-dot error';
+  titlebarStatus.textContent = '검색 오류';
 }
 
 // True while the Korean IME is still building the last syllable (ㅈ → 지 → 직).
@@ -873,6 +896,15 @@ let inputComposing = false;
 function triggerSearch(event) {
   lastInputAt = Date.now();
   inputComposing = Boolean(event && event.isComposing);
+  if (searchInput.value.trim()) {
+    statMatches.textContent = '검색 중…';
+    statElapsed.textContent = '…';
+    if (searchResults.length === 0) {
+      emptyState.style.display = 'block';
+      document.getElementById('emptyTitle').textContent = '파일을 찾고 있습니다';
+      document.getElementById('emptySub').textContent = '검색이 끝나면 결과가 여기에 나타납니다.';
+    }
+  }
   clearTimeout(searchDebounceTimer);
   // Wait for a short typing pause so each keystroke (and each Hangul
   // composition step) does not start its own native search.
@@ -902,7 +934,9 @@ function renderResults(items, currentQuery) {
     document.getElementById('emptySub').textContent = lastSearchWarning && hasQuery
       ? lastSearchWarning
       : hasQuery
-      ? '색인 중이면 잠시 뒤 자동으로 결과가 늘어납니다. 다른 키워드나 필터 조건도 사용해 보세요.'
+      ? lastSearchIndexing
+        ? '처음 파일 목록을 만드는 중입니다. 잠시 뒤 결과가 더 나올 수 있습니다.'
+        : '검색어를 짧게 바꾸거나, 파일 종류를 ‘모두’로 바꿔 다시 찾아보세요.'
       : '파일명이나 폴더명을 입력하면 이 PC의 파일을 바로 찾습니다.';
     document.getElementById('emptyExamples').style.display = hasQuery ? 'none' : 'flex';
     return;
@@ -2539,7 +2573,9 @@ window.dawithAPI.onIndexStatus((data) => {
     titlebarStatus.textContent = '색인 작업 진행 중...';
   } else if (data.status === 'idle') {
     statusDot.className = 'status-dot';
-    titlebarStatus.textContent = '색인 완료';
+    titlebarStatus.textContent = backendStatus?.textContent?.includes('Spotlight')
+      ? 'Spotlight 사용 중'
+      : '색인 완료';
     executeSearch();
   } else if (data.status === 'updated') {
     executeSearch();
@@ -2557,6 +2593,7 @@ async function initBackendStatus() {
   try {
     const status = await window.dawithAPI.getBackendStatus();
     if (backendStatus) backendStatus.textContent = status.label || '로컬 색인';
+    if (status.backend === 'spotlight') titlebarStatus.textContent = 'Spotlight 사용 중';
     const nativeEngineStatus = document.getElementById('nativeEngineStatus');
     const installGozButton = document.getElementById('btnInstallGoz');
     if (nativeEngineStatus) nativeEngineStatus.textContent = status.detail || status.label || '로컬 색인 모드';

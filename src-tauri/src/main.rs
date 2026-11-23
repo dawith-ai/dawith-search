@@ -892,6 +892,14 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
             .arg(&expression)
             .output()
             .map_err(|error| error.to_string())?;
+        if !output.status.success() {
+            let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(if detail.is_empty() {
+                "Spotlight 검색을 실행하지 못했습니다.".to_string()
+            } else {
+                format!("Spotlight 검색을 실행하지 못했습니다: {detail}")
+            });
+        }
         for path in String::from_utf8_lossy(&output.stdout).lines() {
             if records.len() >= limit {
                 break;
@@ -1521,7 +1529,7 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
         return Ok(json!({
             "results": results,
             "totalMatches": total_matches,
-            "totalIndexed": 0,
+            "totalIndexed": null,
             "elapsedMs": started.elapsed().as_millis(),
             "backend": "spotlight"
         }));
@@ -2635,6 +2643,14 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spotlight_name_query_uses_case_and_diacritic_insensitive_substring_match() {
+        assert_eq!(
+            mac_spotlight_expression("kakao"),
+            "kMDItemFSName == \"*kakao*\"cd"
+        );
+    }
 
     #[test]
     fn root_scope_allows_children() {

@@ -192,6 +192,13 @@ async function pageState() {
     hasApi: Boolean(window.dawithAPI),
     indexed: document.querySelector('#statTotalIndexed')?.textContent || '',
     matches: document.querySelector('#statMatches')?.textContent || '',
+    emptyTitle: document.querySelector('#emptyTitle')?.textContent || '',
+    emptySub: document.querySelector('#emptySub')?.textContent || '',
+    tauriDragRegions: {
+      bar: document.querySelector('.titlebar-drag')?.hasAttribute('data-tauri-drag-region') || false,
+      brand: document.querySelector('.logo-text')?.hasAttribute('data-tauri-drag-region') || false,
+      status: document.querySelector('#titlebarStatusText')?.hasAttribute('data-tauri-drag-region') || false
+    },
     rows: document.querySelectorAll('#tableBody .table-row').length,
     rowText: document.querySelector('#tableBody')?.textContent || '',
     bodyClass: document.body.className,
@@ -292,6 +299,8 @@ async function run() {
   assert.strictEqual(initialState.hasApi, true);
   assert.strictEqual(initialState.title, 'Dawith Search');
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
+  assert.deepStrictEqual(initialState.tauriDragRegions, { bar: true, brand: true, status: true });
+  record('상단 바 드래그 영역', '여백·앱 이름·상태 글자에 Tauri 창 이동 속성이 적용됨');
 
   assert.strictEqual(await evaluate("document.querySelectorAll('.mode-choice-preview').length"), 2);
   assert.strictEqual(await evaluate("document.querySelector('.titlebar-controls #btnViewSimple') !== null"), true);
@@ -335,6 +344,12 @@ async function run() {
   await setSearch('contract');
   await waitForState('search results', state => state.rows > 0 && state.rowText.includes('contract-agreement.txt'));
   record('파일명 검색', 'contract-agreement.txt 검색 결과 확인');
+
+  await evaluate("renderSearchError(new Error('TEST_SEARCH_FAILURE'), 'trigger-error')");
+  await waitForState('visible search error', state => state.emptyTitle === '검색을 실행하지 못했습니다' && state.matches === '검색 오류' && state.emptySub.includes('TEST_SEARCH_FAILURE'));
+  record('검색 오류 안내', '검색 요청이 실패하면 빈 결과처럼 숨기지 않고 오류를 표시');
+  await setSearch('contract');
+  await waitForState('search restored after error', state => state.rows > 0 && state.rowText.includes('contract-agreement.txt'));
 
   await setSearch('content:개인정보');
   await waitForState('content search results', state => state.rows > 0 && state.rowText.includes('contract-agreement.txt'));

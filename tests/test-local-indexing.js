@@ -64,6 +64,8 @@ async function main() {
     assert.strictEqual(fs.existsSync(nativeIndexer.cacheFile), false, 'native local scope must prune the stale JSON mirror');
     await nativeIndexer.startIndexing();
     assert.strictEqual(nativeIndexer.records.length, 0, 'native local search must not duplicate the whole local tree');
+    const nativeSearchResponse = await nativeIndexer.search('indexed-001.txt');
+    assert.strictEqual(nativeSearchResponse.totalIndexed, null, 'native backend must not report its unused local cache as the index count');
     nativeIndexer.fileWatcher.close();
     console.log('Native-index regression passed (automatic local scope delegated without a duplicate JSON scan).');
   } finally {

@@ -610,7 +610,7 @@ class Indexer extends EventEmitter {
         return {
           results: sorted.slice(0, options.limit || 5000),
           totalMatches: sorted.length,
-          totalIndexed: this.records.length,
+          totalIndexed: nativeResult.backend === 'local-fallback' ? this.records.length : null,
           elapsedMs: Date.now() - start,
           parsedQuery: parsed,
           backend: localFallbackRecords.length > 0 ? 'local-fallback' : nativeResult.backend,

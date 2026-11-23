@@ -838,7 +838,17 @@ async function runSearch() {
 
     statMatches.textContent = `${res.totalMatches.toLocaleString()}개 항목 발견`;
     statElapsed.textContent = `${res.elapsedMs} ms`;
-    statTotalIndexed.textContent = `색인 항목: ${res.totalIndexed.toLocaleString()}개`;
+    if (Number.isFinite(res.totalIndexed)) {
+      statTotalIndexed.textContent = `색인 항목: ${res.totalIndexed.toLocaleString()}개`;
+    } else {
+      const engineNames = {
+        spotlight: 'Spotlight',
+        everything: 'Everything',
+        'everything-ipc': 'Everything',
+        goz: 'goz'
+      };
+      statTotalIndexed.textContent = `검색 방식: ${engineNames[res.backend] || '빠른 검색 엔진'}`;
+    }
     if (res.indexing) {
       // Indexing can already be running when this window opens; show the
       // first-run guide from the search response too, not only from events.

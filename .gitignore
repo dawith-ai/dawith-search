@@ -12,3 +12,4 @@ src-tauri/gen/
 bin/native/windows/**/*.lib
 bin/native/windows/**/*.exp
 .playwright-cli/
+.vercel

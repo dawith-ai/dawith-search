@@ -68,9 +68,7 @@
 - `git diff --check` 통과
 - GitHub Actions에서 Ubuntu·macOS·Windows 검증 및 macOS·Windows 패키징 성공
 - 릴리스 태그가 `main` 커밋과 일치하고 공개 다운로드 자산이 존재
-- macOS 릴리스는 Universal DMG 내부 앱과 arm64·x86_64 아키텍처를 검증한 뒤 업로드
-- Apple 인증서·공증 시크릿 6개가 모두 있으면 Developer ID 서명과 공증을 검증하고, 모두 없으면 무료 미서명 배포로 진행
-- Apple 시크릿이 일부만 등록된 상태는 실패 처리
+- macOS 릴리스는 비용 없는 무서명 Universal DMG로 빌드하고, 내부 앱과 arm64·x86_64 아키텍처를 검증한 뒤 업로드
 - 미서명 앱은 다운로드 안내의 Finder Control-클릭 → 열기 절차로 처음 실행하도록 안내하며, 격리 속성을 제거하는 터미널 명령은 권하지 않음
 
 검증 명령:
@@ -87,16 +85,7 @@ npm run build:win
 
 ### macOS 배포 방식
 
-비용 없이 배포할 때는 Apple Actions secrets를 등록하지 않고 `macOS release` 워크플로를 실행한다. 워크플로는 Universal DMG와 실행 파일 아키텍처를 확인한 뒤 GitHub Release에 올린다. 아래 여섯 secrets를 모두 등록하면 Developer ID 서명과 공증 경로를 사용한다.
-
-- `APPLE_CERTIFICATE`: Developer ID Application `.p12`의 base64 값
-- `APPLE_CERTIFICATE_PASSWORD`: `.p12` 내보내기 암호
-- `APPLE_ID`: Apple Developer 계정 이메일
-- `APPLE_PASSWORD`: 공증용 앱 전용 암호
-- `APPLE_TEAM_ID`: Apple Developer Team ID
-- `KEYCHAIN_PASSWORD`: CI 임시 키체인 암호
-
-시크릿이 일부만 등록되면 설정 오류로 실패한다. 사용자는 공식 안내 페이지의 순서대로 DMG를 열고 앱을 응용 프로그램 폴더에 넣은 다음, Finder에서 앱을 Control 키를 누른 채 클릭해 `열기`를 선택한다. `xattr`로 격리 속성을 제거하는 절차는 배포 안내에 사용하지 않는다.
+`macOS release` 워크플로는 Apple 서명 관련 시크릿을 읽지 않고 무서명 빌드를 게시한다. 사용자는 공식 안내 페이지의 순서대로 DMG를 열고 앱을 응용 프로그램 폴더에 넣은 다음, Finder에서 앱을 Control 키를 누른 채 클릭해 `열기`를 선택한다. `xattr`로 격리 속성을 제거하는 절차는 배포 안내에 사용하지 않는다.
 
 ## 운영 경계
 

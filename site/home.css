@@ -60,7 +60,6 @@
 .home-page .side-link:hover { transform: translateY(-1px); }
 .home-page .nav-icon { width: 17px; height: 17px; color: var(--home-mint); font-size: 12px; }
 .home-page .side-link.active .nav-icon { background: transparent; color: #d5f0dd; }
-.home-page .side-link:nth-of-type(n + 6) { display: none; }
 .home-page .sidebar-footer { display: flex; gap: 16px; align-items: center; margin: 0; }
 .home-page .local-status { padding: 8px 10px; border: 1px solid rgba(183, 226, 198, .2); background: rgba(183, 226, 198, .1); color: #c5e9cf; }
 .home-page .local-status strong { font-size: 12px; }
@@ -266,9 +265,7 @@
   .home-page .help-card:hover { transform: none; }
 }
 
-/* Top bar: line icons, six links on desktop, GitHub and download on the right. */
-.home-page .side-link:nth-of-type(n + 6) { display: flex; }
-.home-page .side-link:nth-of-type(n + 7) { display: none; }
+/* Top bar: keep every section link visible, with download as the primary action. */
 .home-page .side-link { display: flex; gap: 7px; align-items: center; padding: 9px 13px; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
 .home-page .nav-svg { flex: 0 0 auto; color: #8fd3a6; opacity: .9; transition: color .2s ease, opacity .2s ease; }
 .home-page .side-link:hover .nav-svg, .home-page .side-link.is-current .nav-svg { color: #c9f0d5; opacity: 1; }
@@ -284,7 +281,6 @@
   .home-page .sidebar { grid-template-columns: auto minmax(0, 1fr) auto; }
   .home-page .sidebar-footer.nav-actions { display: flex; }
   .home-page .side-link .nav-svg { display: none; }
-  .home-page .side-link:nth-of-type(n + 5) { display: none; }
 }
 @media (max-width: 700px) {
   .home-page .sidebar { grid-template-columns: 1fr auto; }

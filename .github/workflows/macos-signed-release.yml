@@ -1,4 +1,4 @@
-name: Signed macOS release
+name: macOS release
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build and upload (for example v1.3.21)
+        description: Release tag to build and upload (for example v1.3.22)
         required: true
         type: string
 
@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   macos:
-    name: Build, notarize and upload macOS DMG
+    name: Build and upload macOS DMG
     runs-on: macos-15
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
@@ -31,18 +31,22 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
-      - name: Require Apple signing and notarization secrets
+      - name: Select signed or no-cost unsigned distribution
+        id: signing
         shell: bash
         run: |
-          missing=0
+          present=0
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID KEYCHAIN_PASSWORD; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "Missing required GitHub Actions secret: $name" >&2
-              missing=1
-            fi
+            [[ -z "${!name:-}" ]] || ((present+=1))
           done
-          if [[ "$missing" -ne 0 ]]; then
-            echo "Refusing to publish an unsigned or unnotarized macOS build." >&2
+          if [[ "$present" -eq 0 ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "No Apple signing secrets configured; building the free-download DMG." >> "$GITHUB_STEP_SUMMARY"
+          elif [[ "$present" -eq 6 ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Apple Developer ID signing and notarization will be used." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Apple signing is partially configured. Provide all six secrets or remove them all." >&2
             exit 1
           fi
 
@@ -62,6 +66,7 @@ jobs:
         run: npm ci
 
       - name: Import Developer ID certificate
+        if: steps.signing.outputs.enabled == 'true'
         shell: bash
         run: |
           printf '%s' "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
@@ -86,11 +91,13 @@ jobs:
           echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
           rm -f certificate.p12
 
-      - name: Build and notarize universal DMG
+      - name: Build universal DMG
         run: npx tauri build --target universal-apple-darwin --bundles dmg
 
-      - name: Verify signed and notarized app
+      - name: Verify app bundle and architecture
         shell: bash
+        env:
+          SIGNED: ${{ steps.signing.outputs.enabled }}
         run: |
           set -euo pipefail
           dmg=$(find src-tauri/target -type f -name '*.dmg' -print -quit)
@@ -99,11 +106,19 @@ jobs:
           hdiutil attach "$dmg" -nobrowse -readonly -mountpoint "$mountpoint" >/dev/null
           app=$(find "$mountpoint" -maxdepth 1 -name '*.app' -print -quit)
           [[ -n "$app" ]] || { echo 'App bundle was not found in DMG.' >&2; exit 1; }
-          codesign --verify --deep --strict --verbose=2 "$app"
-          spctl --assess --type execute --verbose=4 "$app"
+          executable="$app/Contents/MacOS/dawith-search"
+          [[ -f "$executable" ]] || { echo 'Dawith Search executable was not found.' >&2; exit 1; }
+          architectures=$(lipo -archs "$executable")
+          [[ "$architectures" == *arm64* && "$architectures" == *x86_64* ]] || { echo "Expected universal binary, got: $architectures" >&2; exit 1; }
+          if [[ "$SIGNED" == 'true' ]]; then
+            codesign --verify --deep --strict --verbose=2 "$app"
+            spctl --assess --type execute --verbose=4 "$app"
+          else
+            echo 'No-cost DMG is not Developer ID signed or notarized; first-open instructions are on the download page.'
+          fi
           hdiutil detach "$mountpoint" >/dev/null
 
-      - name: Upload notarized DMG to GitHub Release
+      - name: Upload macOS DMG to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -16,9 +16,9 @@
   var DOWNLOAD_PREFIX = 'https://github.com/dawith-ai/dawith-search/releases/';
   var CACHE_KEY = 'dawith-latest-release:v2';
   var CACHE_MS = 10 * 60 * 1000;
-  var WIN_SETUP = /^Dawith-Search_[\d.]+_x64-setup\.exe$/;
+  var WIN_SETUP = /^Dawith(?:-| )Search_[\d.]+_x64-setup\.exe$/;
   // Prefer the lightweight Tauri Universal package over the Electron fallback.
-  var MAC_DMG = /^Dawith\.Search_[\d.]+_universal\.dmg$/i;
+  var MAC_DMG = /^Dawith[ .-]Search_[\d.]+_universal\.dmg$/i;
   // Linux packages are attached by CI a few minutes after the release.
   var LINUX_DEB = /^Dawith\.Search_[\d.]+_amd64\.deb$/;
   var LINUX_RPM = /^Dawith\.Search-[\d.]+-\d+\.x86_64\.rpm$/;

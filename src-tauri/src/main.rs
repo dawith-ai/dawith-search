@@ -29,6 +29,10 @@ struct LocalIndex {
     total_folders: usize,
 }
 
+// Finder-launched macOS apps can inherit no PATH from launchd. Use Spotlight's
+// system binary by absolute path so searches do not depend on a shell profile.
+const SPOTLIGHT_COMMAND: &str = "/usr/bin/mdfind";
+
 // The release build uses the Windows GUI subsystem, so every console child
 // (everything-ipc, goz, powershell, cmd) would otherwise open its own window.
 fn hidden_command<S: AsRef<std::ffi::OsStr>>(program: S) -> Command {
@@ -886,7 +890,7 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
         if records.len() >= limit {
             break;
         }
-        let output = hidden_command("mdfind")
+        let output = hidden_command(SPOTLIGHT_COMMAND)
             .arg("-onlyin")
             .arg(root)
             .arg(&expression)
@@ -2650,6 +2654,7 @@ mod tests {
             mac_spotlight_expression("kakao"),
             "kMDItemFSName == \"*kakao*\"cd"
         );
+        assert_eq!(SPOTLIGHT_COMMAND, "/usr/bin/mdfind");
     }
 
     #[test]

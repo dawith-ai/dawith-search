@@ -2696,6 +2696,9 @@ mod tests {
     #[test]
     fn guide_url_uses_the_hosted_vercel_help_page() {
         assert_eq!(HELP_URL, "https://dawith-search-guide.vercel.app/");
+        let opened = open_guide().expect("the OS should accept the guide URL");
+        assert_eq!(opened["success"], true);
+        assert_eq!(opened["url"], HELP_URL);
     }
 
     #[test]

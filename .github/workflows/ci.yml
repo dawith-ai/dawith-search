@@ -100,6 +100,7 @@ jobs:
         include:
           - os: macos-15
           - os: windows-latest
+          - os: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -110,6 +111,9 @@ jobs:
           cache: npm
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux Tauri dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf rpm xvfb
       - name: Setup MSVC for Everything SDK IPC helper
         if: matrix.os == 'windows-latest'
         uses: ilammy/msvc-dev-cmd@v1
@@ -127,6 +131,17 @@ jobs:
       - name: Build Tauri Windows package
         if: matrix.os == 'windows-latest'
         run: npm run build:tauri
+      - name: Build Tauri Linux packages
+        if: matrix.os == 'ubuntu-22.04'
+        run: npx tauri build --bundles deb,rpm,appimage --config '{"bundle":{"resources":{"../bin/native/windows/x64/*.exe":null}}}'
+      - name: Open the hosted guide through the native OS handler
+        if: matrix.os == 'ubuntu-22.04'
+        env:
+          BROWSER: google-chrome
+        run: xvfb-run -a cargo test --manifest-path src-tauri/Cargo.toml guide_url_uses_the_hosted_vercel_help_page -- --nocapture
+      - name: Open the hosted guide through the native OS handler
+        if: matrix.os != 'ubuntu-22.04'
+        run: cargo test --manifest-path src-tauri/Cargo.toml guide_url_uses_the_hosted_vercel_help_page -- --nocapture
       - name: Verify Tauri package contents
         run: npm run verify:tauri
       - name: Upload Tauri artifacts

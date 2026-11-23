@@ -575,7 +575,12 @@ async function run() {
   const rendererSource = fs.readFileSync(path.join(repoRoot, 'src/renderer/app.js'), 'utf8');
   assert.ok(rendererSource.includes('window.dawithAPI.openGuide().then(result =>'));
   assert.ok(rendererSource.includes('사용 안내 페이지를 열지 못했습니다. 인터넷 연결을 확인한 뒤 다시 눌러 주세요.'));
-  record('사용 안내 링크', '앱 메뉴 버튼, Electron·Tauri Vercel 연결, 실패 안내 확인');
+  await evaluate("window.__guideOpenError = null; window.alert = message => { window.__guideOpenError = String(message); };");
+  await click('#syntaxHintBtn');
+  await wait(1500);
+  const guideOpenError = await evaluate('window.__guideOpenError');
+  assert.strictEqual(guideOpenError, null, `The app could not open its guide on ${process.platform}: ${guideOpenError}`);
+  record('사용 안내 실제 실행', `앱 버튼 → Electron IPC → ${process.platform} 기본 브라우저 호출 성공`);
 
   await saveScreenshot();
   console.log(`E2E_SCREENSHOT=${screenshotPath}`);

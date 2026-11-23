@@ -119,6 +119,15 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
       - name: Install dependencies
         run: npm ci
+      - name: Prepare headless Linux URL handler
+        if: matrix.os == 'ubuntu-22.04'
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/dawith-test-bin"
+          cp tests/fixtures/ci-xdg-open.sh "$RUNNER_TEMP/dawith-test-bin/xdg-open"
+          chmod +x "$RUNNER_TEMP/dawith-test-bin/xdg-open"
+          echo "$RUNNER_TEMP/dawith-test-bin" >> "$GITHUB_PATH"
+          echo "DAWITH_TEST_OPEN_LOG=$RUNNER_TEMP/dawith-guide-open.log" >> "$GITHUB_ENV"
       - name: Add macOS universal Rust targets
         if: matrix.os == 'macos-15'
         run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
@@ -137,8 +146,10 @@ jobs:
       - name: Open the hosted guide through the native OS handler
         if: matrix.os == 'ubuntu-22.04'
         env:
-          BROWSER: google-chrome
-        run: xvfb-run -a cargo test --manifest-path src-tauri/Cargo.toml guide_url_uses_the_hosted_vercel_help_page -- --nocapture
+          BROWSER: xdg-open
+        run: |
+          xvfb-run -a cargo test --manifest-path src-tauri/Cargo.toml guide_url_uses_the_hosted_vercel_help_page -- --nocapture
+          grep -Fx 'https://dawith-search-guide.vercel.app/' "$DAWITH_TEST_OPEN_LOG"
       - name: Open the hosted guide through the native OS handler
         if: matrix.os != 'ubuntu-22.04'
         run: cargo test --manifest-path src-tauri/Cargo.toml guide_url_uses_the_hosted_vercel_help_page -- --nocapture

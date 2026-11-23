@@ -54,6 +54,17 @@ function createFixture() {
   fs.mkdirSync(path.join(tempHome, '.dawith-search'), { recursive: true });
   fs.mkdirSync(userDataDir, { recursive: true });
 
+  if (process.platform === 'linux' && process.env.GITHUB_ACTIONS === 'true') {
+    const binDir = path.join(tempHome, 'bin');
+    fs.mkdirSync(binDir, { recursive: true });
+    const openLog = path.join(tempHome, 'guide-open.log');
+    const openShim = path.join(binDir, 'xdg-open');
+    fs.writeFileSync(openShim, '#!/bin/sh\nprintf "%s\\n" "$@" >> "$DAWITH_TEST_OPEN_LOG"\n', 'utf8');
+    fs.chmodSync(openShim, 0o755);
+    process.env.DAWITH_TEST_OPEN_LOG = openLog;
+    process.env.PATH = `${binDir}${path.delimiter}${process.env.PATH || ''}`;
+  }
+
   fs.writeFileSync(
     path.join(fixtureRoot, 'contract-agreement.txt'),
     '사회복지기관 계약서\n수급자 개인정보 보호와 사례관리 업무를 위한 문서입니다.\n',
@@ -580,7 +591,12 @@ async function run() {
   await wait(1500);
   const guideOpenError = await evaluate('window.__guideOpenError');
   assert.strictEqual(guideOpenError, null, `The app could not open its guide on ${process.platform}: ${guideOpenError}`);
-  record('사용 안내 실제 실행', `앱 버튼 → Electron IPC → ${process.platform} 기본 브라우저 호출 성공`);
+  if (process.platform === 'linux' && process.env.GITHUB_ACTIONS === 'true') {
+    await waitFor('Linux system URL handler invocation', () => fs.existsSync(process.env.DAWITH_TEST_OPEN_LOG));
+    const openedUrls = fs.readFileSync(process.env.DAWITH_TEST_OPEN_LOG, 'utf8').trim().split(/\r?\n/);
+    assert.ok(openedUrls.includes('https://dawith-search-guide.vercel.app/'), `Linux URL handler received: ${openedUrls.join(', ')}`);
+  }
+  record('사용 안내 OS 열기', `앱 버튼 → Electron IPC → ${process.platform} URL 처리기에 Vercel 주소 전달 성공`);
 
   await saveScreenshot();
   console.log(`E2E_SCREENSHOT=${screenshotPath}`);

@@ -564,41 +564,14 @@ async function run() {
   await evaluate("document.querySelector('#btnCloseConversion').click()");
   record('검색 결과 변환 UI', '결과 행 변환 버튼·변환 옵션 모달 확인');
 
-  await click('#syntaxHintBtn');
-  const guideTarget = await waitForDebugTarget(port, item => item.type === 'page' && item.url.includes('guide.html'));
-  const guideSocket = new WebSocket(guideTarget.webSocketDebuggerUrl);
-  await new Promise((resolve, reject) => {
-    guideSocket.once('open', resolve);
-    guideSocket.once('error', reject);
-  });
-  let guideCdpId = 0;
-  const guidePending = new Map();
-  guideSocket.on('message', message => {
-    const payload = JSON.parse(message.toString());
-    if (!payload.id || !guidePending.has(payload.id)) return;
-    const pending = guidePending.get(payload.id);
-    guidePending.delete(payload.id);
-    if (payload.error) pending.reject(new Error(payload.error.message));
-    else pending.resolve(payload.result);
-  });
-  const guideCdp = (method, params = {}) => new Promise((resolve, reject) => {
-    const id = ++guideCdpId;
-    guidePending.set(id, { resolve, reject });
-    guideSocket.send(JSON.stringify({ id, method, params }));
-  });
-  await guideCdp('Runtime.enable');
-  const guideResult = await waitFor('guide document', async () => {
-    const result = await guideCdp('Runtime.evaluate', {
-      expression: "document.readyState === 'complete' ? ({ title: document.title, links: [...document.querySelectorAll('a')].map(a => a.href), text: document.body.innerText }) : null",
-      returnByValue: true
-    });
-    return result.result?.value || false;
-  }, 10000, 100);
-  guideSocket.close();
-  assert.strictEqual(guideResult.title, 'Dawith Search 사용 안내');
-  assert.ok(guideResult.links.some(link => link.includes('voidtools.com/ko-kr/')));
-  assert.ok(guideResult.links.some(link => link.includes('github.com/dawith-ai/dawith-search/releases/latest')));
-  record('사용 안내 페이지', 'Voidtools 공식 링크·최신 앱 다운로드 링크 확인');
+  const mainSource = fs.readFileSync(path.join(repoRoot, 'src/main/main.js'), 'utf8');
+  const tauriSource = fs.readFileSync(path.join(repoRoot, 'src-tauri/src/main.rs'), 'utf8');
+  assert.ok(mainSource.includes("const HELP_URL = 'https://dawith-search-guide.vercel.app/'"));
+  assert.ok(mainSource.includes('await shell.openExternal(HELP_URL)'));
+  assert.ok(tauriSource.includes('const HELP_URL: &str = "https://dawith-search-guide.vercel.app/"'));
+  assert.ok(tauriSource.includes('run_open(Path::new(HELP_URL))'));
+  assert.ok(await evaluate("Boolean(document.querySelector('#syntaxHintBtn'))"));
+  record('사용 안내 링크', '앱 메뉴 버튼과 Electron·Tauri 양쪽 Vercel 연결 확인');
 
   await saveScreenshot();
   console.log(`E2E_SCREENSHOT=${screenshotPath}`);

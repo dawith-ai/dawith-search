@@ -29,7 +29,7 @@ const RootManager = require('../engine/root-manager');
 const UpdateManager = require('./update-manager');
 
 let mainWindow = null;
-let guideWindow = null;
+const HELP_URL = 'https://dawith-search-guide.vercel.app/';
 let tray = null;
 let indexer = null;
 let remoteServer = null;
@@ -113,37 +113,6 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-  });
-}
-
-function openGuideWindow() {
-  if (guideWindow && !guideWindow.isDestroyed()) {
-    guideWindow.show();
-    guideWindow.focus();
-    return;
-  }
-
-  guideWindow = new BrowserWindow({
-    width: 1120,
-    height: 800,
-    minWidth: 780,
-    minHeight: 620,
-    title: 'Dawith Search 사용 안내',
-    backgroundColor: '#0a0f19',
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true
-    }
-  });
-  guideWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) {
-      shell.openExternal(url).catch(error => writeCrashLog('EXTERNAL_OPEN_FAILED: ' + error.stack));
-    }
-    return { action: 'deny' };
-  });
-  guideWindow.loadFile(path.join(__dirname, '../renderer/guide.html'));
-  guideWindow.on('closed', () => {
-    guideWindow = null;
   });
 }
 
@@ -671,9 +640,14 @@ ipcMain.handle('download-update', async () => {
   }
 });
 
-ipcMain.handle('open-guide', () => {
-  openGuideWindow();
-  return { success: true };
+ipcMain.handle('open-guide', async () => {
+  try {
+    await shell.openExternal(HELP_URL);
+    return { success: true, url: HELP_URL };
+  } catch (error) {
+    writeCrashLog('OPEN_GUIDE_FAILED: ' + error.stack);
+    return { success: false, error: error.message, url: HELP_URL };
+  }
 });
 
 ipcMain.handle('save-config', (event, config) => {

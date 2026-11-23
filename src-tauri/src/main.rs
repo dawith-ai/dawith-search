@@ -395,6 +395,22 @@ fn walk_dir_parallel(dir: &Path, depth: usize, max_depth: usize, root_index: usi
 fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
     let state = app.state::<AppState>();
     let config = state.config.lock().map_err(|_| "설정 잠금에 실패했습니다.")?.clone();
+    let mut scan_roots: Vec<PathBuf> = if cfg!(target_os = "macos") {
+        supplemental_index_roots(&config)
+    } else {
+        config_roots(&config)
+    }
+    .into_iter()
+    .filter(|root| root.exists())
+    .collect();
+    if cfg!(target_os = "macos") {
+        // macOS local files are already indexed by Spotlight. Walking the
+        // entire home directory here duplicated that work and triggered
+        // avoidable permission prompts and disk activity on every launch.
+        if scan_roots.is_empty() {
+            return Ok(false);
+        }
+    }
     if use_everything(&config) && cfg!(windows) && everything_ipc_ready(app).map(|(_, ready)| ready).unwrap_or(false) {
         // Start the resident helper now so the first search does not pay
         // for launching it.
@@ -429,7 +445,7 @@ fn start_local_indexing(app: &AppHandle) -> Result<bool, String> {
     let worker_app = app.clone();
     std::thread::spawn(move || {
         let mut roots: Vec<PathBuf> = Vec::new();
-        for root in config_roots(&config).into_iter().filter(|root| root.exists()) {
+        for root in scan_roots {
             // Skip a root that sits inside one already listed.
             if roots.iter().any(|known| is_path_within(&root, known)) { continue; }
             roots.retain(|known| !is_path_within(known, &root));
@@ -620,6 +636,14 @@ fn local_roots(config: &Value) -> Vec<PathBuf> {
         .and_then(Value::as_array)
         .map(|roots| roots.iter().filter_map(Value::as_str).map(PathBuf::from).collect())
         .unwrap_or_default()
+}
+
+fn supplemental_index_roots(config: &Value) -> Vec<PathBuf> {
+    let local = local_roots(config);
+    config_roots(config)
+        .into_iter()
+        .filter(|root| !local.iter().any(|known| is_path_within(root, known)))
+        .collect()
 }
 
 // Builds a result row from a native backend item. Metadata the backend already
@@ -2375,9 +2399,9 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
-const HELP_URL: &str = "https://dawith-ai.github.io/dawith-search/help.html";
+const HELP_URL: &str = "https://dawith-search-guide.vercel.app/";
 
-/// "사용 안내" opens Dawith Search's own help page.
+/// Opens the current hosted guide in the system browser on every platform.
 #[tauri::command]
 fn open_guide() -> Value {
     let _ = run_open(Path::new(HELP_URL));
@@ -2655,6 +2679,23 @@ mod tests {
             "kMDItemFSName == \"*kakao*\"cd"
         );
         assert_eq!(SPOTLIGHT_COMMAND, "/usr/bin/mdfind");
+    }
+
+    #[test]
+    fn mac_supplemental_index_skips_paths_already_covered_by_spotlight_local_roots() {
+        let config = json!({
+            "roots": ["/Users/example", "/Volumes/team-share", "/Volumes/archive/project"],
+            "localRoots": ["/Users/example"]
+        });
+        assert_eq!(
+            supplemental_index_roots(&config),
+            vec![PathBuf::from("/Volumes/team-share"), PathBuf::from("/Volumes/archive/project")]
+        );
+    }
+
+    #[test]
+    fn guide_url_uses_the_hosted_vercel_help_page() {
+        assert_eq!(HELP_URL, "https://dawith-search-guide.vercel.app/");
     }
 
     #[test]

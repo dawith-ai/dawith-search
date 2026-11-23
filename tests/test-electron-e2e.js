@@ -4,7 +4,7 @@ const fs = require('fs');
 const http = require('http');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const WebSocket = require('ws');
 
 const repoRoot = path.resolve(__dirname, '..');
@@ -599,6 +599,13 @@ async function run() {
     process.exitCode = 1;
   } finally {
     await closeApp();
+    // The Windows smoke test opens the real system browser. Edge inherits the
+    // isolated E2E profile and keeps its database files locked until it exits.
+    // GitHub-hosted runners are disposable; never terminate a local user's browser.
+    if (process.platform === 'win32' && process.env.GITHUB_ACTIONS === 'true') {
+      spawnSync('taskkill', ['/F', '/IM', 'msedge.exe'], { windowsHide: true, timeout: 10000 });
+      await wait(500);
+    }
     fs.rmSync(fixtureRoot, { recursive: true, force: true });
     fs.rmSync(tempHome, { recursive: true, force: true });
     fs.rmSync(userDataDir, { recursive: true, force: true });

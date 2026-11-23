@@ -16,7 +16,9 @@
   var DOWNLOAD_PREFIX = 'https://github.com/dawith-ai/dawith-search/releases/';
   var CACHE_KEY = 'dawith-latest-release:v2';
   var CACHE_MS = 10 * 60 * 1000;
-  var WIN_SETUP = /^Dawith[ .-]Search_[\d.]+_x64-setup\.exe$/;
+  // Electron publishes the lightweight NSIS web installer. Keep the legacy
+  // Tauri filename for older releases so the guide works across both formats.
+  var WIN_SETUP = /^(?:Dawith[ .-]Search_[\d.]+_x64-setup\.exe|DawithSearch-[\d.]+-web-setup\.exe)$/;
   // Prefer the lightweight Tauri Universal package over the Electron fallback.
   var MAC_DMG = /^Dawith[ .-]Search_[\d.]+_universal\.dmg$/i;
   // Linux packages are attached by CI a few minutes after the release.

@@ -9,7 +9,7 @@
 </head>
 <body class="light-theme">
   <!-- Custom Titlebar -->
-  <div class="titlebar">
+  <div class="titlebar" data-tauri-drag-region>
     <div class="titlebar-drag" data-tauri-drag-region>
       <div class="logo">
         <img class="logo-icon" src="assets/icon.png" alt="Dawith CI" data-tauri-drag-region>
@@ -26,12 +26,12 @@
       </div>
     </div>
     <div class="titlebar-controls">
-      <div class="view-switcher" role="group" aria-label="화면 보기 전환">
+      <div class="view-switcher" data-tauri-drag-region role="group" aria-label="화면 보기 전환">
         <span class="view-switcher-label">보기</span>
         <button class="view-switch-btn" id="btnViewSimple" type="button" aria-pressed="false" title="검색 중심의 간편 화면">간편</button>
         <button class="view-switch-btn" id="btnViewAdvanced" type="button" aria-pressed="true" title="필터·분석·저장 기능을 포함한 화면">기능</button>
       </div>
-      <div class="view-switcher tauri-only" id="bodySearchSwitch" role="group" aria-label="본문 검색 켜기·끄기">
+      <div class="view-switcher tauri-only" id="bodySearchSwitch" data-tauri-drag-region role="group" aria-label="본문 검색 켜기·끄기">
         <span class="view-switcher-label">본문</span>
         <button class="view-switch-btn" id="btnBodySearchOff" type="button" aria-pressed="true" title="문서 내용은 읽지 않습니다">끔</button>
         <button class="view-switch-btn" id="btnBodySearchOn" type="button" aria-pressed="false" title="고른 폴더의 문서 내용으로도 찾습니다 (켤 때 안내를 확인합니다)">켬</button>

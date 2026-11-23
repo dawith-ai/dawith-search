@@ -34,6 +34,9 @@ class Indexer extends EventEmitter {
 
     // Configuration
     this.config = this.loadConfig();
+    if (this.nativeSearch && typeof this.nativeSearch.warmSpotlight === 'function') {
+      this.nativeSearch.warmSpotlight(this.config.roots);
+    }
     this.isIndexing = false;
     this.stats = {
       totalFiles: 0,

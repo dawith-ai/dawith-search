@@ -130,6 +130,25 @@ class NativeSearchAdapter {
     this.everythingIpcStatusCheckedAt = 0;
     this.gozStatus = null;
     this.gozStatusCheckedAt = 0;
+    this.spotlightWarmupStarted = false;
+  }
+
+  warmSpotlight(roots = []) {
+    if (this.platform !== 'darwin' || this.spotlightWarmupStarted) return;
+    this.spotlightWarmupStarted = true;
+    const root = Array.isArray(roots) && roots.length > 0 ? roots[0] : os.homedir();
+    try {
+      // Start mdfind while the window is loading so the first user query does
+      // not pay the macOS metadata/parser startup cost. This is deliberately
+      // a no-match query and never blocks the search path.
+      this.spawn('mdfind', ['-onlyin', root, '-name', '__dawith_search_warmup__'], {
+        timeout: 1500,
+        maxBuffer: 1024
+      }, () => {});
+    } catch (error) {
+      // Spotlight is an optional accelerator. A missing or restricted helper
+      // must not prevent the local index fallback from starting.
+    }
   }
 
   findEverythingIpcCli() {
@@ -478,23 +497,34 @@ class NativeSearchAdapter {
         return { supported: false, error: result.error.message };
       }
 
-      for (const fullPath of String(result.stdout || '').split(/\r?\n/).filter(Boolean)) {
-        let stat;
-        try {
-          stat = await fs.promises.stat(fullPath);
-        } catch (error) {
-          continue;
-        }
-        const record = normalizeEverythingRecord({
-          name: path.basename(fullPath),
-          path: path.dirname(fullPath),
-          fullPath,
-          size: stat.isDirectory() ? 0 : stat.size,
-          mtime: stat.mtimeMs,
-          ctime: stat.birthtimeMs || stat.ctimeMs,
-          isDir: stat.isDirectory()
-        });
-        if (QueryParser.matches(record, parsed)) {
+      const candidatePaths = String(result.stdout || '').split(/\r?\n/).filter(Boolean);
+      // Spotlight returns paths quickly, but stat-ing hundreds of candidates one by one
+      // made the first visible result wait for every earlier candidate. Keep the work
+      // bounded so the filesystem is not flooded while allowing the first batch to
+      // complete together.
+      const statBatchSize = 64;
+      for (let offset = 0; offset < candidatePaths.length && records.length < limit; offset += statBatchSize) {
+        const batch = candidatePaths.slice(offset, offset + statBatchSize);
+        const batchRecords = await Promise.all(batch.map(async fullPath => {
+          let stat;
+          try {
+            stat = await fs.promises.stat(fullPath);
+          } catch (error) {
+            return null;
+          }
+          return normalizeEverythingRecord({
+            name: path.basename(fullPath),
+            path: path.dirname(fullPath),
+            fullPath,
+            size: stat.isDirectory() ? 0 : stat.size,
+            mtime: stat.mtimeMs,
+            ctime: stat.birthtimeMs || stat.ctimeMs,
+            isDir: stat.isDirectory()
+          });
+        }));
+
+        for (const record of batchRecords) {
+          if (!record || !QueryParser.matches(record, parsed)) continue;
           records.push(record);
           if (records.length >= limit) break;
         }

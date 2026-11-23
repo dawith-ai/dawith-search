@@ -206,9 +206,11 @@ async function pageState() {
     emptyTitle: document.querySelector('#emptyTitle')?.textContent || '',
     emptySub: document.querySelector('#emptySub')?.textContent || '',
     tauriDragRegions: {
+      titlebar: document.querySelector('.titlebar')?.hasAttribute('data-tauri-drag-region') || false,
       bar: document.querySelector('.titlebar-drag')?.hasAttribute('data-tauri-drag-region') || false,
       brand: document.querySelector('.logo-text')?.hasAttribute('data-tauri-drag-region') || false,
-      status: document.querySelector('#titlebarStatusText')?.hasAttribute('data-tauri-drag-region') || false
+      status: document.querySelector('#titlebarStatusText')?.hasAttribute('data-tauri-drag-region') || false,
+      view: document.querySelector('.titlebar-controls .view-switcher')?.hasAttribute('data-tauri-drag-region') || false
     },
     rows: document.querySelectorAll('#tableBody .table-row').length,
     rowText: document.querySelector('#tableBody')?.textContent || '',
@@ -310,8 +312,8 @@ async function run() {
   assert.strictEqual(initialState.hasApi, true);
   assert.strictEqual(initialState.title, 'Dawith Search');
   record('앱 창·렌더러·preload API 로드', `색인 상태: ${initialState.indexed}`);
-  assert.deepStrictEqual(initialState.tauriDragRegions, { bar: true, brand: true, status: true });
-  record('상단 바 드래그 영역', '여백·앱 이름·상태 글자에 Tauri 창 이동 속성이 적용됨');
+  assert.deepStrictEqual(initialState.tauriDragRegions, { titlebar: true, bar: true, brand: true, status: true, view: true });
+  record('상단 바 드래그 영역', '상단 전체와 보기 메뉴에 창 이동 속성을 적용하고 메뉴 버튼 클릭은 유지');
 
   assert.strictEqual(await evaluate("document.querySelectorAll('.mode-choice-preview').length"), 2);
   assert.strictEqual(await evaluate("document.querySelector('.titlebar-controls #btnViewSimple') !== null"), true);

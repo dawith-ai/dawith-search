@@ -77,6 +77,7 @@ body {
   align-items: center;
   border-bottom: 1px solid var(--border-color);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03);
+  -webkit-app-region: drag;
 }
 
 .titlebar-drag {
@@ -186,6 +187,14 @@ body {
   flex: 0 0 auto;
   height: 31px;
   margin-right: 4px;
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+.titlebar-controls .view-switcher:active { cursor: grabbing; }
+.titlebar-controls .view-switcher-label { -webkit-app-region: drag; }
+.titlebar-controls .view-switch-btn {
+  -webkit-app-region: no-drag;
+  cursor: pointer;
 }
 
 .win-btn {

@@ -170,6 +170,20 @@ assert.match(spotlightExpression, /kMDItemFSName == \"\*AI목소리\*\"cd/);
 assert.doesNotMatch(spotlightExpression, /-name/);
 assert.strictEqual(canUseSpotlightNameFastPath(QueryParser.parse('report')), true);
 assert.strictEqual(canUseSpotlightNameFastPath(QueryParser.parse('보고서')), false);
+let spotlightWarmupCalls = 0;
+const warmupSpotlight = new NativeSearchAdapter({
+  platform: 'darwin',
+  spawn: (command, args, options, callback) => {
+    spotlightWarmupCalls += 1;
+    assert.strictEqual(command, 'mdfind');
+    assert.deepStrictEqual(args, ['-onlyin', '/Users/dawith', '-name', '__dawith_search_warmup__']);
+    callback(null, '', '');
+  }
+});
+warmupSpotlight.warmSpotlight(['/Users/dawith']);
+warmupSpotlight.warmSpotlight(['/Users/dawith']);
+assert.strictEqual(spotlightWarmupCalls, 1, 'Spotlight warmup must run only once per app process');
+console.log('  ✓ Spotlight first-query warmup is bounded and non-blocking');
 assert.strictEqual(QueryParser.matches({
   name: 'AI목소리_edge_비교.mp3',
   path: '/Users/dawith/Desktop',

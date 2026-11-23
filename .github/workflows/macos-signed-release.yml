@@ -16,7 +16,9 @@ permissions:
 jobs:
   macos:
     name: Build and upload macOS DMG
-    runs-on: macos-15
+    # macos-15 can remain queued when the public runner pool is saturated;
+    # macos-14 provides the same universal-build toolchain with better availability.
+    runs-on: macos-14
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:

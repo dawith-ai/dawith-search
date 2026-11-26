@@ -1,15 +1,19 @@
 name: Windows release
 
-# Build the public Windows installer when a GitHub release is published.
-# The regular CI package is retained for pull-request and push validation;
-# this workflow attaches the verified installer to the release users download.
+# Build the lightweight Tauri installer (about 5 MB) when a GitHub release is
+# published and attach it under two names:
+#   Dawith-Search_<ver>_x64-setup.exe  the download page and the Tauri app's updater
+#   DawithSearch-<ver>-portable.exe    the 1.3.22-1.3.24 Electron app's updater, so
+#                                      those users move to the Tauri build too
+# If a maintainer already uploaded a verified installer under a name, that
+# file is kept (its SHA-256 is published on the download page).
 on:
   release:
     types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag to build and upload (for example v1.3.24)
+        description: Release tag to build and upload (for example v1.3.25)
         required: true
         type: string
 
@@ -34,27 +38,42 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Windows installer
-        run: npm run build:win
+      - name: Build Tauri installer
+        run: npm run build:tauri
 
-      - name: Verify packaged app contents
-        run: node scripts/verify-build-artifacts.js
+      - name: Verify Tauri artifacts
+        run: npm run verify:tauri
 
-      - name: Upload Windows installers to GitHub Release
+      - name: Upload Windows installer to GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          files=(dist/DawithSearch-*.exe dist/nsis-web/DawithSearch-*.exe)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo 'No Windows installers were built.' >&2
+          version="${TAG#v}"
+          setup=$(ls src-tauri/target/release/bundle/nsis/*_x64-setup.exe | head -n 1)
+          if [ -z "$setup" ]; then
+            echo 'No Windows installer was built.' >&2
             exit 1
           fi
-          gh release upload "$TAG" "${files[@]}" --clobber
+          mkdir -p upload
+          cp "$setup" "upload/Dawith-Search_${version}_x64-setup.exe"
+          cp "$setup" "upload/DawithSearch-${version}-portable.exe"
+          existing=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          for file in upload/*.exe; do
+            name=$(basename "$file")
+            if grep -qxF "$name" <<<"$existing"; then
+              echo "Keeping the $name already on the release."
+            else
+              gh release upload "$TAG" "$file"
+            fi
+          done

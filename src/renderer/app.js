@@ -16,6 +16,13 @@ let lastSearchAt = 0;
 let lastRenderedSignature = '';
 let lastSearchWarning = '';
 let lastSearchIndexing = false;
+// Results come in pages: scrolling to the end of the list asks for more.
+const RESULT_PAGE = 200;
+const RESULT_MAX = 5000;
+let resultLimit = RESULT_PAGE;
+let resultKey = '';
+let lastTotalMatches = 0;
+let loadingMoreResults = false;
 let searchInFlight = false;
 let searchQueued = false;
 let resultsRenderToken = 0;
@@ -789,13 +796,21 @@ async function runSearch() {
 
   clearBtn.style.display = rawInput ? 'block' : 'none';
 
+  // A new query starts again from the first page.
+  const key = [query, currentSortBy, currentSortOrder, scopeRoot || ''].join('\u0000');
+  if (key !== resultKey) {
+    resultKey = key;
+    resultLimit = RESULT_PAGE;
+  }
+  const loadingMore = loadingMoreResults;
+
   try {
     const res = await window.dawithAPI.search(query, {
       sortBy: currentSortBy,
       sortOrder: currentSortOrder,
-      // Keep the result table responsive. The backend still reports the
-      // total match count while returning a compact first page for rendering.
-      limit: 200,
+      // The first page renders fast; scrolling to the end loads more
+      // (see the table's scroll handler). The backend reports the total.
+      limit: resultLimit,
       scopeRoot: scopeRoot || undefined,
       // Lets the index treat an unfinished last syllable as a prefix (직이 → 직인).
       composing: inputComposing
@@ -816,13 +831,23 @@ async function runSearch() {
     lastSearchWarning = res.warning || '';
     lastSearchIndexing = Boolean(res.indexing);
     const signature = currentFilter + '\u0000' + lastSearchWarning + '\u0000' + rawInput + '\u0000' + nextResults.map(item => item.fullPath + '|' + item.size + '|' + item.mtime + '|' + item.starred).join('\u0001');
+    lastTotalMatches = Number(res.totalMatches) || nextResults.length;
     if (signature !== lastRenderedSignature) {
       lastRenderedSignature = signature;
       searchResults = nextResults;
-      selectedIndex = searchResults.length > 0 ? 0 : -1;
-      selectedIndexes = searchResults.length > 0 ? new Set([0]) : new Set();
-      updateSelectionUI();
-      renderResults(searchResults, rawInput);
+      if (loadingMore) {
+        // More rows for the same search: keep the selection and the scroll spot.
+        const scrollTop = tableBody.scrollTop;
+        renderResults(searchResults, rawInput, { renderAll: true });
+        tableBody.scrollTop = scrollTop;
+      } else {
+        selectedIndex = searchResults.length > 0 ? 0 : -1;
+        selectedIndexes = searchResults.length > 0 ? new Set([0]) : new Set();
+        updateSelectionUI();
+        renderResults(searchResults, rawInput);
+      }
+    } else {
+      updateResultsFooter();
     }
 
     if (backendStatus) {
@@ -920,8 +945,31 @@ function refreshResultsForIndexing() {
   executeSearch();
 }
 
+// The last line of the list says how many of the matches are shown.
+function updateResultsFooter() {
+  tableBody.querySelector('.results-more')?.remove();
+  const shown = searchResults.length;
+  if (!shown || lastTotalMatches <= shown) return;
+  const footer = document.createElement('div');
+  footer.className = 'results-more';
+  footer.textContent = resultLimit >= RESULT_MAX
+    ? `전체 ${lastTotalMatches.toLocaleString()}개 중 ${shown.toLocaleString()}개까지 보여 줍니다. 검색어를 더 넣어 범위를 좁혀 보세요.`
+    : `전체 ${lastTotalMatches.toLocaleString()}개 중 ${shown.toLocaleString()}개 표시 · 아래로 내리면 더 불러옵니다`;
+  tableBody.appendChild(footer);
+}
+
+function loadMoreResultsIfNeeded() {
+  if (loadingMoreResults || resultLimit >= RESULT_MAX || searchResults.length >= lastTotalMatches) return;
+  if (tableBody.scrollTop + tableBody.clientHeight < tableBody.scrollHeight - 240) return;
+  loadingMoreResults = true;
+  resultLimit = Math.min(RESULT_MAX, resultLimit + 500);
+  executeSearch().finally(() => { loadingMoreResults = false; });
+}
+
+tableBody.addEventListener('scroll', loadMoreResultsIfNeeded, { passive: true });
+
 // Render Results Table
-function renderResults(items, currentQuery) {
+function renderResults(items, currentQuery, { renderAll = false } = {}) {
   const renderToken = ++resultsRenderToken;
   tableBody.innerHTML = '';
 
@@ -1066,18 +1114,31 @@ function renderResults(items, currentQuery) {
   // Building all rows at once blocked the UI for 100-150 ms per search.
   // Show the first screen immediately and add the rest one frame at a time;
   // a newer render cancels the remaining batches.
+  // Loading more for the same search adds everything at once so the scroll
+  // position can be restored right away.
+  if (renderAll) {
+    appendRows(0, items.length);
+    updateResultsFooter();
+    return;
+  }
   const batchSize = 40;
   let next = Math.min(items.length, batchSize);
   appendRows(0, next);
   scrollToSelected();
+  // setTimeout rather than requestAnimationFrame: animation frames pause
+  // while the window is covered, which left the list stuck at 40 rows.
   const appendNextBatch = () => {
-    if (renderToken !== resultsRenderToken || next >= items.length) return;
+    if (renderToken !== resultsRenderToken) return;
+    if (next >= items.length) {
+      updateResultsFooter();
+      return;
+    }
     const end = Math.min(items.length, next + batchSize);
     appendRows(next, end);
     next = end;
-    requestAnimationFrame(appendNextBatch);
+    setTimeout(appendNextBatch, 0);
   };
-  requestAnimationFrame(appendNextBatch);
+  setTimeout(appendNextBatch, 0);
 }
 
 function selectRow(index) {
@@ -1827,6 +1888,43 @@ document.getElementById('btnClearScope').addEventListener('click', () => {
 document.getElementById('btnSidebarCollapse').addEventListener('click', () => {
   workspaceSidebar.classList.toggle('is-collapsed');
 });
+
+// Drag the sidebar's right edge to change its width; double-click resets it.
+const SIDEBAR_WIDTH_KEY = 'dawith-sidebar-width';
+const sidebarResizer = document.getElementById('sidebarResizer');
+function setSidebarWidth(width, persist = true) {
+  if (width === null) {
+    workspaceSidebar.style.removeProperty('--sidebar-w');
+    if (persist) localStorage.removeItem(SIDEBAR_WIDTH_KEY);
+    return;
+  }
+  const next = Math.round(Math.max(170, Math.min(480, width)));
+  workspaceSidebar.style.setProperty('--sidebar-w', `${next}px`);
+  if (persist) localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next));
+}
+const savedSidebarWidth = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY));
+if (savedSidebarWidth) setSidebarWidth(savedSidebarWidth, false);
+if (sidebarResizer) {
+  sidebarResizer.addEventListener('mousedown', event => {
+    if (event.button !== 0 || workspaceSidebar.classList.contains('is-collapsed')) return;
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = workspaceSidebar.getBoundingClientRect().width;
+    document.body.classList.add('col-resizing');
+    workspaceSidebar.classList.add('is-resizing');
+    const onMove = ev => setSidebarWidth(startWidth + ev.clientX - startX, false);
+    const onUp = ev => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.classList.remove('col-resizing');
+      workspaceSidebar.classList.remove('is-resizing');
+      setSidebarWidth(startWidth + ev.clientX - startX);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+  sidebarResizer.addEventListener('dblclick', () => setSidebarWidth(null));
+}
 document.getElementById('btnCopySelectedPaths').addEventListener('click', copySelectedPaths);
 document.getElementById('btnConvertSelected').addEventListener('click', () => openConversionDialog(getSelectedItems()));
 document.getElementById('btnBatchRename').addEventListener('click', batchRenameSelected);

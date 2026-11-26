@@ -237,8 +237,8 @@ body {
 }
 
 .workspace-sidebar {
-  width: 238px;
-  min-width: 238px;
+  width: var(--sidebar-w, 238px);
+  min-width: var(--sidebar-w, 238px);
   padding: 18px 12px 14px;
   display: flex;
   flex-direction: column;
@@ -1977,8 +1977,8 @@ input:focus-visible,
   }
 
   .workspace-sidebar {
-    width: 210px;
-    min-width: 210px;
+    width: var(--sidebar-w, 210px);
+    min-width: var(--sidebar-w, 210px);
   }
 
   .filter-bar { padding-left: 14px; padding-right: 14px; }
@@ -2349,3 +2349,15 @@ body.ui-simple .table-row .type-badge { min-width: 32px; height: 19px; font-size
 .content-warning-check { padding: 10px 12px; border: 1px solid #f4b4ae; border-radius: 10px; background: #fff7f6; }
 .content-warning-check:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
 .content-index-dialog .modal-body { max-height: min(78vh, 720px); overflow-y: auto; }
+
+/* Drag handle on the sidebar's right edge. */
+.sidebar-resizer { flex: 0 0 7px; margin: 0 -4px 0 -3px; z-index: 5; cursor: col-resize; position: relative; }
+.sidebar-resizer::after { content: ''; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background .12s; }
+.sidebar-resizer:hover::after, .workspace-sidebar.is-resizing + .sidebar-resizer::after { background: var(--accent); width: 2px; }
+.workspace-sidebar.is-resizing { transition: none; }
+.workspace-sidebar.is-collapsed + .sidebar-resizer,
+body.ui-simple .sidebar-resizer { display: none; }
+@media (max-width: 720px) { .sidebar-resizer { display: none; } }
+
+/* Last line of the result list: how many of the matches are shown. */
+.results-more { padding: 12px 16px 18px; color: var(--text-dim); font-size: 12px; text-align: center; }

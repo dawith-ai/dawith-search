@@ -904,16 +904,61 @@ fn mac_spotlight_expression(query: &str) -> String {
     }
 }
 
-fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<Value>, String> {
+/// Same order as the Windows/Linux index: exact name, then starts with the
+/// first word, then word start, then anywhere; newest first within a rank.
+/// A clicked column (`sortBy`) overrides it.
+fn name_rank(name: &str, terms: &[String]) -> u8 {
+    let lower = name.to_lowercase();
+    let whole = terms.join(" ").to_lowercase();
+    let stem = lower.rsplit_once('.').map(|(stem, _)| stem).filter(|stem| !stem.is_empty()).unwrap_or(&lower);
+    if !whole.is_empty() && (lower == whole || stem == whole) {
+        return 0;
+    }
+    let Some(first) = terms.first().map(|term| term.to_lowercase()) else { return 3 };
+    match lower.find(&first) {
+        Some(0) => 1,
+        Some(byte) => match lower[..byte].chars().last() {
+            Some(c) if !c.is_alphanumeric() => 2,
+            _ => 3,
+        },
+        None => 3,
+    }
+}
+
+fn sort_records(records: &mut [Value], query: &str, sort_by: Option<&str>, descending: bool) {
+    let terms = query_terms(query);
+    let text = |record: &Value, key: &str| record.get(key).and_then(Value::as_str).unwrap_or("").to_lowercase();
+    let number = |record: &Value, key: &str| record.get(key).and_then(Value::as_u64).unwrap_or(0);
+    records.sort_by(|a, b| {
+        let ordering = match sort_by.unwrap_or("") {
+            "name" => text(a, "name").cmp(&text(b, "name")),
+            "path" => text(a, "path").cmp(&text(b, "path")).then_with(|| text(a, "name").cmp(&text(b, "name"))),
+            "size" => number(a, "size").cmp(&number(b, "size")),
+            "mtime" => number(a, "mtime").cmp(&number(b, "mtime")),
+            "ext" => text(a, "ext").cmp(&text(b, "ext")).then_with(|| text(a, "name").cmp(&text(b, "name"))),
+            _ => {
+                let rank = |record: &Value| name_rank(record.get("name").and_then(Value::as_str).unwrap_or(""), &terms);
+                return rank(a).cmp(&rank(b)).then_with(|| number(b, "mtime").cmp(&number(a, "mtime"))).then_with(|| text(a, "name").cmp(&text(b, "name")));
+            }
+        };
+        if descending { ordering.reverse() } else { ordering }
+    });
+}
+
+/// Spotlight (macOS) returns matches in its own order. Read up to
+/// SPOTLIGHT_MAX of them, order them like the index and report the real
+/// total, so ranking and "load more" behave as on Windows.
+const SPOTLIGHT_MAX: usize = 5000;
+
+fn search_spotlight(query: &str, roots: &[PathBuf], options: &Value, limit: usize) -> Result<(Vec<Value>, usize), String> {
     if query.trim().is_empty() {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), 0));
     }
     let expression = mac_spotlight_expression(query);
-    let mut records = Vec::new();
+    let mut paths: Vec<String> = Vec::new();
+    let mut seen = HashSet::new();
+    let mut total = 0usize;
     for root in roots {
-        if records.len() >= limit {
-            break;
-        }
         let output = hidden_command(SPOTLIGHT_COMMAND)
             .arg("-onlyin")
             .arg(root)
@@ -929,16 +974,22 @@ fn search_spotlight(query: &str, roots: &[PathBuf], limit: usize) -> Result<Vec<
             });
         }
         for path in String::from_utf8_lossy(&output.stdout).lines() {
-            if records.len() >= limit {
-                break;
+            let path = path.trim();
+            if path.is_empty() || !seen.insert(path.to_string()) {
+                continue;
             }
-            let candidate = PathBuf::from(path.trim());
-            if let Some(record) = path_record(&candidate) {
-                records.push(record);
+            total += 1;
+            if paths.len() < SPOTLIGHT_MAX {
+                paths.push(path.to_string());
             }
         }
     }
-    Ok(records)
+    let mut records: Vec<Value> = paths.iter().filter_map(|path| path_record(Path::new(path))).collect();
+    let sort_by = options.get("sortBy").and_then(Value::as_str);
+    let descending = options.get("sortOrder").and_then(Value::as_str) == Some("desc");
+    sort_records(&mut records, query, sort_by, descending);
+    records.truncate(limit);
+    Ok((records, total))
 }
 
 // Older installers bundled `../bin/native/**` under `_up_/bin/native`, so
@@ -1550,10 +1601,8 @@ async fn search(app: AppHandle, state: State<'_, AppState>, query: String, optio
         }
     }
     if cfg!(target_os = "macos") {
-        let results = search_spotlight(&normalized_query, &roots, limit)?;
-        let mut results = results;
+        let (mut results, total_matches) = search_spotlight(&normalized_query, &roots, &options, limit)?;
         hydrate_records(&mut results, &metadata);
-        let total_matches = results.len();
         return Ok(json!({
             "results": results,
             "totalMatches": total_matches,
@@ -2315,6 +2364,11 @@ fn open_folder_blocking(path: PathBuf, config: Value) -> Result<Value, String> {
         Command::new("explorer.exe").raw_arg(argument).spawn().map_err(|error| error.to_string())?;
         return Ok(json!({ "success": true }));
     }
+    // macOS: reveal the file in Finder with it selected.
+    if cfg!(target_os = "macos") && !path.is_dir() {
+        Command::new("open").arg("-R").arg(&path).spawn().map_err(|error| error.to_string())?;
+        return Ok(json!({ "success": true }));
+    }
     let folder = if path.is_dir() { path } else { path.parent().unwrap_or(Path::new(".")).to_path_buf() };
     run_open(&folder)?;
     Ok(json!({ "success": true }))
@@ -2671,6 +2725,30 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn spotlight_results_follow_index_order() {
+        let record = |name: &str, mtime: u64, size: u64| json!({ "name": name, "path": "/Users/me/Docs", "mtime": mtime, "size": size, "ext": name.rsplit('.').next().unwrap_or("") });
+        let mut records = vec![
+            record("프로젝트잘잇.txt", 999, 1),
+            record("회의 잘잇.hwp", 900, 2),
+            record("잘잇수다", 100, 3),
+            record("잘잇.pdf", 50, 4),
+            record("잘잇수다", 300, 5),
+        ];
+        sort_records(&mut records, "잘잇", None, false);
+        let order: Vec<(String, u64)> = records.iter().map(|r| (r["name"].as_str().unwrap().to_string(), r["mtime"].as_u64().unwrap())).collect();
+        assert_eq!(order, vec![
+            ("잘잇.pdf".to_string(), 50),
+            ("잘잇수다".to_string(), 300),
+            ("잘잇수다".to_string(), 100),
+            ("회의 잘잇.hwp".to_string(), 900),
+            ("프로젝트잘잇.txt".to_string(), 999),
+        ]);
+        // A clicked column wins over relevance.
+        sort_records(&mut records, "잘잇", Some("size"), true);
+        assert_eq!(records[0]["size"], 5);
+    }
 
     #[test]
     fn spotlight_name_query_uses_case_and_diacritic_insensitive_substring_match() {

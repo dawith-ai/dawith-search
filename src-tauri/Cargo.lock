@@ -768,7 +768,7 @@ dependencies = [
 
 [[package]]
 name = "dawith-search"
-version = "1.3.25"
+version = "1.3.26"
 dependencies = [
  "cfb 0.12.1",
  "encoding_rs",

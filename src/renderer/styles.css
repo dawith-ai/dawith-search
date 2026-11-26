@@ -1060,13 +1060,15 @@ body.dark-theme .search-target-summary.is-scoped {
   --col-size-w: 90px;
   --col-mtime-w: 140px;
   --col-ext-w: 70px;
-  /* Columns that don't fit scroll sideways, header and rows together. */
-  overflow-x: auto;
-  overflow-y: hidden;
 }
-.results-container > .table-header,
-.results-container > .table-body { min-width: var(--table-min-w, 0); }
-body.ui-simple .results-container > .table-body { min-width: 0; }
+/* Columns that don't fit scroll sideways inside the list, so the list's
+   vertical scrollbar always stays at the right edge of the window. The
+   header follows the list's horizontal scroll (see app.js). */
+.results-container > .table-header { overflow: hidden; }
+.results-container > .table-body { overflow: auto; }
+.table-body > .table-row,
+.table-body > .results-more { min-width: var(--table-min-w, 0); }
+body.ui-simple .table-body > .table-row { min-width: 0; }
 /* Every column keeps its user-draggable width; path also takes spare space. */
 .col-name { flex: 0 0 var(--col-name-w); min-width: 0; }
 .col-path { flex: 1 0 var(--col-path-w); min-width: 0; }

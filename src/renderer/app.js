@@ -967,6 +967,9 @@ function loadMoreResultsIfNeeded() {
 }
 
 tableBody.addEventListener('scroll', loadMoreResultsIfNeeded, { passive: true });
+// The list scrolls sideways itself; keep the column header in step with it.
+const resultsHeader = document.querySelector('.table-header');
+tableBody.addEventListener('scroll', () => { resultsHeader.scrollLeft = tableBody.scrollLeft; }, { passive: true });
 
 // Render Results Table
 function renderResults(items, currentQuery, { renderAll = false } = {}) {

@@ -16,9 +16,9 @@ permissions:
 jobs:
   macos:
     name: Build and upload macOS DMG
-    # macos-15 can remain queued when the public runner pool is saturated;
-    # macos-14 provides the same universal-build toolchain with better availability.
-    runs-on: macos-14
+    # GitHub no longer accepts macos-14 ("configuration not supported"), so
+    # every release job was cancelled at once. Use the current image.
+    runs-on: macos-latest
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
